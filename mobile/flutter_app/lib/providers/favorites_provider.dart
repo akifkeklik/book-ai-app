@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/book_model.dart';
 import '../services/supabase_service.dart';
@@ -8,6 +9,7 @@ class FavoritesProvider extends ChangeNotifier {
   List<FavoriteBook> _favorites = [];
   bool _isLoading = false;
   String? _error;
+  StreamSubscription<List<Map<String, dynamic>>>? _favoritesSub;
 
   List<FavoriteBook> get favorites => _favorites;
   bool get isLoading => _isLoading;
@@ -23,19 +25,40 @@ class FavoritesProvider extends ChangeNotifier {
     _isLoading = true;
     _error = null;
     notifyListeners();
+    
+    _favoritesSub?.cancel();
     try {
-      _favorites = await _svc.getFavorites(userId);
+      _favoritesSub = _svc.client
+          .from('favorites')
+          .stream(primaryKey: ['id'])
+          .eq('user_id', userId)
+          .order('added_at', ascending: false)
+          .listen((data) {
+        _favorites = data.map((j) => FavoriteBook.fromJson(j)).toList();
+        _isLoading = false;
+        notifyListeners();
+      }, onError: (e) {
+        _error = 'Favoriler gerçek zamanlı güncellenemedi: $e';
+        _isLoading = false;
+        notifyListeners();
+      });
     } catch (e) {
-      _error = 'Failed to load favorites.';
-    } finally {
+      _error = 'Failed to load favorites: $e';
       _isLoading = false;
       notifyListeners();
     }
   }
 
   void clearFavorites() {
+    _favoritesSub?.cancel();
     _favorites = [];
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _favoritesSub?.cancel();
+    super.dispose();
   }
 
   // ── Add / Remove ───────────────────────────────────────────────────────────
@@ -45,18 +68,24 @@ class FavoritesProvider extends ChangeNotifier {
     required Book book,
   }) async {
     if (isFavorite(book.isbn13)) {
-      await _removeFavorite(userId: userId, isbn13: book.isbn13);
+      await _removeFavorite(userId: userId, bookId: book.isbn13);
     } else {
       await _addFavorite(userId: userId, book: book);
     }
   }
 
-  /// Convenience method for screens that only have an isbn13 (e.g. favorites list).
+  Future<void> removeFavoriteByBookId({
+    required String userId,
+    required String bookId,
+  }) async {
+    await _removeFavorite(userId: userId, bookId: bookId);
+  }
+
   Future<void> removeFavoriteByIsbn({
     required String userId,
     required String isbn13,
   }) async {
-    await _removeFavorite(userId: userId, isbn13: isbn13);
+    await _removeFavorite(userId: userId, bookId: isbn13);
   }
 
   Future<void> _addFavorite({required String userId, required Book book}) async {
@@ -75,9 +104,10 @@ class FavoritesProvider extends ChangeNotifier {
     try {
       await _svc.addFavorite(
         userId: userId,
-        isbn13: book.isbn13,
-        bookTitle: book.title,
-        thumbnail: book.thumbnail,
+        bookId: book.isbn13,
+        title: book.title,
+        author: book.author,
+        imageUrl: book.thumbnail,
       );
       // Reload to get real ID
       await loadFavorites(userId);
@@ -91,24 +121,26 @@ class FavoritesProvider extends ChangeNotifier {
 
   Future<void> _removeFavorite({
     required String userId,
-    required String isbn13,
+    required String bookId,
   }) async {
-    final removed = _favorites.firstWhere((f) => f.isbn13 == isbn13,
-        orElse: () => FavoriteBook(
-              id: '',
-              userId: userId,
-              isbn13: isbn13,
-              bookTitle: '',
-              thumbnail: '',
-              addedAt: DateTime.now(),
-            ));
+    final removed = _favorites.firstWhere(
+      (f) => f.isbn13 == bookId,
+      orElse: () => FavoriteBook(
+        id: '',
+        userId: userId,
+        isbn13: bookId,
+        bookTitle: '',
+        thumbnail: '',
+        addedAt: DateTime.now(),
+      ),
+    );
 
     // Optimistic removal
-    _favorites.removeWhere((f) => f.isbn13 == isbn13);
+    _favorites.removeWhere((f) => f.isbn13 == bookId);
     notifyListeners();
 
     try {
-      await _svc.removeFavorite(userId: userId, isbn13: isbn13);
+      await _svc.removeFavorite(userId, bookId);
     } catch (e) {
       // Rollback
       _favorites.insert(0, removed);

@@ -1,0 +1,25 @@
+# 🐳 Libris Ecosystem: Unified Orchestration
+# Purpose: Single command development and deployment.
+
+services:
+  # ── Backend AI Engine (Python/Flask) ───────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: libris_backend
+    restart: always
+    ports:
+      - "5000:5000"
+    env_file:
+      # Local development: create a root `.env` (see `.env.example`)
+      - ./.env
+    volumes:
+      - ./backend:/app # Hot-reload during development
+      - /app/venv      # Anonymous volume for dependencies
+    networks:
+      - libris_net
+
+networks:
+  libris_net:
+    driver: bridge
