@@ -4,10 +4,11 @@
 name: Libris Engineering Excellence
 
 on:
-  push:
-    branches: [ main, develop ]
+  # push:
+  #   branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:
   # ── 🛡️ Backend CI (Python/Flask) ───────────────────────────────────────────
