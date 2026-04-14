@@ -1,191 +1,98 @@
-# BookAI
+# 📚 Libris: The Sovereign of Digital Epics
 
-> **Goodreads meets machine learning** — an AI-powered book recommendation mobile app built with Flask, TF-IDF, Flutter, and Supabase.
+[![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
+[![AI Powered](https://img.shields.io/badge/AI-Powered-FF6F61?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com)
 
----
-
-## Architecture
-
-```
-Flutter App
-  ├── Provider state management
-  ├── Dio → Flask API (books, search, recommendations)
-  └── Supabase SDK (auth, favorites, activity)
-
-Flask Backend
-  ├── TF-IDF + Cosine Similarity engine
-  ├── Hybrid scoring (content + popularity)
-  ├── Google Books API (cover enrichment)
-  └── books.csv → tfidf.pkl (auto-trained on startup)
-
-Supabase (cloud)
-  ├── Auth (email/password)
-  ├── favorites table
-  └── user_activity table
-```
+**Libris** is not just a book app; it is a premium, AI-driven gateway to your next literary obsession. Built with a "Zero-Overflow" engineering philosophy and an Apple-inspired aesthetic, Libris combines the power of **RAG (Retrieval-Augmented Generation)** with a seamless mobile experience to help you discover books that truly resonate with your soul.
 
 ---
 
-## Features
+## ✨ Key Features
 
-| Feature | Status |
-|---------|--------|
-| TF-IDF content-based recommendations | Done |
-| Hybrid scoring (content + popularity) | Done |
-| Full-text book search | Done |
-| Google Books cover enrichment | Done |
-| OpenLibrary cover fallback | Done |
-| Email/password authentication | Done |
-| Favorites with Supabase RLS | Done |
-| Personalised home feed | Done |
-| Dark / light theme | Done |
-| Similarity score badges | Done |
-| Swipe-to-remove favorites | Done |
-| Activity tracking | Done |
+### 🧠 AI-Powered Discoverability
+- **RAG Architecture:** Real-time semantic analysis of over 6,000 titles to provide insights that go beyond simple metadata.
+- **Personalized Recommendations:** Onboarding that learns your reading rhythm, interests, and "vibe" to curate a unique library.
+- **AI Insights:** Quick, intelligent summaries and "Why you should read this" notes for every book.
 
----
+### 💎 Premium Experience (Elite UI)
+- **Zero-Overflow Design:** Surgically hardened layouts that adapt gracefully to any device size (iPhone Mini to iPad Pro).
+- **Apple-Inspired Aesthetic:** Glassmorphism, subtle micro-animations, and a sophisticated pastel-dark theme.
+- **Infinite Discovery:** High-performance infinite scroll through a massive catalog of world classics and modern masterpieces.
 
-## Quick Start
-
-### Backend
-
-```bash
-cd backend
-python -m venv venv && venv\Scripts\activate   # Windows
-pip install -r requirements.txt
-cp env.example .env                             # fill in keys
-python app.py
-```
-
-### Flutter
-
-```bash
-cd mobile/flutter_app
-flutter pub get
-# edit lib/config.dart with your backend URL + Supabase keys
-flutter run
-```
-
-Full instructions: [docs/setup.md](docs/setup.md)
+### 🌍 Global & Accessible
+- **Full Localization:** Native support for English and Turkish, switchable at runtime.
+- **Offline Resilience:** Advanced caching using Hive to ensure your library is always accessible.
+- **Smart Filters:** Filter by author, page count, or genre with a single tap.
 
 ---
 
-## API Reference
+## 🛠️ Technical Stack
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Liveness probe |
-| GET | `/api/books?page=1&per_page=20` | Paginated book list |
-| GET | `/api/books/popular?limit=20` | Popular books |
-| GET | `/api/books/<isbn>` | Single book by ISBN |
-| GET | `/api/search?q=tolkien` | Search by title/author/genre |
-| GET | `/api/recommend?book=Dune&top_n=10` | AI recommendations |
-| POST | `/api/track` | Log user activity |
+### Mobile (Flutter)
+- **State Management:** Provider (Senior-grade architectural separation).
+- **Database:** Supabase (Real-time sync) & Hive (Local cache).
+- **Navigation:** GoRouter (Modular routing).
+- **UI:** Custom "Libris Design System" built on Material 3 with premium styling.
 
----
-
-## Project Structure
-
-```
-book-ai-app/
-├── backend/
-│   ├── app.py              Flask factory
-│   ├── config.py           Env-driven settings
-│   ├── model/
-│   │   └── recommender.py  TF-IDF + cosine similarity engine
-│   ├── routes/routes.py    API endpoints
-│   ├── services/
-│   │   └── book_service.py Orchestration + Google Books
-│   ├── utils/preprocess.py Text cleaning + feature engineering
-│   ├── data/books.csv      80+ book dataset
-│   └── saved_model/        tfidf.pkl (auto-generated)
-│
-├── mobile/flutter_app/
-│   └── lib/
-│       ├── main.dart           App entry
-│       ├── config.dart         Constants
-│       ├── router.dart         GoRouter + auth guard
-│       ├── theme/app_theme.dart Dark/light theme
-│       ├── models/             Book, FavoriteBook
-│       ├── providers/          Auth, Book, Favorites
-│       ├── services/           ApiService, SupabaseService
-│       ├── screens/            7 screens
-│       └── widgets/            BookCard, ShimmerLoader
-│
-└── docs/
-    ├── setup.md
-    ├── supabase_setup.md
-    └── google_api_setup.md
-```
+### Backend (Python/Flask)
+- **AI Core:** RAG implementation for deep semantic searches.
+- **API:** Fast, scalable endpoints for recommendation generation.
+- **Integration:** Seamless bridge between Supabase data and AI models.
 
 ---
 
-## ML Recommendation Engine
+## 🚀 Getting Started
 
-```
-Input: book title
-  ↓
-TfidfVectorizer (max_features=10k, ngram_range=(1,2), sublinear_tf)
-  applied to: title×3 + categories×2 + authors + description
-  ↓
-cosine_similarity(query_vector, all_book_vectors)
-  ↓
-Hybrid scoring:
-  0.60 × content_similarity
-  0.25 × log_normalised(ratings_count)
-  0.15 × normalised(average_rating)
-  ↓
-Top-10 results with similarity_score badge
-```
+### Prerequisites
+- Flutter SDK (3.16+)
+- Python 3.9+
+- Supabase Project
 
----
+### Installation
 
-## Deployment
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/akifkeklik/book-ai-app.git
+   cd book-ai-app
+   ```
 
-### Flask on Render
+2. **Frontend Setup:**
+   ```bash
+   cd mobile/flutter_app
+   flutter pub get
+   flutter run
+   ```
 
-1. Push `backend/` to a GitHub repo
-2. Render Dashboard → **New Web Service**
-3. Connect repo, set **Root Directory** to `backend`
-4. Build command: `pip install -r requirements.txt`
-5. Start command: `gunicorn app:app --bind 0.0.0.0:$PORT`
-6. Add environment variables in **Environment** tab
-7. Deploy
-
-### Flask on Railway
-
-```bash
-npm install -g @railway/cli
-railway login
-cd backend
-railway init
-railway up
-railway env set GOOGLE_BOOKS_API_KEY=your-key
-railway env set SECRET_KEY=your-secret
-```
-
-### Flutter (Android APK)
-
-```bash
-cd mobile/flutter_app
-# Update lib/config.dart with your deployed backend URL
-flutter build apk --release
-# APK at: build/app/outputs/flutter-apk/app-release.apk
-```
+3. **Backend Setup:**
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   python app.py
+   ```
 
 ---
 
-## Extending the Dataset
+## 🏗️ Architecture Detail
 
-The sample `books.csv` contains ~85 books. For a real production deployment:
-
-1. Download from Kaggle: **7k books dataset** (ISBN, title, authors, categories, description, ratings)
-2. Drop the file at `backend/data/books.csv`
-3. Delete `backend/saved_model/tfidf.pkl`
-4. Restart the server — model retrains automatically
+Libris follows a **Clean Architecture** pattern:
+- **Presentation Layer:** Highly responsive Flutter widgets and Providers.
+- **Domain Layer:** Business logic for recommendation matching.
+- **Data Layer:** Supabase services with robust error handling and localized fallback mechanisms.
 
 ---
 
-## License
+## 🛡️ Engineering Excellence (Zero-Overflow Phase)
+We recently completed a surgical strike on UI stability:
+- ✅ **Dynamic Constraints:** Replaced all fixed-dimension containers with `Flexible` and `Expanded` wrappers.
+- ✅ **Empty State Management:** Integrated `LibrisEmptyState` and `ErrorView` to ensure the UI never feels broken, even without a connection.
+- ✅ **Title Resilience:** Implemented multi-line text guards to prevent layout breakage from long book titles.
 
-MIT
+---
+
+## 🎨 UI Showcase
+
+> Use the **System Theme** to experience the adaptive glassmorphism effects in both Light and Dark modes.
+
+---

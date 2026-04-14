@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../models/book_model.dart';
-import '../providers/book_provider.dart';
+import '../services/api_service.dart';
 import '../widgets/book_card.dart';
 import '../widgets/shimmer_loader.dart';
 
@@ -31,8 +30,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
       _error = null;
     });
     try {
-      final recs = await context
-          .read<BookProvider>()
+      final recs = await ApiService.instance
           .getRecommendations(widget.bookTitle);
       if (mounted) setState(() => _recommendations = recs);
     } catch (e) {
@@ -72,11 +70,11 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     if (_loading) {
       return GridView.builder(
         padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 200,
           childAspectRatio: 0.55,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 24,
         ),
         itemCount: 8,
         itemBuilder: (_, __) => const ShimmerBookCard(),
@@ -145,11 +143,11 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
         Expanded(
           child: GridView.builder(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 200,
               childAspectRatio: 0.55,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 24,
             ),
             itemCount: _recommendations.length,
             itemBuilder: (_, i) {
@@ -169,11 +167,11 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '${(book.similarityScore! * 100).round()}%',
+                          '%${(book.similarityScore! * 100).round()}',
                           style: const TextStyle(
                               fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black),
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white),
                         ),
                       ),
                     ),

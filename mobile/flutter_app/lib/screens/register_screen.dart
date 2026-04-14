@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
+import '../providers/language_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -58,7 +59,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       size: 80,
                       color: Theme.of(context).colorScheme.primary),
                   const SizedBox(height: 20),
-                  Text('Account Created!',
+                  Text(context.tr('register_title'),
                       style: Theme.of(context).textTheme.headlineLarge),
                   const SizedBox(height: 12),
                   Text(
@@ -72,7 +73,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 32),
                   ElevatedButton(
                     onPressed: () => context.go('/login'),
-                    child: const Text('Go to Sign In'),
+                    child: Text(context.tr('sign_in_hint')),
                   ),
                 ],
               ),
@@ -83,7 +84,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Account')),
+      appBar: AppBar(title: Text(context.tr('register_title'))),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -100,12 +101,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
                 Center(
-                  child: Text('Join BookAI',
+                  child: Text(context.tr('app_name'),
                       style: Theme.of(context).textTheme.headlineLarge),
                 ),
                 Center(
                   child: Text(
-                    'Discover your next favourite book',
+                    context.tr('register_subtitle'),
                     style: Theme.of(context)
                         .textTheme
                         .bodyMedium
@@ -125,14 +126,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
+                  decoration: InputDecoration(
+                    labelText: context.tr('email'),
+                    prefixIcon: const Icon(Icons.email_outlined),
                   ),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Email is required';
+                    if (v == null || v.isEmpty) return context.tr('email_required');
                     if (!v.contains('@') || !v.contains('.')) {
-                      return 'Enter a valid email';
+                      return context.tr('error');
                     }
                     return null;
                   },
@@ -145,7 +146,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   obscureText: _obscurePass,
                   textInputAction: TextInputAction.next,
                   decoration: InputDecoration(
-                    labelText: 'Password',
+                    labelText: context.tr('password'),
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(_obscurePass
@@ -156,11 +157,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Password is required';
-                    if (v.length < 8) return 'At least 8 characters';
-                    if (!v.contains(RegExp(r'[0-9]'))) {
-                      return 'Include at least one number';
-                    }
+                    if (v == null || v.isEmpty) return context.tr('password_required');
+                    if (v.length < 6) return context.tr('password_too_short');
                     return null;
                   },
                 ),
@@ -173,7 +171,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _submit(),
                   decoration: InputDecoration(
-                    labelText: 'Confirm Password',
+                    labelText: context.tr('password'),
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(_obscureConfirm
@@ -184,28 +182,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   validator: (v) {
-                    if (v != _passCtrl.text) return 'Passwords do not match';
+                    if (v != _passCtrl.text) return context.tr('error');
                     return null;
                   },
                 ),
                 const SizedBox(height: 32),
 
-                // Submit
                 auth.isLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : ElevatedButton(
-                        onPressed: _submit,
-                        child: const Text('Create Account'),
+                    : SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _submit,
+                          child: Text(context.tr('sign_up')),
+                        ),
                       ),
 
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Already have an account? '),
+                    Text(context.tr('already_have_account')),
                     TextButton(
                       onPressed: () => context.go('/login'),
-                      child: const Text('Sign In'),
+                      child: Text(context.tr('sign_in_hint')),
                     ),
                   ],
                 ),

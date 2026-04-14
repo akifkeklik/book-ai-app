@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/book_provider.dart';
+import '../providers/language_provider.dart';
 import '../widgets/book_card.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/shimmer_loader.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -43,7 +45,7 @@ class _SearchScreenState extends State<SearchScreen> {
           autofocus: true,
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
-            hintText: 'Search books, authors, genres…',
+            hintText: context.tr('search_placeholder'),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
@@ -67,18 +69,131 @@ class _SearchScreenState extends State<SearchScreen> {
             }
           },
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.tune_outlined),
+            onPressed: () => _showFilterSheet(context),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: _buildBody(bookProv),
+    );
+  }
+
+  void _showFilterSheet(BuildContext context) {
+    final bookProv = context.read<BookProvider>();
+    String tempAuthor = bookProv.filterAuthor;
+    int tempRange = bookProv.filterPageRange; // 0: All, 1: <300, 2: 300-500, 3: >500
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(sheetCtx).viewInsets.bottom,
+                left: 24, right: 24, top: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(context.tr('filters'), style: Theme.of(sheetCtx).textTheme.headlineSmall),
+                      TextButton(
+                        onPressed: () {
+                          setSheetState(() {
+                            tempAuthor = '';
+                            tempRange = 0;
+                          });
+                        },
+                        child: Text(context.tr('reset')),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Author TextField
+                  Text(context.tr('author_name'), style: Theme.of(sheetCtx).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    initialValue: tempAuthor,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. İlber Ortaylı',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    onChanged: (val) => tempAuthor = val,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Page Count Chips
+                  Text(context.tr('page_count'), style: Theme.of(sheetCtx).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ChoiceChip(
+                        label: Text(context.tr('all')),
+                        selected: tempRange == 0,
+                        onSelected: (val) => setSheetState(() => tempRange = 0),
+                      ),
+                      ChoiceChip(
+                        label: Text(context.tr('pages_less_than_300')),
+                        selected: tempRange == 1,
+                        onSelected: (val) => setSheetState(() => tempRange = 1),
+                      ),
+                      ChoiceChip(
+                        label: Text(context.tr('pages_300_500')),
+                        selected: tempRange == 2,
+                        onSelected: (val) => setSheetState(() => tempRange = 2),
+                      ),
+                      ChoiceChip(
+                        label: Text(context.tr('pages_more_than_500')),
+                        selected: tempRange == 3,
+                        onSelected: (val) => setSheetState(() => tempRange = 3),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Apply Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        bookProv.setFilters(author: tempAuthor, pageRange: tempRange);
+                        Navigator.pop(sheetCtx);
+                      },
+                      child: Text(context.tr('apply_filters')),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
   Widget _buildBody(BookProvider bookProv) {
     switch (bookProv.searchStatus) {
       case BookStatus.initial:
-        return _EmptyState(
+        return LibrisEmptyState(
           icon: Icons.search_outlined,
-          title: 'Discover Books',
-          subtitle: 'Search by title, author, or genre',
+          title: context.tr('search_empty_title'),
+          message: context.tr('search_empty_message'),
         );
 
       case BookStatus.loading:
@@ -92,10 +207,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
       case BookStatus.loaded:
         if (bookProv.searchResults.isEmpty) {
-          return _EmptyState(
+          return const LibrisEmptyState(
             icon: Icons.sentiment_dissatisfied_outlined,
             title: 'No results',
-            subtitle: 'Try a different keyword',
+            message: 'Try a different keyword',
           );
         }
         return ListView.builder(
@@ -107,36 +222,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-  final IconData icon;
-  final String title;
-  final String subtitle;
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 72, color: Colors.grey.shade600),
-          const SizedBox(height: 16),
-          Text(title, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(subtitle,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: Colors.grey)),
-        ],
-      ),
-    );
-  }
-}
 
 class _ErrorState extends StatelessWidget {
   const _ErrorState({required this.message, required this.onRetry});

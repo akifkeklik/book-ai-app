@@ -100,16 +100,17 @@ flutter pub get
 ```
 
 ### 3.2 Configure endpoints
+This app reads config from `--dart-define` (recommended) so secrets are not hard-coded.
 
-Open `lib/config.dart` and update:
+Examples:
 
-```dart
-static const String backendUrl = 'http://10.0.2.2:5000';  // Android emulator
-// or
-static const String backendUrl = 'http://localhost:5000';   // iOS simulator
-
-static const String supabaseUrl = 'https://YOUR_PROJECT.supabase.co';
-static const String supabaseAnonKey = 'YOUR_ANON_KEY';
+```bash
+# Android emulator
+flutter run \
+  --dart-define=BACKEND_URL=http://10.0.2.2:5000 \
+  --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=YOUR_ANON_KEY \
+  --dart-define=LIBRIS_API_KEY=YOUR_BACKEND_API_KEY
 ```
 
 > **Android physical device**: use your machine's local IP, e.g. `http://192.168.1.x:5000`

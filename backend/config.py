@@ -13,7 +13,10 @@ class Config:
     # ── General ──────────────────────────────────────────────────────────────
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
     TESTING: bool = os.getenv("TESTING", "False").lower() == "true"
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret-change-in-production")
+    # ── Security ─────────────────────────────────────────────────────────────
+    # In production these must be set via environment variables.
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "")
+    LIBRIS_API_KEY: str = os.getenv("LIBRIS_API_KEY", "")
 
     # ── Paths ─────────────────────────────────────────────────────────────────
     BASE_DIR: str = os.path.dirname(os.path.abspath(__file__))

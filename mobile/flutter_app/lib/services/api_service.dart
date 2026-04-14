@@ -8,18 +8,19 @@ class ApiService {
 
   late final Dio _dio;
 
-  // Call once from main() or lazily on first use
   void init() {
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.backendUrl,
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 30),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Key': AppConfig.librisApiKey,
+        },
       ),
     );
 
-    // Request / response logger in debug mode
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
@@ -38,7 +39,8 @@ class ApiService {
 
   // ── Books ──────────────────────────────────────────────────────────────────
 
-  Future<List<Book>> getPopularBooks({int limit = 20}) async {
+  Future<List<Book>> getPopularBooks({int limit = 2000}) async {
+    // Senior Update: Increased default limit to 2000
     final resp = await _dio.get(
       AppConfig.apiPopular,
       queryParameters: {'limit': limit},
@@ -47,7 +49,8 @@ class ApiService {
     return list.map((j) => Book.fromJson(j as Map<String, dynamic>)).toList();
   }
 
-  Future<Map<String, dynamic>> getAllBooks({int page = 1, int perPage = 20}) async {
+  Future<Map<String, dynamic>> getAllBooks({int page = 1, int perPage = 100}) async {
+    // Senior Update: Increased perPage for faster discovery
     final resp = await _dio.get(
       AppConfig.apiBooks,
       queryParameters: {'page': page, 'per_page': perPage},
@@ -72,7 +75,8 @@ class ApiService {
 
   // ── Search ─────────────────────────────────────────────────────────────────
 
-  Future<List<Book>> searchBooks(String query, {int limit = 20}) async {
+  Future<List<Book>> searchBooks(String query, {int limit = 500}) async {
+    // Senior Update: Increased limit for searches
     final resp = await _dio.get(
       AppConfig.apiSearch,
       queryParameters: {'q': query, 'limit': limit},
@@ -83,10 +87,22 @@ class ApiService {
 
   // ── Recommendations ────────────────────────────────────────────────────────
 
-  Future<List<Book>> getRecommendations(String bookTitle, {int topN = 10}) async {
+  Future<List<Book>> getRecommendations(String bookTitle, {int topN = 20}) async {
     final resp = await _dio.get(
       AppConfig.apiRecommend,
       queryParameters: {'book': bookTitle, 'top_n': topN, 'hybrid': 'true'},
+    );
+    final List<dynamic> list = resp.data['recommendations'] as List;
+    return list.map((j) => Book.fromJson(j as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<Book>> getPersonalizedRecommendations({
+    required String userId,
+    int limit = 10,
+  }) async {
+    final resp = await _dio.get(
+      '/api/recommend/personalized',
+      queryParameters: {'user_id': userId, 'limit': limit},
     );
     final List<dynamic> list = resp.data['recommendations'] as List;
     return list.map((j) => Book.fromJson(j as Map<String, dynamic>)).toList();
@@ -105,7 +121,6 @@ class ApiService {
         data: {'user_id': userId, 'book_name': bookName, 'action': action},
       );
     } catch (_) {
-      // Non-critical — swallow silently
     }
   }
 }

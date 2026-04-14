@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../providers/favorites_provider.dart';
+import '../providers/language_provider.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -32,7 +33,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     if (!auth.isLoggedIn) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Saved Books')),
+        appBar: AppBar(title: Text(context.tr('saved'))),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
@@ -43,11 +44,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     size: 80,
                     color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
                 const SizedBox(height: 20),
-                Text('Your Reading List',
+                Text(context.tr('favorites_title'),
                     style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 10),
                 Text(
-                  'Sign in to save books and keep track of your reading list',
+                  context.tr('sign_in_subtitle'),
                   textAlign: TextAlign.center,
                   style: Theme.of(context)
                       .textTheme
@@ -57,12 +58,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 const SizedBox(height: 32),
                 ElevatedButton(
                   onPressed: () => context.push('/login'),
-                  child: const Text('Sign In'),
+                  child: Text(context.tr('sign_in_hint')),
                 ),
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: () => context.push('/register'),
-                  child: const Text('Create Account'),
+                  child: Text(context.tr('create_one')),
                 ),
               ],
             ),
@@ -73,7 +74,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Saved Books'),
+        title: Text(context.tr('saved')),
         actions: [
           if (favs.favorites.isNotEmpty)
             Padding(
@@ -122,11 +123,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       .primary
                       .withOpacity(0.5)),
               const SizedBox(height: 20),
-              Text('No saved books yet',
+              Text(context.tr('favorites_empty_title'),
                   style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 10),
               Text(
-                'Tap the bookmark icon on any book to save it here',
+                context.tr('favorites_empty_message'),
                 textAlign: TextAlign.center,
                 style: Theme.of(context)
                     .textTheme
@@ -137,7 +138,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               ElevatedButton.icon(
                 onPressed: () => context.go('/'),
                 icon: const Icon(Icons.explore_outlined),
-                label: const Text('Discover Books'),
+                label: Text(context.tr('explore')),
               ),
             ],
           ),
@@ -158,13 +159,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             alignment: Alignment.centerRight,
             padding: const EdgeInsets.only(right: 24),
             color: Colors.red.withOpacity(0.8),
-            child: const Column(
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.delete_outline, color: Colors.white),
                 SizedBox(height: 4),
-                Text('Remove',
-                    style: TextStyle(color: Colors.white, fontSize: 11)),
+                Text(context.tr('remove'),
+                    style: const TextStyle(color: Colors.white, fontSize: 11)),
               ],
             ),
           ),
@@ -172,16 +173,16 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             return await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('Remove Favorite'),
-                content: Text('Remove "${fav.bookTitle}" from favorites?'),
+                title: Text(context.tr('remove_favorite_title')),
+                content: Text(context.tr('remove_favorite_confirm', args: {'title': fav.bookTitle})),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Cancel')),
+                      child: Text(context.tr('cancel'))),
                   TextButton(
                       onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Remove',
-                          style: TextStyle(color: Colors.red))),
+                      child: Text(context.tr('remove'),
+                          style: const TextStyle(color: Colors.red))),
                 ],
               ),
             );
@@ -224,7 +225,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             subtitle: Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                'Saved ${_formatDate(fav.addedAt)}',
+                '${context.tr('saved')}: ${context.trRelativeDate(fav.addedAt)}',
                 style:
                     Theme.of(context).textTheme.bodySmall,
               ),
@@ -236,12 +237,5 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       },
     );
   }
-
-  String _formatDate(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inDays > 30) return '${dt.day}/${dt.month}/${dt.year}';
-    if (diff.inDays > 0) return '${diff.inDays}d ago';
-    if (diff.inHours > 0) return '${diff.inHours}h ago';
-    return 'just now';
-  }
 }
+
