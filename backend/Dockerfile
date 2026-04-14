@@ -35,5 +35,5 @@ ENV PORT=5000
 # Metadata
 EXPOSE 5000
 
-# High-performance server: Gunicorn with multiple workers
-CMD sh -c "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 4 --timeout 120 app:app"
+# High-performance server: Gunicorn with 1 worker to fit in Free Tier RAM (512MB)
+CMD sh -c "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --preload --timeout 120 app:app"
