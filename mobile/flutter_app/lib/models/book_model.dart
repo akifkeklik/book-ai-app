@@ -12,6 +12,7 @@ class Book {
   final String publishedDate;
   final int pageCount;
   final double? similarityScore;
+  final String? aiNote;
 
   const Book({
     required this.isbn13,
@@ -25,6 +26,7 @@ class Book {
     required this.publishedDate,
     required this.pageCount,
     this.similarityScore,
+    this.aiNote,
   });
 
   factory Book.fromJson(Map<String, dynamic> json) {
@@ -40,6 +42,7 @@ class Book {
       publishedDate: json['published_date']?.toString() ?? '',
       pageCount: (json['page_count'] as num?)?.toInt() ?? 0,
       similarityScore: (json['similarity_score'] as num?)?.toDouble(),
+      aiNote: json['ai_note']?.toString(),
     );
   }
 
@@ -55,7 +58,12 @@ class Book {
         'published_date': publishedDate,
         'page_count': pageCount,
         if (similarityScore != null) 'similarity_score': similarityScore,
+        if (aiNote != null) 'ai_note': aiNote,
       };
+
+  /// Aliases for database compatibility
+  String get author => authors;
+  String get genre => primaryCategory;
 
   /// Formatted authors list for display.
   String get authorsFormatted =>
@@ -69,9 +77,19 @@ class Book {
   List<String> get categoryList =>
       categories.split(RegExp(r'[|;,]')).map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
 
-  /// Cover URL with a fallback.
-  String get coverUrl =>
-      thumbnail.isNotEmpty ? thumbnail : 'https://via.placeholder.com/120x180.png?text=Book';
+  /// Cover URL with CORS fix (HTTPS override). Returns empty if none.
+  String get coverUrl {
+    if (thumbnail.isEmpty) return '';
+    // Web strict CORS blocks mixed-content (http on https), Google Books API returns http sometimes.
+    return thumbnail.replaceFirst('http://', 'https://');
+  }
+
+  /// OpenLibrary fallback based on ISBN
+  String get openLibraryCoverUrl {
+    if (isbn13.isEmpty) return '';
+    // Both ISBN-10 and ISBN-13 can be queried. default=false forces 404 if missing.
+    return 'https://covers.openlibrary.org/b/isbn/$isbn13-L.jpg?default=false';
+  }
 
   @override
   bool operator ==(Object other) =>

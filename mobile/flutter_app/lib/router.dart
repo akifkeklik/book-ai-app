@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 
+import 'models/book_model.dart';
 import 'providers/auth_provider.dart';
+import 'providers/language_provider.dart';
+import 'screens/categories_screen.dart';
+import 'screens/category_timeline_screen.dart';
 import 'screens/detail_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/recommendation_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/search_screen.dart';
+import 'screens/settings_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -19,46 +24,81 @@ class AppRouter {
       initialLocation: '/',
       refreshListenable: auth,
       redirect: (context, state) {
+        // Senior Logic: Wait for auth to settle!
+        if (auth.isLoading) {
+          return null; // Don't move while loading
+        }
+
         final loggedIn = auth.isLoggedIn;
-        final loggingIn = state.matchedLocation == '/login' ||
+        final isAuthRoute = state.matchedLocation == '/login' ||
             state.matchedLocation == '/register';
 
-        // Protect favorites
-        if (state.matchedLocation == '/favorites' && !loggedIn) {
+        // 1. If NOT logged in and NOT on an auth page, redirect to LOGIN (not register!)
+        if (!loggedIn && !isAuthRoute) {
           return '/login';
         }
-        // Don't send already-logged-in users to auth pages
-        if (loggingIn && loggedIn) return '/';
+
+        // 2. If logged in and trying to go to LOGIN/REGISTER, redirect to HOME
+        if (loggedIn && isAuthRoute) {
+          return '/';
+        }
+
         return null;
       },
       routes: [
-        // ── Shell with bottom navigation ─────────────────────────────────────
         ShellRoute(
           builder: (context, state, child) => _ScaffoldWithNav(child: child),
           routes: [
             GoRoute(
               path: '/',
-              pageBuilder: (context, state) =>
-                  const NoTransitionPage(child: HomeScreen()),
+              pageBuilder: (context, state) => CustomTransitionPage(
+                child: const HomeScreen(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+              ),
             ),
             GoRoute(
               path: '/search',
-              pageBuilder: (context, state) =>
-                  const NoTransitionPage(child: SearchScreen()),
+              pageBuilder: (context, state) => CustomTransitionPage(
+                child: const SearchScreen(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+              ),
+            ),
+            GoRoute(
+              path: '/categories',
+              pageBuilder: (context, state) => CustomTransitionPage(
+                child: const CategoriesScreen(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+              ),
             ),
             GoRoute(
               path: '/favorites',
-              pageBuilder: (context, state) =>
-                  const NoTransitionPage(child: FavoritesScreen()),
+              pageBuilder: (context, state) => CustomTransitionPage(
+                child: const FavoritesScreen(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+              ),
             ),
           ],
         ),
-
-        // ── Full-screen routes (no bottom nav) ───────────────────────────────
+        GoRoute(
+          path: '/onboarding',
+          builder: (context, state) => const OnboardingScreen(),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/category/:genre',
+          builder: (context, state) => CategoryTimelineScreen(
+            genre: state.pathParameters['genre']!,
+          ),
+        ),
         GoRoute(
           path: '/book/:isbn',
-          builder: (context, state) =>
-              DetailScreen(isbn: state.pathParameters['isbn']!),
+          builder: (context, state) => DetailScreen(
+            isbn: state.pathParameters['isbn']!,
+            initialBook: state.extra is Book ? state.extra as Book : null,
+          ),
         ),
         GoRoute(
           path: '/recommend/:title',
@@ -79,21 +119,16 @@ class AppRouter {
   }
 }
 
-// ── Bottom navigation shell ──────────────────────────────────────────────────
+// ── Sub-widgets ───────────────────────────────────────────────────────────────
 
 class _ScaffoldWithNav extends StatelessWidget {
   const _ScaffoldWithNav({required this.child});
   final Widget child;
 
-  static const _tabs = [
-    _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home', path: '/'),
-    _NavItem(icon: Icons.search_outlined, activeIcon: Icons.search, label: 'Search', path: '/search'),
-    _NavItem(icon: Icons.bookmark_outline, activeIcon: Icons.bookmark, label: 'Saved', path: '/favorites'),
-  ];
-
   int _indexFor(String location) {
-    if (location.startsWith('/search')) return 1;
-    if (location.startsWith('/favorites')) return 2;
+    if (location.startsWith('/categories')) return 1;
+    if (location.startsWith('/search')) return 2;
+    if (location.startsWith('/favorites')) return 3;
     return 0;
   }
 
@@ -104,30 +139,47 @@ class _ScaffoldWithNav extends StatelessWidget {
 
     return Scaffold(
       body: child,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: currentIndex,
-        onTap: (i) => context.go(_tabs[i].path),
-        items: _tabs
-            .map((t) => BottomNavigationBarItem(
-                  icon: Icon(t.icon),
-                  activeIcon: Icon(t.activeIcon),
-                  label: t.label,
-                ))
-            .toList(),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: currentIndex,
+        onDestinationSelected: (i) {
+          switch (i) {
+            case 0:
+              context.go('/');
+              break;
+            case 1:
+              context.go('/categories');
+              break;
+            case 2:
+              context.go('/search');
+              break;
+            case 3:
+              context.go('/favorites');
+              break;
+          }
+        },
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home),
+            label: context.tr('home'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.explore_outlined),
+            selectedIcon: const Icon(Icons.explore),
+            label: context.tr('categories'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.search_outlined),
+            selectedIcon: const Icon(Icons.search),
+            label: context.tr('search'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.bookmark_outline),
+            selectedIcon: const Icon(Icons.bookmark),
+            label: context.tr('saved'),
+          ),
+        ],
       ),
     );
   }
-}
-
-class _NavItem {
-  const _NavItem({
-    required this.icon,
-    required this.activeIcon,
-    required this.label,
-    required this.path,
-  });
-  final IconData icon;
-  final IconData activeIcon;
-  final String label;
-  final String path;
 }

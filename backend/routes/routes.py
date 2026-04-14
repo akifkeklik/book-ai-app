@@ -26,6 +26,15 @@ def health_check():
     return jsonify({"status": "healthy", "service": "book-ai-api"}), 200
 
 
+@books_bp.route("/categories", methods=["GET"])
+def get_categories():
+    try:
+        return jsonify({"categories": _svc.get_categories()}), 200
+    except Exception as exc:
+        logger.exception("GET /categories error")
+        return jsonify({"error": str(exc)}), 500
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Books
 # ─────────────────────────────────────────────────────────────────────────────
@@ -34,7 +43,8 @@ def health_check():
 def get_books():
     try:
         page = max(1, int(request.args.get("page", 1)))
-        per_page = min(max(1, int(request.args.get("per_page", 20))), 100)
+        # Keep server load bounded (and match test expectations)
+        per_page = min(max(1, int(request.args.get("per_page", 50))), 100)
         return jsonify(_svc.get_all_books(page=page, per_page=per_page)), 200
     except Exception as exc:
         logger.exception("GET /books error")
@@ -44,7 +54,8 @@ def get_books():
 @books_bp.route("/books/popular", methods=["GET"])
 def get_popular_books():
     try:
-        limit = min(max(1, int(request.args.get("limit", 20))), 50)
+        # Senior Update: Increased limit for "All Books" section
+        limit = min(max(1, int(request.args.get("limit", 50))), 5000)
         books = _svc.get_popular_books(limit=limit)
         return jsonify({"books": books, "total": len(books)}), 200
     except Exception as exc:
@@ -76,7 +87,7 @@ def search_books():
     if len(query) < 2:
         return jsonify({"error": "Query must be at least 2 characters"}), 400
     try:
-        limit = min(max(1, int(request.args.get("limit", 20))), 50)
+        limit = min(max(1, int(request.args.get("limit", 20))), 100)
         books = _svc.search_books(query=query, limit=limit)
         return jsonify({"books": books, "total": len(books), "query": query}), 200
     except Exception as exc:
@@ -94,7 +105,7 @@ def get_recommendations():
     if not book_title:
         return jsonify({"error": "Query parameter 'book' is required"}), 400
     try:
-        top_n = min(max(1, int(request.args.get("top_n", 10))), 20)
+        top_n = min(max(1, int(request.args.get("top_n", 10))), 50)
         use_hybrid = request.args.get("hybrid", "true").lower() != "false"
         recommendations = _svc.get_recommendations(
             book_title=book_title,
@@ -117,6 +128,24 @@ def get_recommendations():
         ), 200
     except Exception as exc:
         logger.exception("GET /recommend error")
+        return jsonify({"error": str(exc)}), 500
+
+
+@books_bp.route("/recommend/personalized", methods=["GET"])
+def get_personalized():
+    user_id = request.args.get("user_id", "").strip()
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    try:
+        limit = min(max(1, int(request.args.get("limit", 10))), 50)
+        recommendations = _svc.get_personalized_recommendations(user_id=user_id, limit=limit)
+        return jsonify({
+            "user_id": user_id,
+            "recommendations": recommendations,
+            "total": len(recommendations)
+        }), 200
+    except Exception as exc:
+        logger.exception("GET /recommend/personalized error")
         return jsonify({"error": str(exc)}), 500
 
 

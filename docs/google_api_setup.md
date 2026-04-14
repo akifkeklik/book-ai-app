@@ -42,7 +42,7 @@ The app works without it (falls back to OpenLibrary covers) but a key gives bett
 
 ## Step 5: Insert the Key
 
-### Flask backend (`.env`):
+### Backend (`.env` at project root):
 ```env
 GOOGLE_BOOKS_API_KEY=AIzaSy...YOUR_KEY_HERE
 ```

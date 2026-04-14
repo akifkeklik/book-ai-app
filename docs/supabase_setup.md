@@ -91,7 +91,7 @@ static const String supabaseUrl = 'https://YOUR_PROJECT_ID.supabase.co';
 static const String supabaseAnonKey = 'YOUR_ANON_PUBLIC_KEY';
 ```
 
-### Flask backend (`.env`):
+### Backend (`.env` at project root):
 ```env
 SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
 SUPABASE_ANON_KEY=YOUR_ANON_PUBLIC_KEY

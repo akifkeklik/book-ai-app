@@ -5,7 +5,7 @@ Flask factory application with CORS, error handlers, and blueprint registration.
 
 import logging
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import Config
@@ -25,10 +25,39 @@ def create_app(config_class=Config) -> Flask:
     app.config.from_object(config_class)
 
     # ── CORS ──────────────────────────────────────────────────────────────────
-    CORS(app, origins=config_class.ALLOWED_ORIGINS, supports_credentials=True)
+    # Allow Flutter Web / browsers to send our API key header.
+    CORS(
+        app,
+        origins=config_class.ALLOWED_ORIGINS,
+        supports_credentials=True,
+        allow_headers=["Content-Type", "X-Api-Key"],
+    )
 
     # ── Blueprints ────────────────────────────────────────────────────────────
     app.register_blueprint(books_bp, url_prefix="/api")
+
+    # ── Security Middleware ──────────────────────────────────────────────────
+    @app.before_request
+    def validate_api_key():
+        # Don't enforce API keys in unit/integration tests
+        if app.config.get("TESTING", False):
+            return None
+
+        # Allow root manifest and health checks without key potentially
+        if request.path == "/" or request.path == "/api/health":
+            return None
+        
+        if request.path.startswith("/api/"):
+            # Misconfiguration guard: never run "open" by accident
+            if not app.config.get("LIBRIS_API_KEY"):
+                logger.error("LIBRIS_API_KEY is not set. Refusing to serve protected endpoints.")
+                return jsonify({"error": "Server misconfigured"}), 503
+
+            api_key = request.headers.get("X-Api-Key")
+            if not api_key or api_key != app.config["LIBRIS_API_KEY"]:
+                logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
+                return jsonify({"error": "Unauthorized: Invalid or missing API Key"}), 401
+        return None
 
     # ── Global error handlers ─────────────────────────────────────────────────
     @app.errorhandler(404)

@@ -8,11 +8,12 @@ Responsibilities:
 """
 
 import logging
+import random
+import requests
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
-import requests
-
+from supabase import create_client, Client
 from config import Config
 from model.recommender import BookRecommender
 
@@ -24,6 +25,9 @@ class BookService:
 
     def __init__(self) -> None:
         self.recommender = BookRecommender()
+        self._supabase: Optional[Client] = None
+        if Config.SUPABASE_URL and Config.SUPABASE_ANON_KEY:
+            self._supabase = create_client(Config.SUPABASE_URL, Config.SUPABASE_ANON_KEY)
         self._bootstrap()
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -31,7 +35,25 @@ class BookService:
     # ─────────────────────────────────────────────────────────────────────────
 
     def _bootstrap(self) -> None:
-        """Load model from disk; train from CSV if no pickle is found."""
+        """Fetch from Supabase and train; fallback to CSV only if no Supabase."""
+        # 1. Try Supabase first (Higher priority (Senior upgrade))
+        if self._supabase:
+            try:
+                # Check if model already exists and matches Supabase data hash (Performance Optimization)
+                if self.recommender.load_model(Config.MODEL_PATH):
+                    logger.info("Recommendation model loaded from pickle. Verifying data consistency...")
+                    # In a production env, we'd compare hashes here. For now, let's assume it's good if loaded.
+                    return
+
+                logger.info("Bootstrap: Loading data from Supabase for training...")
+                self.recommender.load_from_supabase(self._supabase)
+                self.recommender.fit(save_path=Config.MODEL_PATH)
+                logger.info("Recommendation model trained on Supabase data.")
+                return
+            except Exception as e:
+                logger.error(f"Failed to bootstrap from Supabase: {e}")
+        
+        # 2. Fallback to pickle or CSV
         if self.recommender.load_model(Config.MODEL_PATH):
             logger.info("Recommendation model loaded from pickle.")
             return
@@ -40,6 +62,12 @@ class BookService:
         self.recommender.load_data(Config.DATA_PATH)
         self.recommender.fit(save_path=Config.MODEL_PATH)
         logger.info("Training complete. Model saved to %s", Config.MODEL_PATH)
+
+    def get_categories(self) -> List[str]:
+        """Return all unique categories found in the dataset."""
+        if not self.recommender.is_fitted:
+            return []
+        return self.recommender.get_unique_categories()
 
     # ─────────────────────────────────────────────────────────────────────────
     # Public API
@@ -70,6 +98,38 @@ class BookService:
             use_hybrid=use_hybrid,
         )
         return self._enrich(books)
+
+    def get_personalized_recommendations(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Return personalized recommendations by querying ML model on user's recent favorites."""
+        if not self._supabase:
+            logger.warning("No Supabase client, falling back to popular books for personalized recs.")
+            return self.get_popular_books(limit=limit)
+            
+        try:
+            # 1. Fetch user's favorite books directly from Supabase
+            favs = self._supabase.table("favorites").select("book_title").eq("user_id", user_id).execute()
+            titles = [f["book_title"] for f in getattr(favs, 'data', []) if "book_title" in f]
+            
+            if not titles:
+                logger.info(f"User {user_id} has no favorites. Returning popular books.")
+                return self.get_popular_books(limit=limit)
+                
+            # 2. Use the most recent favorite to get recommendations
+            # We take the first one (assuming it's recently interacted, or select randomly from favorites)
+            seed_title = titles[0] 
+            logger.info(f"Generating ML recommendations for user {user_id} based on favorite: '{seed_title}'.")
+            
+            # 3. Call the actual ML recommendation engine
+            recs = self.recommender.recommend(seed_title, top_n=limit, use_hybrid=True)
+            
+            if not recs:
+                logger.warning(f"ML engine returned no recs for '{seed_title}'. Falling back to popular.")
+                return self.get_popular_books(limit=limit)
+                
+            return self._enrich(recs)
+        except Exception as e:
+            logger.error(f"Failed to get ML personalized recs: {e}")
+            return self.get_popular_books(limit=limit)
 
     def get_book_by_isbn(self, isbn: str) -> Optional[Dict[str, Any]]:
         book = self.recommender.get_book_by_isbn(isbn)

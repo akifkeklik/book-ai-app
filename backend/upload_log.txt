@@ -1,0 +1,17 @@
+Başladı...
+CSV dosyası okunuyor...
+Toplam 6396 kayıt bulundu. Supabase'e yükleniyor...
+Yüklendi: 500 / 6396
+Yüklendi: 1000 / 6396
+Yüklendi: 1500 / 6396
+Yüklendi: 2000 / 6396
+Yüklendi: 2500 / 6396
+Yüklendi: 3000 / 6396
+Yüklendi: 3500 / 6396
+Yüklendi: 4000 / 6396
+Yüklendi: 4500 / 6396
+Yüklendi: 5000 / 6396
+Yüklendi: 5500 / 6396
+Yüklendi: 6000 / 6396
+Yüklendi: 6396 / 6396
+Yükleme başarıyla tamamlandı!
