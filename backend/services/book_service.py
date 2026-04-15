@@ -112,45 +112,47 @@ class BookService:
             return self.get_popular_books(limit=limit)
             
         try:
-            # 1. Fetch user's interactions
-            resp = self._supabase.table("user_interactions").select("*").eq("user_id", user_id).execute()
-            interactions = getattr(resp, 'data', [])
-            
-            likes = [i["book_id"] for i in interactions if i["interaction_type"] == "like"]
-            dislikes = [i["book_id"] for i in interactions if i["interaction_type"] == "dislike"]
-            
-            # Use favorites as additional likes
+            # 1. Get user interactions (Likes)
             fav_resp = self._supabase.table("favorites").select("book_id").eq("user_id", user_id).execute()
-            likes.extend([f["book_id"] for f in getattr(fav_resp, 'data', [])])
+            likes = [f["book_id"] for f in getattr(fav_resp, 'data', [])]
             likes = list(set(likes)) # dedupe
+            dislikes = [] # Initializing dislikes
 
+            seed_titles = []
+            if likes:
+                # Convert ISBNs to Titles for the engine
+                for bid in likes:
+                    idx = self.recommender.engine.find_index(bid)
+                    if idx is not None:
+                        seed_titles.append(self.recommender.engine.df.iloc[idx]["title"])
+
+            # 2. If no direct likes found, check Profile Genres
             if not seed_titles:
-                # Senior Solution: Fallback to Profile Genres if no book interactions exist
+                logger.info(f"User {user_id} has no book likes. Checking profile genres fallback.")
                 profile_resp = self._supabase.table("user_profiles").select("preferred_genres").eq("user_id", user_id).execute()
                 profile_data = getattr(profile_resp, 'data', [])
+                
                 if profile_data:
                     genres = profile_data[0].get("preferred_genres", [])
                     if genres:
                         logger.info(f"Using preferred genres as seed for {user_id}: {genres}")
-                        # Fetch top books in these genres
                         genre_recs = []
-                        for g in genres[:3]: # Take first 3 genres for variety
+                        for g in genres[:3]: # Variety
                             res = self.recommender.get_all_books(page=1, per_page=10, category=g)
                             genre_recs.extend(res.get("books", []))
                         
                         if genre_recs:
-                            # Dedupe and shuffle
                             unique_recs = {r['isbn13']: r for r in genre_recs}.values()
                             final_genre_recs = list(unique_recs)
                             random.shuffle(final_genre_recs)
                             return self._enrich(final_genre_recs[:limit])
 
-                logger.info(f"User {user_id} has no interactions or profile genres. Returning trending books.")
+                # 3. Final Fallback: Trending books
+                logger.info(f"User {user_id} has no profile info. Returning trending books.")
                 return self.get_popular_books(limit=limit)
 
+            # 4. If we have seeds, generate recommendations
             logger.info(f"Generating personalized recs for {user_id} with {len(seed_titles)} seeds.")
-            
-            # 3. Call Orchestrator
             recs = self.recommender.recommend(seed_titles, top_n=limit, use_diversity=True)
             
             # 4. Filter out dislikes (if not already handled by engine)
