@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../models/book_model.dart';
-import '../providers/language_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/book_provider.dart';
 import 'book_cover_fallback.dart';
 
 // ── Shared Multi-layer Fallback Cover ───────────────────────────────────────
@@ -45,7 +47,7 @@ class NetworkCoverWithFallback extends StatelessWidget {
             placeholder: (_, __) => Container(
               width: width,
               height: height,
-              color: Theme.of(context).colorScheme.surfaceVariant,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
             ),
           );
 
@@ -61,7 +63,7 @@ class NetworkCoverWithFallback extends StatelessWidget {
       placeholder: (_, __) => Container(
         width: width,
         height: height,
-        color: Theme.of(context).colorScheme.surfaceVariant,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
       ),
     );
   }
@@ -112,7 +114,7 @@ class BookCard extends StatelessWidget {
                     child: NetworkCoverWithFallback(
                         book: book, width: double.infinity, height: 195),
                   ),
-                  if (book.similarityScore != null && book.similarityScore! > 0)
+                  if (book.explanation != null)
                     Positioned(
                       top: 8,
                       right: 8,
@@ -128,16 +130,15 @@ class BookCard extends StatelessWidget {
                                 blurRadius: 4),
                           ],
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.auto_awesome,
+                            Icon(Icons.auto_awesome,
                                 size: 10, color: Colors.white),
-                            const SizedBox(width: 4),
+                            SizedBox(width: 4),
                             Text(
-                              context.tr(
-                                  'explore'), // or a new key like 'suggested'
-                              style: const TextStyle(
+                              "SİZİN İÇİN",
+                              style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
@@ -145,6 +146,22 @@ class BookCard extends StatelessWidget {
                             ),
                           ],
                         ),
+                      ),
+                    ),
+
+                  // Debug Visibility Tooltip (Top Left)
+                  if (book.finalScore != null)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.bug_report,
+                            size: 10, color: Colors.white70),
                       ),
                     ),
                 ],
@@ -191,7 +208,7 @@ class BookCard extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (book.aiNote != null)
+                        if (book.explanation != null)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 6),
                             child: Row(
@@ -201,8 +218,8 @@ class BookCard extends StatelessWidget {
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
-                                    book.aiNote!,
-                                    maxLines: 1,
+                                    book.explanation!,
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       fontSize: 8,
@@ -216,6 +233,15 @@ class BookCard extends StatelessWidget {
                             ),
                           ),
                         _RatingRow(rating: book.averageRating),
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: _InteractionButtons(book: book),
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -298,7 +324,7 @@ class BookListTile extends StatelessWidget {
                           ),
                     ),
                     const SizedBox(height: 8),
-                    if (book.aiNote != null) ...[
+                    if (book.explanation != null) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
@@ -314,7 +340,7 @@ class BookListTile extends StatelessWidget {
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
-                                book.aiNote!,
+                                book.explanation!,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -558,6 +584,113 @@ class _CategoryChip extends StatelessWidget {
             fontSize: 10,
             color: Theme.of(context).colorScheme.primary,
             fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+class _InteractionButtons extends StatelessWidget {
+  final Book book;
+  const _InteractionButtons({required this.book});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final bp = context.read<BookProvider>();
+    final auth = context.read<AuthProvider>();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          onPressed: () {
+            HapticFeedback.mediumImpact();
+            if (auth.currentUser != null) {
+              bp.submitFeedback(
+                userId: auth.currentUser!.id,
+                bookId: book.isbn13,
+                interaction: 'like',
+              );
+            }
+          },
+          icon: const Icon(Icons.thumb_up_alt_outlined, size: 14),
+          padding: const EdgeInsets.all(2),
+          constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+          visualDensity: VisualDensity.compact,
+          splashRadius: 14,
+          color: colors.primary,
+        ),
+        const SizedBox(width: 4),
+        IconButton(
+          onPressed: () {
+            HapticFeedback.heavyImpact();
+            if (auth.currentUser != null) {
+              bp.submitFeedback(
+                userId: auth.currentUser!.id,
+                bookId: book.isbn13,
+                interaction: 'dislike',
+              );
+            }
+          },
+          icon: const Icon(Icons.thumb_down_alt_outlined, size: 14),
+          padding: const EdgeInsets.all(2),
+          constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+          visualDensity: VisualDensity.compact,
+          splashRadius: 14,
+          color: colors.error,
+        ),
+        if (book.finalScore != null) ...[
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  backgroundColor: Theme.of(context).cardColor,
+                  title: const Text("AI Analizi (Debug)",
+                      style: TextStyle(color: Colors.white, fontSize: 16)),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Kaynak: ${book.explanationSourceBook}",
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12)),
+                      const Divider(color: Colors.white10),
+                      _debugScoreRow(
+                          "İçerik Benzerliği", book.rawSimilarityScore),
+                      _debugScoreRow(
+                          "Çeşitlilik Cezası", book.diversityPenalty),
+                      const SizedBox(height: 8),
+                      Text("Final Skor: ${book.finalScore}",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: colors.primary,
+                              fontSize: 14)),
+                    ],
+                  ),
+                ),
+              );
+            },
+            child: Icon(Icons.info_outline,
+                size: 12, color: colors.onSurface.withOpacity(0.3)),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _debugScoreRow(String label, double? score) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: const TextStyle(color: Colors.white54, fontSize: 10)),
+          Text(score?.toStringAsFixed(4) ?? "0.0000",
+              style: const TextStyle(color: Colors.white, fontSize: 10)),
+        ],
       ),
     );
   }

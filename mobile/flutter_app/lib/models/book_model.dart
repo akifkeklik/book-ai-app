@@ -12,7 +12,11 @@ class Book {
   final String publishedDate;
   final int pageCount;
   final double? similarityScore;
-  final String? aiNote;
+  final String? explanation;
+  final String? explanationSourceBook;
+  final double? rawSimilarityScore;
+  final double? finalScore;
+  final double? diversityPenalty;
 
   const Book({
     required this.isbn13,
@@ -26,7 +30,11 @@ class Book {
     required this.publishedDate,
     required this.pageCount,
     this.similarityScore,
-    this.aiNote,
+    this.explanation,
+    this.explanationSourceBook,
+    this.rawSimilarityScore,
+    this.finalScore,
+    this.diversityPenalty,
   });
 
   factory Book.fromJson(Map<String, dynamic> json) {
@@ -41,8 +49,12 @@ class Book {
       ratingsCount: (json['ratings_count'] as num?)?.toInt() ?? 0,
       publishedDate: json['published_date']?.toString() ?? '',
       pageCount: (json['page_count'] as num?)?.toInt() ?? 0,
-      similarityScore: (json['similarity_score'] as num?)?.toDouble(),
-      aiNote: json['ai_note']?.toString(),
+      similarityScore: (json['similarity_score'] as num?)?.toDouble() ?? (json['final_score'] as num?)?.toDouble(),
+      explanation: json['explanation']?.toString(),
+      explanationSourceBook: json['explanation_source_book']?.toString(),
+      rawSimilarityScore: (json['raw_similarity_score'] as num?)?.toDouble(),
+      finalScore: (json['final_score'] as num?)?.toDouble(),
+      diversityPenalty: (json['diversity_penalty'] as num?)?.toDouble(),
     );
   }
 
@@ -58,7 +70,11 @@ class Book {
         'published_date': publishedDate,
         'page_count': pageCount,
         if (similarityScore != null) 'similarity_score': similarityScore,
-        if (aiNote != null) 'ai_note': aiNote,
+        if (explanation != null) 'explanation': explanation,
+        if (explanationSourceBook != null) 'explanation_source_book': explanationSourceBook,
+        if (rawSimilarityScore != null) 'raw_similarity_score': rawSimilarityScore,
+        if (finalScore != null) 'final_score': finalScore,
+        if (diversityPenalty != null) 'diversity_penalty': diversityPenalty,
       };
 
   /// Aliases for database compatibility
@@ -124,9 +140,9 @@ class FavoriteBook {
     return FavoriteBook(
       id: json['id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? '',
-      isbn13: json['isbn13']?.toString() ?? '',
+      isbn13: json['book_id']?.toString() ?? '',
       bookTitle: json['book_title']?.toString() ?? '',
-      thumbnail: json['thumbnail']?.toString() ?? '',
+      thumbnail: json['book_image_url']?.toString() ?? '',
       addedAt: json['added_at'] != null
           ? DateTime.tryParse(json['added_at'].toString()) ?? DateTime.now()
           : DateTime.now(),

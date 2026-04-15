@@ -100,21 +100,20 @@ class LanguageProvider extends ChangeNotifier {
   /// Senior Solution: Localize relative date strings
   String formatRelativeDate(DateTime dt) {
     final diff = DateTime.now().difference(dt);
-    final isTr = _locale.languageCode == 'tr';
 
     if (diff.inDays > 30) return '${dt.day}/${dt.month}/${dt.year}';
     
     if (diff.inDays > 0) {
-      return isTr ? '${diff.inDays} gün önce' : '${diff.inDays}d ago';
+      return translate('time_day_ago', args: {'count': diff.inDays.toString()});
     }
     if (diff.inHours > 0) {
-      return isTr ? '${diff.inHours} saat önce' : '${diff.inHours}h ago';
+      return translate('time_hour_ago', args: {'count': diff.inHours.toString()});
     }
     if (diff.inMinutes > 0) {
-      return isTr ? '${diff.inMinutes} dakika önce' : '${diff.inMinutes}m ago';
+      return translate('time_min_ago', args: {'count': diff.inMinutes.toString()});
     }
     
-    return isTr ? 'az önce' : 'just now';
+    return translate('time_just_now');
   }
 }
 

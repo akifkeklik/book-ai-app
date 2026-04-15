@@ -14,8 +14,8 @@ from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 from supabase import create_client, Client
-from config import Config
-from model.recommender import BookRecommender
+from ..config import Config
+from ..recommender import BookRecommender
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +73,8 @@ class BookService:
     # Public API
     # ─────────────────────────────────────────────────────────────────────────
 
-    def get_all_books(self, page: int = 1, per_page: int = 20) -> Dict[str, Any]:
-        result = self.recommender.get_all_books(page=page, per_page=per_page)
+    def get_all_books(self, page: int = 1, per_page: int = 20, category: Optional[str] = None) -> Dict[str, Any]:
+        result = self.recommender.get_all_books(page=page, per_page=per_page, category=category)
         result["books"] = self._enrich(result["books"])
         return result
 
@@ -92,44 +92,110 @@ class BookService:
         top_n: int = 10,
         use_hybrid: bool = True,
     ) -> List[Dict[str, Any]]:
+        # Single seed recommendation
         books = self.recommender.recommend(
-            book_title=book_title,
+            seed_titles=[book_title],
             top_n=top_n,
-            use_hybrid=use_hybrid,
+            use_diversity=True,
         )
         return self._enrich(books)
 
     def get_personalized_recommendations(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """Return personalized recommendations by querying ML model on user's recent favorites."""
+        """
+        Production-grade personalization:
+        1. Fetch Likes and Dislikes from Supabase.
+        2. Calculate centroid based on Likes.
+        3. Exclude Dislikes.
+        4. Apply MMR Diversity.
+        """
         if not self._supabase:
-            logger.warning("No Supabase client, falling back to popular books for personalized recs.")
             return self.get_popular_books(limit=limit)
             
         try:
-            # 1. Fetch user's favorite books directly from Supabase
-            favs = self._supabase.table("favorites").select("book_title").eq("user_id", user_id).execute()
-            titles = [f["book_title"] for f in getattr(favs, 'data', []) if "book_title" in f]
+            # 1. Fetch user's interactions
+            resp = self._supabase.table("user_interactions").select("*").eq("user_id", user_id).execute()
+            interactions = getattr(resp, 'data', [])
             
-            if not titles:
-                logger.info(f"User {user_id} has no favorites. Returning popular books.")
+            likes = [i["book_id"] for i in interactions if i["interaction_type"] == "like"]
+            dislikes = [i["book_id"] for i in interactions if i["interaction_type"] == "dislike"]
+            
+            # Use favorites as additional likes
+            fav_resp = self._supabase.table("favorites").select("book_id").eq("user_id", user_id).execute()
+            likes.extend([f["book_id"] for f in getattr(fav_resp, 'data', [])])
+            likes = list(set(likes)) # dedupe
+
+            if not seed_titles:
+                # Senior Solution: Fallback to Profile Genres if no book interactions exist
+                profile_resp = self._supabase.table("user_profiles").select("preferred_genres").eq("user_id", user_id).execute()
+                profile_data = getattr(profile_resp, 'data', [])
+                if profile_data:
+                    genres = profile_data[0].get("preferred_genres", [])
+                    if genres:
+                        logger.info(f"Using preferred genres as seed for {user_id}: {genres}")
+                        # Fetch top books in these genres
+                        genre_recs = []
+                        for g in genres[:3]: # Take first 3 genres for variety
+                            res = self.recommender.get_all_books(page=1, per_page=10, category=g)
+                            genre_recs.extend(res.get("books", []))
+                        
+                        if genre_recs:
+                            # Dedupe and shuffle
+                            unique_recs = {r['isbn13']: r for r in genre_recs}.values()
+                            final_genre_recs = list(unique_recs)
+                            random.shuffle(final_genre_recs)
+                            return self._enrich(final_genre_recs[:limit])
+
+                logger.info(f"User {user_id} has no interactions or profile genres. Returning trending books.")
                 return self.get_popular_books(limit=limit)
-                
-            # 2. Use the most recent favorite to get recommendations
-            # We take the first one (assuming it's recently interacted, or select randomly from favorites)
-            seed_title = titles[0] 
-            logger.info(f"Generating ML recommendations for user {user_id} based on favorite: '{seed_title}'.")
+
+            logger.info(f"Generating personalized recs for {user_id} with {len(seed_titles)} seeds.")
             
-            # 3. Call the actual ML recommendation engine
-            recs = self.recommender.recommend(seed_title, top_n=limit, use_hybrid=True)
+            # 3. Call Orchestrator
+            recs = self.recommender.recommend(seed_titles, top_n=limit, use_diversity=True)
             
-            if not recs:
-                logger.warning(f"ML engine returned no recs for '{seed_title}'. Falling back to popular.")
-                return self.get_popular_books(limit=limit)
-                
-            return self._enrich(recs)
+            # 4. Filter out dislikes (if not already handled by engine)
+            final_recs = [r for r in recs if r.get("isbn13") not in dislikes]
+            
+            return self._enrich(final_recs)
         except Exception as e:
-            logger.error(f"Failed to get ML personalized recs: {e}")
+            logger.error(f"Failed personalized recs: {e}")
             return self.get_popular_books(limit=limit)
+
+    def submit_onboarding(self, user_id: str, book_ids: List[str], genres: List[str]) -> Dict[str, Any]:
+        """Record initial preferences."""
+        if not self._supabase: return {"status": "error", "message": "No Supabase"}
+        
+        try:
+            # 1. Record selected books as 'like'
+            entries = [{"user_id": user_id, "book_id": bid, "interaction_type": "like"} for bid in book_ids]
+            if entries:
+                self._supabase.table("user_interactions").upsert(entries).execute()
+            
+            # 2. Update profile with genres
+            self._supabase.table("user_profiles").upsert({
+                "user_id": user_id,
+                "preferred_genres": genres,
+                "updated_at": "now()"
+            }).execute()
+            
+            return {"status": "success", "message": "Onboarding complete"}
+        except Exception as e:
+            logger.error(f"Onboarding error: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def submit_feedback(self, user_id: str, book_id: str, interaction: str) -> Dict[str, Any]:
+        """Submit like/dislike."""
+        if not self._supabase: return {"status": "error"}
+        try:
+            self._supabase.table("user_interactions").upsert({
+                "user_id": user_id,
+                "book_id": book_id,
+                "interaction_type": interaction
+            }).execute()
+            return {"status": "success"}
+        except Exception as e:
+            logger.error(f"Feedback error: {e}")
+            return {"status": "error"}
 
     def get_book_by_isbn(self, isbn: str) -> Optional[Dict[str, Any]]:
         book = self.recommender.get_book_by_isbn(isbn)

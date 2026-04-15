@@ -1,54 +1,83 @@
 class CategoryMapper {
+  // Map of high-level genres to many potential database keywords
   static const Map<String, List<String>> _genreMap = {
-    'Fiction': ['Fiction', 'Juvenile Fiction', 'Novels', 'Classic', 'Roman', 'Kurgu', 'Edebiyat'],
-    'Science': ['Science', 'Technology', 'Nature', 'Mathematics', 'Physics', 'Biology', 'Bilim', 'Teknoloji', 'Doğa'],
-    'History': ['History', 'Biography & Autobiography', 'Social Science', 'Nonfiction', 'Tarih', 'Biyografi', 'Anı'],
-    'Philosophy': ['Philosophy', 'Religion', 'Christian life', 'Spirituality', 'Felsefe', 'Din', 'Maneviyat'],
+    'Fiction': ['Fiction', 'Juvenile Fiction', 'Novel', 'Literature', 'Kurgu', 'Roman', 'Edebiyat'],
+    'Science': ['Science', 'Technology', 'Nature', 'Mathematics', 'Physics', 'Biology', 'Bilim', 'Teknoloji', 'Doğa', 'Matematik', 'Fizik', 'Biyoloji'],
+    'History': ['History', 'Biography', 'Autobiography', 'Biography & Autobiography', 'Tarih', 'Biyografi', 'Otobiyografi'],
+    'Philosophy': ['Philosophy', 'Religion', 'Psychology', 'Felsefe', 'Din', 'Psikoloji'],
+    'Mystery': ['Mystery', 'Thriller', 'Crime', 'Detective', 'Detective and mystery stories', 'Gizem', 'Gerilim', 'Suç', 'Dedektif'],
+    'Classic': ['Classic', 'Literary', 'Antique', 'Klasik', 'Antik'],
     'Art': ['Art', 'Design', 'Architecture', 'Photography', 'Sanat', 'Tasarım', 'Mimari'],
-    'Mystery': ['Detective and mystery stories', 'Mystery', 'Thriller', 'Crime', 'Gizem', 'Gerilim', 'Polisiye', 'Suç'],
-    'Poetry': ['Poetry', 'Drama', 'Plays', 'Şiir', 'Tiyatro', 'Oyun'],
     'Travel': ['Travel', 'Adventure stories', 'Geography', 'Gezi', 'Macera', 'Coğrafya'],
-    'Computers': ['Computers', 'Internet', 'Digital', 'Bilgisayar', 'İnternet', 'Teknoloji'],
     'Business': ['Business & Economics', 'Capitalism', 'Finance', 'Management', 'İş', 'Ekonomi', 'Finans', 'Yönetim'],
-    'Psychology': ['Psychology', 'Self-Help', 'Mind', 'Psikoloji', 'Kişisel Gelişim', 'Zihin'],
+    'Fantasy': ['Fantasy', 'Magic', 'Fairy Tales', 'Fantastik', 'Büyü', 'Masal'],
+    'Romance': ['Romance', 'Love Stories', 'Romantik', 'Aşk'],
+    'Poetry': ['Poetry', 'Şiir'],
+    'Self-Help': ['Self-Help', 'Kişisel Gelişim'],
+  };
+
+  static const Map<String, String> _trToEn = {
+    'Kurgu': 'Fiction',
+    'Roman': 'Fiction',
+    'Bilim': 'Science',
+    'Tarih': 'History',
+    'Biyografi': 'History',
+    'Felsefe': 'Philosophy',
+    'Din': 'Philosophy',
+    'Gizem': 'Mystery',
+    'Gerilim': 'Mystery',
+    'Suç': 'Mystery',
+    'Klasik': 'Classic',
+    'Sanat': 'Art',
+    'Gezi': 'Travel',
+    'İş': 'Business',
+    'Psikoloji': 'Psychology',
+    'Aşk': 'Romance',
+    'Romantik': 'Romance',
+    'Şiir': 'Poetry',
+    'Kişisel Gelişim': 'Self-Help',
+    'Fantastik': 'Fantasy',
   };
 
   /// Returns a list of keywords to search for in Supabase for a given genre.
   static List<String> getSearchKeywords(String genre) {
-    // 1. Try to find the canonical English name if input is Turkish or localized
-    final canonical = _reverseMap[genre] ?? genre;
+    if (genre.isEmpty) return [];
     
-    // 2. Return keywords for the canonical name, or fall back to the input
-    return _genreMap[canonical] ?? [genre];
+    final lookup = genre.trim();
+    
+    // 1. Try exact match in trToEn
+    String? canonical = _trToEn[lookup];
+    
+    // 2. Try case-insensitive matching
+    if (canonical == null) {
+      final lowerLookup = lookup.toLowerCase();
+      
+      // Check Turkish keys case-insensitively
+      for (var entry in _trToEn.entries) {
+        if (entry.key.toLowerCase() == lowerLookup) {
+          canonical = entry.value;
+          break;
+        }
+      }
+      
+      // Check English keys case-insensitively
+      if (canonical == null) {
+        for (var key in _genreMap.keys) {
+          if (key.toLowerCase() == lowerLookup) {
+            canonical = key;
+            break;
+          }
+        }
+      }
+    }
+
+    // Default to the input if no mapping found
+    canonical ??= genre;
+    
+    return _genreMap[canonical] ?? [canonical];
   }
 
-  static Map<String, String>? _cachedReverseMap;
-  static Map<String, String> get _reverseMap {
-    if (_cachedReverseMap != null) return _cachedReverseMap!;
-    
-    final map = <String, String>{};
-    // Map Turkish labels to English keys
-    TurkishToEnglish.forEach((tr, en) => map[tr] = en);
-    _cachedReverseMap = map;
-    return map;
-  }
-
-  static const Map<String, String> TurkishToEnglish = {
-    'Kurgu': 'Fiction',
-    'Bilim': 'Science',
-    'Tarih': 'History',
-    'Gizem': 'Mystery',
-    'Sanat': 'Art',
-    'Felsefe': 'Philosophy',
-    'Şiir': 'Poetry',
-    'Gezi': 'Travel',
-    'Bilgisayar': 'Computers',
-    'İş': 'Business',
-    'Psikoloji': 'Psychology',
-  };
-
-  /// Senior Logic: If the UI category is Turkish but the database is English, we match them here.
   static String? mapTurkishToEnglish(String trGenre) {
-    return TurkishToEnglish[trGenre];
+    return _trToEn[trGenre];
   }
 }

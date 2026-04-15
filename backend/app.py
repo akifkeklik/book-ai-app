@@ -8,8 +8,8 @@ import logging
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-from config import Config
-from routes.routes import books_bp
+from .config import Config
+from .routes.routes import books_bp
 
 logging.basicConfig(
     level=logging.INFO,

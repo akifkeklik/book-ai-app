@@ -6,6 +6,8 @@
   "saved": "Saved",
   "explore": "Explore",
   "recommended_for_you": "Recommended for You",
+  "recommended_empty_title": "Discover Your Next Favorite",
+  "recommended_empty_subtitle": "Your personalized recommendations will appear here as you save books to your heart.",
   "popular_books": "Popular Books",
   "search_hint": "Search title or author...",
   "search_placeholder": "Search books, authors, genres...",
@@ -81,6 +83,7 @@
   "about": "About",
   "ai_insight": "AI INSIGHT",
   "ratings": "ratings",
+  "year": "Year",
   "show_less": "Show less",
   "read_more": "Read more",
   "similar_books": "Similar Books",
@@ -127,5 +130,12 @@
   "genre_architecture": "Architecture",
   "genre_medical": "Medical",
   "genre_drama": "Drama",
-  "genre_education": "Education"
+  "genre_education": "Education",
+  "time_just_now": "just now",
+  "time_min_ago": "{count}m ago",
+  "time_hour_ago": "{count}h ago",
+  "time_day_ago": "{count}d ago",
+  "onboarding_title_5": "Your Library Seeds",
+  "onboarding_subtitle_5": "Select at least 3 books you already love to jumpstart the AI.",
+  "book": "Book"
 }

@@ -82,45 +82,38 @@ def normalize_count(count: float, max_count: float) -> float:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Complete preprocessing pipeline:
-    1. Fill missing values with sensible defaults
-    2. Cast numeric columns
-    3. Extract publication year
-    4. Build combined feature string for TF-IDF
-    5. Deduplicate on lowercase title
-    6. Reset index
-    """
+    """Complete preprocessing pipeline for the recommender dataset."""
     df = df.copy()
 
-    # Fill NaN
+    # Fill missing values with sensible defaults.
     df["title"] = df["title"].fillna("Unknown Title")
     df["authors"] = df["authors"].fillna("Unknown Author")
-    df["categories"] = df["categories"].fillna("General")
+    df["categories"] = df["categories"].fillna("General").astype(str)
     df["description"] = df["description"].fillna("")
     df["thumbnail"] = df["thumbnail"].fillna("")
     df["published_date"] = df["published_date"].fillna("").astype(str)
 
-    # Numeric casts
-    df["average_rating"] = (
-        pd.to_numeric(df["average_rating"], errors="coerce").fillna(0.0).astype(float)
-    )
-    df["ratings_count"] = (
-        pd.to_numeric(df["ratings_count"], errors="coerce").fillna(0).astype(int)
-    )
-    df["page_count"] = (
-        pd.to_numeric(df["page_count"], errors="coerce").fillna(0).astype(int)
-    )
+    # Normalize numeric columns.
+    df["average_rating"] = pd.to_numeric(df["average_rating"], errors="coerce").fillna(0.0).astype(float)
+    df["ratings_count"] = pd.to_numeric(df["ratings_count"], errors="coerce").fillna(0).astype(int)
+    df["page_count"] = pd.to_numeric(df["page_count"], errors="coerce").fillna(0).astype(int)
     df["isbn13"] = df["isbn13"].fillna("").astype(str)
 
-    # Derived columns
+    # Derived columns.
     df["year"] = df["published_date"].apply(extract_year)
     df["combined_features"] = df.apply(build_combined_features, axis=1)
 
-    # Deduplicate
+    # Popularity score based on normalized rating and ratings_count.
+    max_rating = df["average_rating"].max() if not df["average_rating"].empty else 5.0
+    max_count = df["ratings_count"].max() if not df["ratings_count"].empty else 1
+    df["_norm_rating"] = df["average_rating"].apply(lambda value: normalize_rating(value, max_rating))
+    df["_norm_count"] = df["ratings_count"].apply(lambda value: normalize_count(value, max_count))
+    df["popularity_score"] = 0.7 * df["_norm_rating"] + 0.3 * df["_norm_count"]
+    df = df.drop(columns=["_norm_rating", "_norm_count"])
+
+    # Deduplicate by lowercase title.
     df["_title_lower"] = df["title"].str.lower().str.strip()
     df = df.drop_duplicates(subset=["_title_lower"], keep="first")
     df = df.drop(columns=["_title_lower"])
-    df = df.reset_index(drop=True)
 
-    return df
+    return df.reset_index(drop=True)
