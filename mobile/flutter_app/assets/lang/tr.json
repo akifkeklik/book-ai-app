@@ -6,6 +6,8 @@
   "saved": "Kaydedilenler",
   "explore": "Keşfet",
   "recommended_for_you": "Sizin İçin Önerilenler",
+  "recommended_empty_title": "Sıradaki Favorini Keşfet",
+  "recommended_empty_subtitle": "Kitaplara kalp bıraktıkça size özel öneriler burada belirecektir.",
   "popular_books": "Popüler Kitaplar",
   "search_hint": "Kitap adı veya yazar ara...",
   "search_placeholder": "Kitapları, yazarları ve türleri arayın...",
@@ -81,6 +83,7 @@
   "about": "Hakkında",
   "ai_insight": "AI ANALİZİ",
   "ratings": "değerlendirme",
+  "year": "Yıl",
   "show_less": "Daha az göster",
   "read_more": "Daha fazla oku",
   "similar_books": "Benzer Kitaplar",
@@ -127,5 +130,12 @@
   "genre_architecture": "Mimarlık",
   "genre_medical": "Tıp",
   "genre_drama": "Dram",
-  "genre_education": "Eğitim"
+  "genre_education": "Eğitim",
+  "time_just_now": "az önce",
+  "time_min_ago": "{count} dakika önce",
+  "time_hour_ago": "{count} saat önce",
+  "time_day_ago": "{count} gün önce",
+  "onboarding_title_5": "Kütüphane Tohumların",
+  "onboarding_subtitle_5": "Yapay zekayı başlatmak için sevdiğin en az 3 kitap seç.",
+  "book": "Kitap"
 }

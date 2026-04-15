@@ -18,17 +18,10 @@ Run:
 """
 
 import json
-import sys
-from pathlib import Path
 
 import pytest
 
-# ── Backend imports ───────────────────────────────────────────────────────────
-_BACKEND_DIR = Path(__file__).resolve().parent.parent
-if str(_BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(_BACKEND_DIR))
-
-from app import create_app
+from backend.app import create_app
 
 
 # ═════════════════════════════════════════════════════════════════════════════

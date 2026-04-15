@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../providers/language_provider.dart';
+
 import '../providers/book_provider.dart';
+import '../providers/language_provider.dart';
 
 class CategoriesScreen extends StatelessWidget {
   const CategoriesScreen({super.key});
@@ -29,17 +30,18 @@ class CategoriesScreen extends StatelessWidget {
 
   Widget _buildCategoryCard(BuildContext context, String cat) {
     final theme = Theme.of(context);
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+        side: BorderSide(
+            color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => context.push('/category/$cat'),
+        onTap: () => context.push('/category/${Uri.encodeComponent(cat)}'),
         child: Container(
           height: 120,
           decoration: BoxDecoration(
@@ -120,26 +122,46 @@ class CategoriesScreen extends StatelessWidget {
 
   IconData _getIconForCategory(String cat) {
     switch (cat.toLowerCase()) {
-      case 'fiction': return Icons.auto_stories;
-      case 'science': return Icons.science;
-      case 'history': return Icons.history_edu;
-      case 'mystery': return Icons.search;
-      case 'fantasy': return Icons.auto_awesome;
-      case 'biography': return Icons.person;
-      case 'self-help': return Icons.psychology;
-      case 'business': return Icons.business_center;
-      case 'romance': return Icons.favorite;
-      case 'thriller': return Icons.dangerous;
-      case 'philosophy': return Icons.menu_book;
-      case 'art': return Icons.palette;
-      case 'cooking': return Icons.restaurant;
-      case 'religion': return Icons.church;
-      case 'computers': return Icons.computer;
-      case 'psychology': return Icons.face;
-      case 'social science': return Icons.public;
-      case 'poetry': return Icons.edit_note;
-      case 'travel': return Icons.flight;
-      default: return Icons.book;
+      case 'fiction':
+        return Icons.auto_stories;
+      case 'science':
+        return Icons.science;
+      case 'history':
+        return Icons.history_edu;
+      case 'mystery':
+        return Icons.search;
+      case 'fantasy':
+        return Icons.auto_awesome;
+      case 'biography':
+        return Icons.person;
+      case 'self-help':
+        return Icons.psychology;
+      case 'business':
+        return Icons.business_center;
+      case 'romance':
+        return Icons.favorite;
+      case 'thriller':
+        return Icons.dangerous;
+      case 'philosophy':
+        return Icons.menu_book;
+      case 'art':
+        return Icons.palette;
+      case 'cooking':
+        return Icons.restaurant;
+      case 'religion':
+        return Icons.church;
+      case 'computers':
+        return Icons.computer;
+      case 'psychology':
+        return Icons.face;
+      case 'social science':
+        return Icons.public;
+      case 'poetry':
+        return Icons.edit_note;
+      case 'travel':
+        return Icons.flight;
+      default:
+        return Icons.book;
     }
   }
 }

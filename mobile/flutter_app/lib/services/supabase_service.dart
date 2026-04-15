@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/book_model.dart';
 import '../utils/category_mapper.dart';
@@ -55,9 +56,9 @@ class SupabaseService {
       final response = await client
           .from('books')
           .select()
-          .or('title.ilike.%$query%,authors.ilike.%$query%,categories.ilike.%$query%')
+          .or('title.ilike.*$query*,authors.ilike.*$query*,categories.ilike.*$query*')
           .limit(50)
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 15));
       return (response as List).map((j) => Book.fromJson(j)).toList();
     } catch (e) {
       throw Exception('Arama sırasında ağ hatası oluştu.');
@@ -66,36 +67,66 @@ class SupabaseService {
 
   Future<List<Book>> getAllBooksByGenre(String category, {int limit = 50, int offset = 0}) async {
     // Senior Logic: Map the UI category to multiple database keywords
-    // To handle localized data or naming variations (e.g. History -> History, Biography).
     final keywords = CategoryMapper.getSearchKeywords(category);
     
     if (keywords.isEmpty) return [];
 
-    // Construct the OR filter for ilike on categories
-    final orFilter = keywords.map((k) => 'categories.ilike.%$k%').join(',');
+    // Construct a flat list of conditions for PostgREST .or()
+    // We search the 'categories', 'title', and 'description' fields for each keyword.
+    // NOTE: We do NOT wrap the entire string in () because the SDK does it for us.
+    final conditions = <String>[];
+    for (var k in keywords) {
+      final sanitized = k.replaceAll("'", "''"); // Basic SQL escape
+      conditions.add('categories.ilike.*$sanitized*');
+      conditions.add('title.ilike.*$sanitized*');
+      // Adding description search only for specific cases or limited keywords to avoid performance hits
+      if (keywords.length < 5) {
+        conditions.add('description.ilike.*$sanitized*');
+      }
+    }
+    
+    final orFilter = conditions.join(',');
     
     try {
+      debugPrint('Fetching genre: $category with filters: $orFilter');
       final response = await client
           .from('books')
           .select()
           .or(orFilter)
           .order('ratings_count', ascending: false)
           .range(offset, offset + limit - 1)
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 15));
           
-      return (response as List).map((j) => Book.fromJson(j)).toList();
+      final data = response as List;
+      debugPrint('Found ${data.length} books for $category');
+      
+      // If we found nothing with ilike, try a broader search or fallback
+      if (data.isEmpty && offset == 0) {
+        debugPrint('Broadening search for $category...');
+        final broaderResponse = await client
+            .from('books')
+            .select()
+            .textSearch('title', category, config: 'english')
+            .limit(limit)
+            .timeout(const Duration(seconds: 10));
+        return (broaderResponse as List).map((j) => Book.fromJson(j)).toList();
+      }
+
+      return data.map((j) => Book.fromJson(j)).toList();
     } catch (e) {
+      debugPrint('Supabase Category Error: $e');
       throw Exception('Kategoriler yüklenirken ağ zaman aşımı oluştu.');
     }
   }
 
   Future<int> getTotalBookCount() async {
     try {
-      // Simplest count that works in most Supabase versions
-      final response = await client.from('books').select('id').count(CountOption.exact);
-      return (response as dynamic).count ?? 0;
-    } catch (_) {
-      return 6400; // Fallback to original count
+      // Use isbn13 as the primary key for the count optimization
+      final response = await client.from('books').select('isbn13').count(CountOption.exact);
+      return (response as dynamic).count ?? 6400; // Fallback to baseline
+    } catch (e) {
+      debugPrint('Error fetching total book count: $e');
+      return 6400; // Original hardcoded fallback for robustness
     }
   }
 
@@ -103,7 +134,7 @@ class SupabaseService {
 
   Future<void> addFavorite({
     required String userId,
-    required String bookId,
+    required String bookId, // This is isbn13
     required String title,
     required String author,
     required String? imageUrl,
@@ -186,15 +217,18 @@ class SupabaseService {
   
   Future<Book?> getBookByIsbn(String isbn) async {
     try {
+      // Senior Update: Only query isbn13 as isbn10 does not exist in the schema
       final response = await client
           .from('books')
           .select()
-          .or('isbn13.eq.$isbn,isbn10.eq.$isbn')
-          .maybeSingle();
+          .eq('isbn13', isbn)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 10));
           
       if (response == null) return null;
       return Book.fromJson(response);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error fetching book details: $e');
       return null;
     }
   }
