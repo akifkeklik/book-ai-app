@@ -308,7 +308,7 @@ class _DetailScreenState extends State<DetailScreen> {
               ],
             ),
             Text(
-              '${_formatCount(book.ratingsCount)} ratings',
+              '${_formatCount(book.ratingsCount)} ${context.tr('ratings')}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -316,11 +316,11 @@ class _DetailScreenState extends State<DetailScreen> {
         const Spacer(),
         if (book.pageCount > 0) ...[
           _StatDivider(),
-          _StatItem(label: 'Pages', value: book.pageCount.toString()),
+          _StatItem(label: context.tr('page_count'), value: book.pageCount.toString()),
         ],
         if (book.publishedDate.isNotEmpty) ...[
           _StatDivider(),
-          _StatItem(label: 'Year', value: book.publishedDate.split('-').first),
+          _StatItem(label: context.tr('year'), value: book.publishedDate.split('-').first),
         ],
       ],
     );
@@ -334,7 +334,7 @@ class _DetailScreenState extends State<DetailScreen> {
             onPressed: () =>
                 context.push('/recommend/${Uri.encodeComponent(book.title)}'),
             icon: const Icon(Icons.auto_awesome),
-            label: const Text('AI Analysis'),
+            label: Text(context.tr('ai_insight')),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -348,11 +348,12 @@ class _DetailScreenState extends State<DetailScreen> {
 
   Widget _buildDescription(BuildContext context, Book book) {
     if (book.description.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('About this book', style: Theme.of(context).textTheme.titleLarge),
+        Text(context.tr('about'), style: theme.textTheme.titleLarge),
         const SizedBox(height: 12),
         AnimatedCrossFade(
           firstChild: Text(
@@ -378,7 +379,7 @@ class _DetailScreenState extends State<DetailScreen> {
         ),
         TextButton(
           onPressed: () => setState(() => _descExpanded = !_descExpanded),
-          child: Text(_descExpanded ? 'Show less' : 'Read more'),
+          child: Text(_descExpanded ? context.tr('show_less') : context.tr('read_more')),
         ),
       ],
     );

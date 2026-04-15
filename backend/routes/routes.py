@@ -7,7 +7,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from services.book_service import BookService
+from ..services.book_service import BookService
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +43,9 @@ def get_categories():
 def get_books():
     try:
         page = max(1, int(request.args.get("page", 1)))
-        # Keep server load bounded (and match test expectations)
         per_page = min(max(1, int(request.args.get("per_page", 50))), 100)
-        return jsonify(_svc.get_all_books(page=page, per_page=per_page)), 200
+        category = request.args.get("category", None)
+        return jsonify(_svc.get_all_books(page=page, per_page=per_page, category=category)), 200
     except Exception as exc:
         logger.exception("GET /books error")
         return jsonify({"error": str(exc)}), 500
@@ -146,6 +146,48 @@ def get_personalized():
         }), 200
     except Exception as exc:
         logger.exception("GET /recommend/personalized error")
+        return jsonify({"error": str(exc)}), 500
+
+
+@books_bp.route("/onboarding", methods=["POST"])
+def onboarding():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    
+    user_id = data.get("user_id")
+    book_ids = data.get("book_ids", [])
+    genres = data.get("genres", [])
+    
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+        
+    try:
+        result = _svc.submit_onboarding(user_id, book_ids, genres)
+        return jsonify(result), 200 if result["status"] == "success" else 500
+    except Exception as exc:
+        logger.exception("POST /onboarding error")
+        return jsonify({"error": str(exc)}), 500
+
+
+@books_bp.route("/feedback", methods=["POST"])
+def feedback():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+        
+    user_id = data.get("user_id")
+    book_id = data.get("book_id")
+    interaction = data.get("interaction") # 'like' or 'dislike'
+    
+    if not all([user_id, book_id, interaction]):
+        return jsonify({"error": "user_id, book_id, and interaction are required"}), 400
+        
+    try:
+        result = _svc.submit_feedback(user_id, book_id, interaction)
+        return jsonify(result), 200 if result["status"] == "success" else 500
+    except Exception as exc:
+        logger.exception("POST /feedback error")
         return jsonify({"error": str(exc)}), 500
 
 

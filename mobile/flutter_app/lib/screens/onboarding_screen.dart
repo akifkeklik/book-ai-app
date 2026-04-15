@@ -22,6 +22,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _readingFrequency = 2; // Default Medium
   final List<String> _selectedAuthors = [];
   String _selectedVibe = 'relaxed';
+  final List<String> _selectedBooks = []; // ISBNs
 
   final List<Map<String, String>> _categories = [
     {'id': 'Fiction', 'icon': '📚'},
@@ -51,10 +52,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _finishOnboarding() async {
-    final userId = context.read<AuthProvider>().currentUser?.id;
+    final auth = context.read<AuthProvider>();
+    final bookProvider = context.read<BookProvider>();
+    final userId = auth.currentUser?.id;
     if (userId == null) return;
 
     try {
+      // 1. Classic profile update (legacy support)
       await SupabaseService.instance.upsertUserProfile(
         userId: userId,
         preferredGenres: _selectedCategories,
@@ -62,10 +66,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         preferredAuthors: _selectedAuthors,
         preferredVibe: _selectedVibe,
       );
+
+      // 2. New AI Onboarding submission
+      final success = await bookProvider.submitOnboarding(
+        userId: userId,
+        bookIds: _selectedBooks,
+        genres: _selectedCategories,
+      );
       
-      if (mounted) {
-        await context.read<BookProvider>().fetchPersonalizedRecs(userId);
+      if (mounted && success) {
         context.go('/');
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.tr('error'))),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -108,6 +122,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     _buildHabitStep(theme, lang),
                     _buildAuthorStep(theme, lang),
                     _buildVibeStep(theme, lang),
+                    _buildBookSelectionStep(theme, lang),
                   ],
                 ),
               ),
@@ -120,7 +135,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildHeader(ThemeData theme, LanguageProvider lang) {
-    double progress = (_currentPage + 1) / 4;
+    double progress = (_currentPage + 1) / 5;
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -130,7 +145,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${context.tr('next').toUpperCase()} ${_currentPage + 1} / 4',
+                '${context.tr('next').toUpperCase()} ${_currentPage + 1} / 5',
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: theme.colorScheme.primary,
                   fontWeight: FontWeight.w900,
@@ -369,27 +384,40 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             lang.translate('onboarding_subtitle_4'),
             theme,
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: 32),
           Expanded(
-            child: ListView.builder(
+            child: ListView.separated(
               itemCount: _vibes.length,
-              itemBuilder: (context, i) {
-                final vibe = _vibes[i];
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final vibe = _vibes[index];
                 final isSelected = _selectedVibe == vibe;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: ListTile(
-                    onTap: () => setState(() => _selectedVibe = vibe),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    tileColor: isSelected ? theme.colorScheme.primary : Colors.white.withOpacity(0.03),
-                    title: Text(
-                      lang.translate('vibe_$vibe'),
-                      style: TextStyle(
-                        color: isSelected ? Colors.black : Colors.white,
-                        fontWeight: FontWeight.w900,
+                return InkWell(
+                  onTap: () => setState(() => _selectedVibe = vibe),
+                  borderRadius: BorderRadius.circular(20),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: isSelected ? theme.colorScheme.primary.withOpacity(0.1) : theme.cardColor.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected ? theme.colorScheme.primary : Colors.white10,
                       ),
                     ),
-                    trailing: isSelected ? const Icon(Icons.check, color: Colors.black) : null,
+                    child: Row(
+                      children: [
+                        Text(
+                          lang.translate('vibe_$vibe'),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w500,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (isSelected) Icon(Icons.check_circle, color: theme.colorScheme.primary),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -400,9 +428,87 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
+  Widget _buildBookSelectionStep(ThemeData theme, LanguageProvider lang) {
+    final bookProvider = context.watch<BookProvider>();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildStepTitle(
+            lang.translate('onboarding_title_5'),
+            lang.translate('onboarding_subtitle_5'),
+            theme,
+          ),
+          const SizedBox(height: 24),
+          TextField(
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: lang.translate('search_hint'),
+              prefixIcon: const Icon(Icons.search, color: Colors.white54),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.05),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+            ),
+            onChanged: (val) {
+              if (val.length > 2) bookProvider.search(val);
+            },
+          ),
+          const SizedBox(height: 16),
+          if (_selectedBooks.isNotEmpty)
+            SizedBox(
+              height: 48,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _selectedBooks.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, i) {
+                  return Chip(
+                    label: Text("${lang.translate('book')} ${i+1}", style: const TextStyle(fontSize: 10)),
+                    backgroundColor: theme.colorScheme.primary,
+                    deleteIcon: const Icon(Icons.close, size: 14),
+                    onDeleted: () => setState(() => _selectedBooks.removeAt(i)),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: bookProvider.searchStatus == BookStatus.loading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    itemCount: bookProvider.searchResults.length,
+                    itemBuilder: (context, i) {
+                      final book = bookProvider.searchResults[i];
+                      final isSelected = _selectedBooks.contains(book.isbn13);
+                      return ListTile(
+                        leading: Image.network(book.coverUrl, height: 40, width: 30, fit: BoxFit.cover, 
+                          errorBuilder: (_,__,___) => const Icon(Icons.book)),
+                        title: Text(book.title, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                        subtitle: Text(book.authorsFormatted, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                        trailing: Checkbox(
+                          value: isSelected,
+                          activeColor: theme.colorScheme.primary,
+                          onChanged: (val) {
+                            setState(() {
+                              if (val == true) _selectedBooks.add(book.isbn13);
+                              else _selectedBooks.remove(book.isbn13);
+                            });
+                          },
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFooter(ThemeData theme, LanguageProvider lang) {
     bool canGoNext = true;
     if (_currentPage == 0 && _selectedCategories.length < 3) canGoNext = false;
+    if (_currentPage == 4 && _selectedBooks.length < 3) canGoNext = false;
     
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
@@ -411,7 +517,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         height: 64,
         child: ElevatedButton(
           onPressed: canGoNext 
-            ? (_currentPage < 3 
+            ? (_currentPage < 4 
                 ? () => _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut)
                 : _finishOnboarding)
             : null,
@@ -424,7 +530,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             shadowColor: theme.colorScheme.primary.withOpacity(0.4),
           ),
           child: Text(
-            _currentPage == 3 ? lang.translate('finish').toUpperCase() : lang.translate('next').toUpperCase(),
+            _currentPage == 4 ? lang.translate('finish').toUpperCase() : lang.translate('next').toUpperCase(),
             style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5),
           ),
         ),

@@ -137,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return context.tr('email_required');
-                    if (!v.contains('@')) return context.tr('error');
+                    if (!v.contains('@')) return context.tr('invalid_email');
                     return null;
                   },
                 ),

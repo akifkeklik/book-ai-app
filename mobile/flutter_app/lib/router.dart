@@ -53,28 +53,36 @@ class AppRouter {
               path: '/',
               pageBuilder: (context, state) => CustomTransitionPage(
                 child: const HomeScreen(),
-                transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) =>
+                        FadeTransition(opacity: animation, child: child),
               ),
             ),
             GoRoute(
               path: '/search',
               pageBuilder: (context, state) => CustomTransitionPage(
                 child: const SearchScreen(),
-                transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) =>
+                        FadeTransition(opacity: animation, child: child),
               ),
             ),
             GoRoute(
               path: '/categories',
               pageBuilder: (context, state) => CustomTransitionPage(
                 child: const CategoriesScreen(),
-                transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) =>
+                        FadeTransition(opacity: animation, child: child),
               ),
             ),
             GoRoute(
               path: '/favorites',
               pageBuilder: (context, state) => CustomTransitionPage(
                 child: const FavoritesScreen(),
-                transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) =>
+                        FadeTransition(opacity: animation, child: child),
               ),
             ),
           ],
@@ -90,7 +98,7 @@ class AppRouter {
         GoRoute(
           path: '/category/:genre',
           builder: (context, state) => CategoryTimelineScreen(
-            genre: state.pathParameters['genre']!,
+            genre: Uri.decodeComponent(state.pathParameters['genre']!),
           ),
         ),
         GoRoute(
