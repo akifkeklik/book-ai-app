@@ -4,6 +4,7 @@ Never commit secrets — use .env locally and platform env vars in production.
 """
 
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()

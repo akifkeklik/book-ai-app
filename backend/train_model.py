@@ -28,8 +28,8 @@ _PROJECT_ROOT = _BACKEND_DIR.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from backend.config import Config
-from backend.recommender import BookRecommender
+from backend.config import Config  # noqa: E402
+from backend.recommender import BookRecommender  # noqa: E402
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -95,20 +95,26 @@ def _validate(engine: BookRecommender) -> bool:
     logger.info(f"  With rating > 0 : {n_with_rating} ({rating_pct:.0f}%)")
 
     if n_books < 10:
-        logger.warning(f"  {_RED}✗ Too few books ({n_books}). Need ≥10 for meaningful recs.{_RESET}")
+        logger.warning(
+            f"  {_RED}✗ Too few books ({n_books}). Need ≥10 for meaningful recs.{_RESET}"
+        )
         failed += 1
     else:
         logger.info(f"  {_GREEN}✓ Dataset size OK{_RESET}")
         passed += 1
 
     if desc_pct < 50:
-        logger.warning(f"  {_YELLOW}⚠ Only {desc_pct:.0f}% have descriptions — recs quality may suffer{_RESET}")
+        logger.warning(
+            f"  {_YELLOW}⚠ Only {desc_pct:.0f}% have descriptions — recs quality may suffer{_RESET}"
+        )
         warnings += 1
 
     # ── Check 2: TF-IDF matrix ────────────────────────────────────────────────
     logger.info(f"\n{_BOLD}[Check 2] TF-IDF Matrix{_RESET}")
     n_features = engine.tfidf_matrix.shape[1]
-    sparsity = 1.0 - (engine.tfidf_matrix.nnz / (engine.tfidf_matrix.shape[0] * engine.tfidf_matrix.shape[1]))
+    sparsity = 1.0 - (
+        engine.tfidf_matrix.nnz / (engine.tfidf_matrix.shape[0] * engine.tfidf_matrix.shape[1])
+    )
 
     logger.info(f"  Shape    : {engine.tfidf_matrix.shape}")
     logger.info(f"  Features : {n_features:,}")
@@ -132,7 +138,9 @@ def _validate(engine: BookRecommender) -> bool:
     logger.info(f"  Avg pairwise similarity: {avg_sim:.4f}")
 
     if avg_sim > 0.8:
-        logger.warning(f"  {_YELLOW}⚠ Avg similarity very high — features may lack diversity{_RESET}")
+        logger.warning(
+            f"  {_YELLOW}⚠ Avg similarity very high — features may lack diversity{_RESET}"
+        )
         warnings += 1
 
     # ── Check 4: Recommendation quality ───────────────────────────────────────
@@ -159,7 +167,9 @@ def _validate(engine: BookRecommender) -> bool:
 
         genre_pct = genre_matches / n_recs * 100 if n_recs else 0
 
-        status = _GREEN + "✓" if genre_pct >= 40 else (_YELLOW + "⚠" if genre_pct >= 20 else _RED + "✗")
+        status = (
+            _GREEN + "✓" if genre_pct >= 40 else (_YELLOW + "⚠" if genre_pct >= 20 else _RED + "✗")
+        )
 
         logger.info(
             f"  '{title}' → {n_recs} recs, "
@@ -232,6 +242,7 @@ def _validate(engine: BookRecommender) -> bool:
 
 # ── Main entry ────────────────────────────────────────────────────────────────
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Train and validate the Libris recommendation model.",
@@ -256,7 +267,8 @@ Examples:
         help=f"Output pickle path (default: {Config.MODEL_PATH})",
     )
     parser.add_argument(
-        "--validate", "-v",
+        "--validate",
+        "-v",
         action="store_true",
         help="Run validation checks after training",
     )
@@ -266,7 +278,8 @@ Examples:
         help="Load and preprocess data but don't save the model",
     )
     parser.add_argument(
-        "--force", "-f",
+        "--force",
+        "-f",
         action="store_true",
         help="Retrain even if a saved pickle already exists",
     )

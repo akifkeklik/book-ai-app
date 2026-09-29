@@ -9,11 +9,12 @@ Responsibilities:
 
 import logging
 import random
-import requests
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
-from supabase import create_client, Client
+import requests
+from supabase import Client, create_client
+
 from ..config import Config
 from ..recommender import BookRecommender
 
@@ -41,7 +42,9 @@ class BookService:
             try:
                 # Check if model already exists and matches Supabase data hash (Performance Optimization)
                 if self.recommender.load_model(Config.MODEL_PATH):
-                    logger.info("Recommendation model loaded from pickle. Verifying data consistency...")
+                    logger.info(
+                        "Recommendation model loaded from pickle. Verifying data consistency..."
+                    )
                     # In a production env, we'd compare hashes here. For now, let's assume it's good if loaded.
                     return
 
@@ -52,7 +55,7 @@ class BookService:
                 return
             except Exception as e:
                 logger.error(f"Failed to bootstrap from Supabase: {e}")
-        
+
         # 2. Fallback to pickle or CSV
         if self.recommender.load_model(Config.MODEL_PATH):
             logger.info("Recommendation model loaded from pickle.")
@@ -73,7 +76,9 @@ class BookService:
     # Public API
     # ─────────────────────────────────────────────────────────────────────────
 
-    def get_all_books(self, page: int = 1, per_page: int = 20, category: Optional[str] = None) -> Dict[str, Any]:
+    def get_all_books(
+        self, page: int = 1, per_page: int = 20, category: Optional[str] = None
+    ) -> Dict[str, Any]:
         result = self.recommender.get_all_books(page=page, per_page=per_page, category=category)
         result["books"] = self._enrich(result["books"])
         return result
@@ -100,7 +105,9 @@ class BookService:
         )
         return self._enrich(books)
 
-    def get_personalized_recommendations(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_personalized_recommendations(
+        self, user_id: str, limit: int = 10
+    ) -> List[Dict[str, Any]]:
         """
         Production-grade personalization:
         1. Fetch Likes and Dislikes from Supabase.
@@ -110,13 +117,15 @@ class BookService:
         """
         if not self._supabase:
             return self.get_popular_books(limit=limit)
-            
+
         try:
             # 1. Get user interactions (Likes)
-            fav_resp = self._supabase.table("favorites").select("book_id").eq("user_id", user_id).execute()
-            likes = [f["book_id"] for f in getattr(fav_resp, 'data', [])]
-            likes = list(set(likes)) # dedupe
-            dislikes = [] # Initializing dislikes
+            fav_resp = (
+                self._supabase.table("favorites").select("book_id").eq("user_id", user_id).execute()
+            )
+            likes = [f["book_id"] for f in getattr(fav_resp, "data", [])]
+            likes = list(set(likes))  # dedupe
+            dislikes = []  # Initializing dislikes
 
             seed_titles = []
             if likes:
@@ -129,20 +138,25 @@ class BookService:
             # 2. If no direct likes found, check Profile Genres
             if not seed_titles:
                 logger.info(f"User {user_id} has no book likes. Checking profile genres fallback.")
-                profile_resp = self._supabase.table("user_profiles").select("preferred_genres").eq("user_id", user_id).execute()
-                profile_data = getattr(profile_resp, 'data', [])
-                
+                profile_resp = (
+                    self._supabase.table("user_profiles")
+                    .select("preferred_genres")
+                    .eq("user_id", user_id)
+                    .execute()
+                )
+                profile_data = getattr(profile_resp, "data", [])
+
                 if profile_data:
                     genres = profile_data[0].get("preferred_genres", [])
                     if genres:
                         logger.info(f"Using preferred genres as seed for {user_id}: {genres}")
                         genre_recs = []
-                        for g in genres[:3]: # Variety
+                        for g in genres[:3]:  # Variety
                             res = self.recommender.get_all_books(page=1, per_page=10, category=g)
                             genre_recs.extend(res.get("books", []))
-                        
+
                         if genre_recs:
-                            unique_recs = {r['isbn13']: r for r in genre_recs}.values()
+                            unique_recs = {r["isbn13"]: r for r in genre_recs}.values()
                             final_genre_recs = list(unique_recs)
                             random.shuffle(final_genre_recs)
                             return self._enrich(final_genre_recs[:limit])
@@ -152,34 +166,45 @@ class BookService:
                 return self.get_popular_books(limit=limit)
 
             # 4. If we have seeds, generate recommendations
-            logger.info(f"Generating personalized recs for {user_id} with {len(seed_titles)} seeds.")
+            logger.info(
+                f"Generating personalized recs for {user_id} with {len(seed_titles)} seeds."
+            )
             recs = self.recommender.recommend(seed_titles, top_n=limit, use_diversity=True)
-            
+
             # 4. Filter out dislikes (if not already handled by engine)
             final_recs = [r for r in recs if r.get("isbn13") not in dislikes]
-            
+
             return self._enrich(final_recs)
         except Exception as e:
             logger.error(f"Failed personalized recs: {e}")
             return self.get_popular_books(limit=limit)
 
-    def submit_onboarding(self, user_id: str, book_ids: List[str], genres: List[str]) -> Dict[str, Any]:
+    def submit_onboarding(
+        self, user_id: str, book_ids: List[str], genres: List[str]
+    ) -> Dict[str, Any]:
         """Record initial preferences."""
-        if not self._supabase: return {"status": "error", "message": "No Supabase"}
-        
+        if not self._supabase:
+            return {"status": "error", "message": "No Supabase"}
+
         try:
             # 1. Record selected books as 'like'
-            entries = [{"user_id": user_id, "book_id": bid, "interaction_type": "like"} for bid in book_ids]
+            entries = [
+                {"user_id": user_id, "book_id": bid, "interaction_type": "like"} for bid in book_ids
+            ]
             if entries:
                 self._supabase.table("user_interactions").upsert(entries).execute()
-            
+
+            import datetime
+
             # 2. Update profile with genres
-            self._supabase.table("user_profiles").upsert({
-                "user_id": user_id,
-                "preferred_genres": genres,
-                "updated_at": "now()"
-            }).execute()
-            
+            self._supabase.table("user_profiles").upsert(
+                {
+                    "user_id": user_id,
+                    "preferred_genres": genres,
+                    "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                }
+            ).execute()
+
             return {"status": "success", "message": "Onboarding complete"}
         except Exception as e:
             logger.error(f"Onboarding error: {e}")
@@ -187,13 +212,12 @@ class BookService:
 
     def submit_feedback(self, user_id: str, book_id: str, interaction: str) -> Dict[str, Any]:
         """Submit like/dislike."""
-        if not self._supabase: return {"status": "error"}
+        if not self._supabase:
+            return {"status": "error"}
         try:
-            self._supabase.table("user_interactions").upsert({
-                "user_id": user_id,
-                "book_id": book_id,
-                "interaction_type": interaction
-            }).execute()
+            self._supabase.table("user_interactions").upsert(
+                {"user_id": user_id, "book_id": book_id, "interaction_type": interaction}
+            ).execute()
             return {"status": "success"}
         except Exception as e:
             logger.error(f"Feedback error: {e}")
@@ -206,13 +230,45 @@ class BookService:
             return enriched[0] if enriched else None
         return None
 
-    @staticmethod
     def track_user_activity(
-        user_id: str, book_name: str, action: str = "view"
+        self, user_id: str, action: str, book_id: str = "", book_name: str = ""
     ) -> Dict[str, Any]:
-        """Acknowledge an activity event. Actual persistence is done in Flutter → Supabase."""
-        logger.info("Activity | user=%s book=%s action=%s", user_id, book_name, action)
-        return {"status": "tracked", "user_id": user_id, "book_name": book_name, "action": action}
+        """Acknowledge an activity event and persist to Supabase."""
+        logger.info(
+            "Activity | user=%s book_id=%s book_name=%s action=%s",
+            user_id,
+            book_id,
+            book_name,
+            action,
+        )
+
+        if not self._supabase:
+            return {"status": "error", "message": "Supabase not initialized"}
+
+        try:
+            import datetime
+
+            payload = {
+                "user_id": user_id,
+                "activity_type": action,
+                "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            }
+            if book_id:
+                payload["book_id"] = book_id
+
+            self._supabase.table("user_activities").insert(payload).execute()
+
+            return {"status": "tracked", "user_id": user_id, "action": action}
+        except Exception as e:
+            logger.error(f"Tracking error: {e}")
+            raise e
+
+    def verify_token(self, token: str):
+        """Verifies JWT with Supabase auth."""
+        if not self._supabase:
+            raise Exception("Supabase client not initialized")
+        user_response = self._supabase.auth.get_user(token)
+        return user_response.user
 
     # ─────────────────────────────────────────────────────────────────────────
     # Cover enrichment

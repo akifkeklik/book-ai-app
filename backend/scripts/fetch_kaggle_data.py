@@ -73,79 +73,71 @@ TARGET_COLUMNS = [
 # Different Kaggle datasets use different column names. We normalise them all.
 COLUMN_ALIASES = {
     # isbn13
-    "isbn13":          "isbn13",
-    "isbn_13":         "isbn13",
-    "isbn":            "isbn13",
-    "ISBN13":          "isbn13",
-
+    "isbn13": "isbn13",
+    "isbn_13": "isbn13",
+    "isbn": "isbn13",
+    "ISBN13": "isbn13",
     # title
-    "title":           "title",
-    "Title":           "title",
-    "book_title":      "title",
-    "original_title":  "title",
-
+    "title": "title",
+    "Title": "title",
+    "book_title": "title",
+    "original_title": "title",
     # authors
-    "authors":         "authors",
-    "author":          "authors",
-    "Author":          "authors",
-    "book_authors":    "authors",
-
+    "authors": "authors",
+    "author": "authors",
+    "Author": "authors",
+    "book_authors": "authors",
     # categories
-    "categories":      "categories",
-    "category":        "categories",
-    "genre":           "categories",
-    "genres":          "categories",
-    "subject":         "categories",
-    "subjects":        "categories",
-
+    "categories": "categories",
+    "category": "categories",
+    "genre": "categories",
+    "genres": "categories",
+    "subject": "categories",
+    "subjects": "categories",
     # description
-    "description":     "description",
-    "Description":     "description",
-    "summary":         "description",
-    "Synopsis":        "description",
-
+    "description": "description",
+    "Description": "description",
+    "summary": "description",
+    "Synopsis": "description",
     # thumbnail
-    "thumbnail":       "thumbnail",
-    "image_url":       "thumbnail",
-    "imageLinks":      "thumbnail",
-    "cover":           "thumbnail",
-    "cover_url":       "thumbnail",
-    "image":           "thumbnail",
-    "smallThumbnail":  "thumbnail",
-
+    "thumbnail": "thumbnail",
+    "image_url": "thumbnail",
+    "imageLinks": "thumbnail",
+    "cover": "thumbnail",
+    "cover_url": "thumbnail",
+    "image": "thumbnail",
+    "smallThumbnail": "thumbnail",
     # average_rating
-    "average_rating":  "average_rating",
-    "rating":          "average_rating",
-    "avg_rating":      "average_rating",
-    "averageRating":   "average_rating",
-
+    "average_rating": "average_rating",
+    "rating": "average_rating",
+    "avg_rating": "average_rating",
+    "averageRating": "average_rating",
     # ratings_count
-    "ratings_count":   "ratings_count",
-    "rating_count":    "ratings_count",
-    "ratingsCount":    "ratings_count",
-    "num_ratings":     "ratings_count",
-    "count":           "ratings_count",
+    "ratings_count": "ratings_count",
+    "rating_count": "ratings_count",
+    "ratingsCount": "ratings_count",
+    "num_ratings": "ratings_count",
+    "count": "ratings_count",
     "text_reviews_count": "ratings_count",
-
     # published_date
-    "published_date":  "published_date",
-    "publishedDate":   "published_date",
-    "published_year":  "published_date",
-    "publication_date":"published_date",
-    "year":            "published_date",
+    "published_date": "published_date",
+    "publishedDate": "published_date",
+    "published_year": "published_date",
+    "publication_date": "published_date",
+    "year": "published_date",
     "original_publication_year": "published_date",
-
     # page_count
-    "page_count":      "page_count",
-    "pageCount":       "page_count",
-    "num_pages":       "page_count",
-    "pages":           "page_count",
+    "page_count": "page_count",
+    "pageCount": "page_count",
+    "num_pages": "page_count",
+    "pages": "page_count",
 }
 
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Kaggle API Download
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 def download_from_kaggle(dataset_slug: str, output_dir: str) -> str:
     """
@@ -169,7 +161,7 @@ def download_from_kaggle(dataset_slug: str, output_dir: str) -> str:
         )
         sys.exit(1)
 
-    logger.info(f"Authenticating with Kaggle API...")
+    logger.info("Authenticating with Kaggle API...")
     api = KaggleApi()
     api.authenticate()
 
@@ -197,6 +189,7 @@ def download_from_kaggle(dataset_slug: str, output_dir: str) -> str:
 # ═════════════════════════════════════════════════════════════════════════════
 # CSV Conversion
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 def detect_encoding(file_path: str) -> str:
     """Detect the encoding of a file by trying common ones."""
@@ -258,7 +251,7 @@ def convert_csv(
         logger.error(f"  Expected some of: {list(set(COLUMN_ALIASES.keys()))}")
         return 0
 
-    logger.info(f"  Column mapping:")
+    logger.info("  Column mapping:")
     for raw, target in sorted(col_map.items(), key=lambda x: x[1]):
         logger.info(f"    {raw:30s} → {_GREEN}{target}{_RESET}")
 
@@ -336,10 +329,10 @@ def convert_csv(
     logger.info(f"\n{'─' * 55}")
     logger.info(f"  {_BOLD}Quality Report{_RESET}")
     logger.info(f"  Total books     : {_BOLD}{n}{_RESET}")
-    logger.info(f"  With ISBN       : {n_isbn} ({n_isbn/n*100:.0f}%)")
-    logger.info(f"  With description: {n_desc} ({n_desc/n*100:.0f}%)")
-    logger.info(f"  With thumbnail  : {n_thumb} ({n_thumb/n*100:.0f}%)")
-    logger.info(f"  With rating > 0 : {n_rating} ({n_rating/n*100:.0f}%)")
+    logger.info(f"  With ISBN       : {n_isbn} ({n_isbn / n * 100:.0f}%)")
+    logger.info(f"  With description: {n_desc} ({n_desc / n * 100:.0f}%)")
+    logger.info(f"  With thumbnail  : {n_thumb} ({n_thumb / n * 100:.0f}%)")
+    logger.info(f"  With rating > 0 : {n_rating} ({n_rating / n * 100:.0f}%)")
     logger.info(f"{'─' * 55}")
 
     if n < 50:
@@ -352,7 +345,9 @@ def convert_csv(
         # Print sample
         logger.info(f"\n{_BOLD}Sample (first 5 rows):{_RESET}")
         for _, row in df.head().iterrows():
-            logger.info(f"  {row['title'][:50]:50s} | {row['authors'][:25]:25s} | {row['categories'][:20]}")
+            logger.info(
+                f"  {row['title'][:50]:50s} | {row['authors'][:25]:25s} | {row['categories'][:20]}"
+            )
         return n
 
     # Backup existing
@@ -372,7 +367,9 @@ def convert_csv(
     pkl_path = os.path.join(_BACKEND_DIR, "saved_model", "tfidf.pkl")
     if os.path.exists(pkl_path):
         logger.info(f"\n  {_YELLOW}⚠ Old model pickle exists: {pkl_path}{_RESET}")
-        logger.info(f"  {_YELLOW}  Delete it or run: python train_model.py --force --validate{_RESET}")
+        logger.info(
+            f"  {_YELLOW}  Delete it or run: python train_model.py --force --validate{_RESET}"
+        )
 
     return n
 
@@ -380,6 +377,7 @@ def convert_csv(
 # ═════════════════════════════════════════════════════════════════════════════
 # Main
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -408,16 +406,19 @@ Recommended Kaggle datasets:
 
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument(
-        "--input", "-i",
+        "--input",
+        "-i",
         help="Path to a manually downloaded CSV file",
     )
     source.add_argument(
-        "--kaggle", "-k",
+        "--kaggle",
+        "-k",
         help="Kaggle dataset slug (e.g. 'dylanjcastillo/7k-books-with-metadata')",
     )
 
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         default=os.path.join(_BACKEND_DIR, "data", "books.csv"),
         help="Output CSV path (default: backend/data/books.csv)",
     )
@@ -466,9 +467,9 @@ Recommended Kaggle datasets:
 
     if not args.dry_run:
         logger.info(f"\n  {_BOLD}Next steps:{_RESET}")
-        logger.info(f"  1. python scripts/enrich_with_google.py  (add covers)")
-        logger.info(f"  2. python train_model.py --force --validate  (retrain model)")
-        logger.info(f"  3. python app.py  (start the API)\n")
+        logger.info("  1. python scripts/enrich_with_google.py  (add covers)")
+        logger.info("  2. python train_model.py --force --validate  (retrain model)")
+        logger.info("  3. python app.py  (start the API)\n")
 
     return 0
 

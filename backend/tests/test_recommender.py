@@ -15,154 +15,153 @@ Run:
     python -m pytest tests/test_recommender.py -v --tb=short  # concise output
 """
 
-import math
 import os
 import shutil
 import tempfile
 
 import pandas as pd
 import pytest
-
+from backend.recommender import BookRecommender
 from backend.utils.preprocess import (
     clean_text,
     extract_year,
-    build_combined_features,
-    normalize_rating,
     normalize_count,
+    normalize_rating,
     preprocess_dataframe,
 )
-from backend.recommender import BookRecommender, EngineConfig, MODEL_VERSION
-
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Fixtures
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture
 def sample_df() -> pd.DataFrame:
     """Minimal but realistic DataFrame for testing."""
-    return pd.DataFrame([
-        {
-            "isbn13": "9780441013593",
-            "title": "Dune",
-            "authors": "Frank Herbert",
-            "categories": "Science Fiction",
-            "description": "A sci-fi epic about desert planet Arrakis and young Paul Atreides.",
-            "thumbnail": "https://example.com/dune.jpg",
-            "average_rating": 4.25,
-            "ratings_count": 845678,
-            "published_date": "1965",
-            "page_count": 896,
-        },
-        {
-            "isbn13": "9780553293357",
-            "title": "Foundation",
-            "authors": "Isaac Asimov",
-            "categories": "Science Fiction",
-            "description": "Psychohistorian Hari Seldon foresees the collapse of the Galactic Empire.",
-            "thumbnail": "https://example.com/foundation.jpg",
-            "average_rating": 4.19,
-            "ratings_count": 456789,
-            "published_date": "1951",
-            "page_count": 255,
-        },
-        {
-            "isbn13": "9780439708180",
-            "title": "Harry Potter and the Sorcerer's Stone",
-            "authors": "J.K. Rowling",
-            "categories": "Fantasy Young Adult",
-            "description": "Harry discovers he is a wizard and enters the magical world of Hogwarts.",
-            "thumbnail": "https://example.com/hp1.jpg",
-            "average_rating": 4.47,
-            "ratings_count": 7895432,
-            "published_date": "1997",
-            "page_count": 309,
-        },
-        {
-            "isbn13": "9780439064873",
-            "title": "Harry Potter and the Chamber of Secrets",
-            "authors": "J.K. Rowling",
-            "categories": "Fantasy Young Adult",
-            "description": "Harry's second year at Hogwarts is marked by dark warnings.",
-            "thumbnail": "https://example.com/hp2.jpg",
-            "average_rating": 4.43,
-            "ratings_count": 4567890,
-            "published_date": "1998",
-            "page_count": 341,
-        },
-        {
-            "isbn13": "9780743273565",
-            "title": "The Great Gatsby",
-            "authors": "F. Scott Fitzgerald",
-            "categories": "Fiction Classic",
-            "description": "A story of the wealthy Jay Gatsby and the American Dream.",
-            "thumbnail": "https://example.com/gatsby.jpg",
-            "average_rating": 3.93,
-            "ratings_count": 4789234,
-            "published_date": "1925",
-            "page_count": 180,
-        },
-        {
-            "isbn13": "9780735211292",
-            "title": "Atomic Habits",
-            "authors": "James Clear",
-            "categories": "Self-Help",
-            "description": "A framework for improving habits and making small changes.",
-            "thumbnail": "https://example.com/habits.jpg",
-            "average_rating": 4.38,
-            "ratings_count": 1123456,
-            "published_date": "2018",
-            "page_count": 320,
-        },
-        {
-            "isbn13": "9780385333481",
-            "title": "Fahrenheit 451",
-            "authors": "Ray Bradbury",
-            "categories": "Fiction Dystopian",
-            "description": "In a future where books are outlawed, a fireman begins to question.",
-            "thumbnail": "https://example.com/f451.jpg",
-            "average_rating": 3.98,
-            "ratings_count": 1345678,
-            "published_date": "1953",
-            "page_count": 158,
-        },
-        {
-            "isbn13": "9780553418026",
-            "title": "The Martian",
-            "authors": "Andy Weir",
-            "categories": "Science Fiction",
-            "description": "An astronaut is stranded alone on Mars with limited supplies.",
-            "thumbnail": "https://example.com/martian.jpg",
-            "average_rating": 4.40,
-            "ratings_count": 1456789,
-            "published_date": "2011",
-            "page_count": 369,
-        },
-        {
-            "isbn13": "9780307474278",
-            "title": "The Girl with the Dragon Tattoo",
-            "authors": "Stieg Larsson",
-            "categories": "Mystery Thriller",
-            "description": "A journalist and hacker investigate a 40-year-old disappearance.",
-            "thumbnail": "",
-            "average_rating": 4.14,
-            "ratings_count": 1234567,
-            "published_date": "2005",
-            "page_count": 672,
-        },
-        {
-            "isbn13": "9780451524935",
-            "title": "1984",
-            "authors": "George Orwell",
-            "categories": "Fiction Dystopian",
-            "description": "In a totalitarian superstate Big Brother watches your every move.",
-            "thumbnail": "https://example.com/1984.jpg",
-            "average_rating": 4.18,
-            "ratings_count": 3841264,
-            "published_date": "1949",
-            "page_count": 328,
-        },
-    ])
+    return pd.DataFrame(
+        [
+            {
+                "isbn13": "9780441013593",
+                "title": "Dune",
+                "authors": "Frank Herbert",
+                "categories": "Science Fiction",
+                "description": "A sci-fi epic about desert planet Arrakis and young Paul Atreides.",
+                "thumbnail": "https://example.com/dune.jpg",
+                "average_rating": 4.25,
+                "ratings_count": 845678,
+                "published_date": "1965",
+                "page_count": 896,
+            },
+            {
+                "isbn13": "9780553293357",
+                "title": "Foundation",
+                "authors": "Isaac Asimov",
+                "categories": "Science Fiction",
+                "description": "Psychohistorian Hari Seldon foresees the collapse of the Galactic Empire.",
+                "thumbnail": "https://example.com/foundation.jpg",
+                "average_rating": 4.19,
+                "ratings_count": 456789,
+                "published_date": "1951",
+                "page_count": 255,
+            },
+            {
+                "isbn13": "9780439708180",
+                "title": "Harry Potter and the Sorcerer's Stone",
+                "authors": "J.K. Rowling",
+                "categories": "Fantasy Young Adult",
+                "description": "Harry discovers he is a wizard and enters the magical world of Hogwarts.",
+                "thumbnail": "https://example.com/hp1.jpg",
+                "average_rating": 4.47,
+                "ratings_count": 7895432,
+                "published_date": "1997",
+                "page_count": 309,
+            },
+            {
+                "isbn13": "9780439064873",
+                "title": "Harry Potter and the Chamber of Secrets",
+                "authors": "J.K. Rowling",
+                "categories": "Fantasy Young Adult",
+                "description": "Harry's second year at Hogwarts is marked by dark warnings.",
+                "thumbnail": "https://example.com/hp2.jpg",
+                "average_rating": 4.43,
+                "ratings_count": 4567890,
+                "published_date": "1998",
+                "page_count": 341,
+            },
+            {
+                "isbn13": "9780743273565",
+                "title": "The Great Gatsby",
+                "authors": "F. Scott Fitzgerald",
+                "categories": "Fiction Classic",
+                "description": "A story of the wealthy Jay Gatsby and the American Dream.",
+                "thumbnail": "https://example.com/gatsby.jpg",
+                "average_rating": 3.93,
+                "ratings_count": 4789234,
+                "published_date": "1925",
+                "page_count": 180,
+            },
+            {
+                "isbn13": "9780735211292",
+                "title": "Atomic Habits",
+                "authors": "James Clear",
+                "categories": "Self-Help",
+                "description": "A framework for improving habits and making small changes.",
+                "thumbnail": "https://example.com/habits.jpg",
+                "average_rating": 4.38,
+                "ratings_count": 1123456,
+                "published_date": "2018",
+                "page_count": 320,
+            },
+            {
+                "isbn13": "9780385333481",
+                "title": "Fahrenheit 451",
+                "authors": "Ray Bradbury",
+                "categories": "Fiction Dystopian",
+                "description": "In a future where books are outlawed, a fireman begins to question.",
+                "thumbnail": "https://example.com/f451.jpg",
+                "average_rating": 3.98,
+                "ratings_count": 1345678,
+                "published_date": "1953",
+                "page_count": 158,
+            },
+            {
+                "isbn13": "9780553418026",
+                "title": "The Martian",
+                "authors": "Andy Weir",
+                "categories": "Science Fiction",
+                "description": "An astronaut is stranded alone on Mars with limited supplies.",
+                "thumbnail": "https://example.com/martian.jpg",
+                "average_rating": 4.40,
+                "ratings_count": 1456789,
+                "published_date": "2011",
+                "page_count": 369,
+            },
+            {
+                "isbn13": "9780307474278",
+                "title": "The Girl with the Dragon Tattoo",
+                "authors": "Stieg Larsson",
+                "categories": "Mystery Thriller",
+                "description": "A journalist and hacker investigate a 40-year-old disappearance.",
+                "thumbnail": "",
+                "average_rating": 4.14,
+                "ratings_count": 1234567,
+                "published_date": "2005",
+                "page_count": 672,
+            },
+            {
+                "isbn13": "9780451524935",
+                "title": "1984",
+                "authors": "George Orwell",
+                "categories": "Fiction Dystopian",
+                "description": "In a totalitarian superstate Big Brother watches your every move.",
+                "thumbnail": "https://example.com/1984.jpg",
+                "average_rating": 4.18,
+                "ratings_count": 3841264,
+                "published_date": "1949",
+                "page_count": 328,
+            },
+        ]
+    )
 
 
 @pytest.fixture
@@ -186,6 +185,7 @@ def tmp_dir():
 # ═════════════════════════════════════════════════════════════════════════════
 # 1. TEXT PREPROCESSING
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestCleanText:
     def test_lowercase(self):
@@ -251,6 +251,7 @@ class TestNormalization:
 # 2. DATAFRAME PREPROCESSING
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestPreprocessDataframe:
     def test_fills_nan(self, sample_df):
         sample_df.loc[0, "title"] = None
@@ -293,6 +294,7 @@ class TestPreprocessDataframe:
 # 3. BOOK RECOMMENDER — CORE
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestBookRecommenderTraining:
     def test_fit_sets_attributes(self, trained_engine):
         assert trained_engine.is_fitted is True
@@ -314,13 +316,15 @@ class TestBookRecommenderTraining:
         assert trained_engine.engine.cosine_sim.shape == (n, n)
 
     def test_metadata(self, trained_engine):
-        # Update: metadata attribute might not exist or changed. 
+        # Update: metadata attribute might not exist or changed.
         # Checking is_fitted instead.
         assert trained_engine.is_fitted is True
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 4. TITLE MATCHING
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestTitleMatching:
     def test_exact_match(self, trained_engine):
@@ -341,6 +345,7 @@ class TestTitleMatching:
 # ═════════════════════════════════════════════════════════════════════════════
 # 5. RECOMMENDATIONS
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestRecommendations:
     def test_recommend_returns_results(self, trained_engine):
@@ -385,9 +390,10 @@ class TestRecommendations:
         """Dune should recommend other sci-fi books preferentially."""
         recs = trained_engine.recommend(["Dune"], top_n=5)
         sci_fi_count = sum(
-            1 for r in recs
+            1
+            for r in recs
             if "science fiction" in r.get("categories", "").lower()
-               or "sci-fi" in r.get("categories", "").lower()
+            or "sci-fi" in r.get("categories", "").lower()
         )
         # At least some should be sci-fi
         assert sci_fi_count >= 1
@@ -396,6 +402,7 @@ class TestRecommendations:
 # ═════════════════════════════════════════════════════════════════════════════
 # 6. SEARCH
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestSearch:
     def test_search_by_title(self, trained_engine):
@@ -419,6 +426,7 @@ class TestSearch:
 # ═════════════════════════════════════════════════════════════════════════════
 # 7. POPULAR BOOKS
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestPopularBooks:
     def test_returns_books(self, trained_engine):
@@ -444,6 +452,7 @@ class TestPopularBooks:
 # 8. ISBN LOOKUP
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestISBNLookup:
     def test_find_by_isbn(self, trained_engine):
         book = trained_engine.get_book_by_isbn("9780441013593")
@@ -466,6 +475,7 @@ class TestISBNLookup:
 # 9. PAGINATION
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestPagination:
     def test_first_page(self, trained_engine):
         result = trained_engine.get_all_books(page=1, per_page=3)
@@ -485,6 +495,7 @@ class TestPagination:
 # ═════════════════════════════════════════════════════════════════════════════
 # 10. MODEL PERSISTENCE
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestModelPersistence:
     def test_save_and_load(self, trained_engine, tmp_dir):
@@ -524,6 +535,7 @@ class TestModelPersistence:
 # ═════════════════════════════════════════════════════════════════════════════
 # 12. STATISTICS
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestStatistics:
     def test_get_stats(self, trained_engine):
