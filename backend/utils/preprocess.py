@@ -9,18 +9,18 @@ from typing import Optional
 
 import pandas as pd
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Text helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def clean_text(text: str) -> str:
     """Lowercase, strip HTML tags, collapse special chars and whitespace."""
     if not text or not isinstance(text, str):
         return ""
     text = text.lower()
-    text = re.sub(r"<[^>]+>", " ", text)          # strip HTML
-    text = re.sub(r"[^a-z0-9\s]", " ", text)      # keep alphanumeric
+    text = re.sub(r"<[^>]+>", " ", text)  # strip HTML
+    text = re.sub(r"[^a-z0-9\s]", " ", text)  # keep alphanumeric
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
@@ -40,6 +40,7 @@ def extract_year(date_str: Optional[str]) -> int:
 # ─────────────────────────────────────────────────────────────────────────────
 # Feature engineering
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def build_combined_features(row: pd.Series) -> str:
     """
@@ -63,6 +64,7 @@ def build_combined_features(row: pd.Series) -> str:
 # Normalization helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def normalize_rating(rating: float, max_rating: float = 5.0) -> float:
     """Clamp and scale rating to [0, 1]."""
     if max_rating == 0:
@@ -81,6 +83,7 @@ def normalize_count(count: float, max_count: float) -> float:
 # Full preprocessing pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Complete preprocessing pipeline for the recommender dataset."""
     df = df.copy()
@@ -94,7 +97,9 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df["published_date"] = df["published_date"].fillna("").astype(str)
 
     # Normalize numeric columns.
-    df["average_rating"] = pd.to_numeric(df["average_rating"], errors="coerce").fillna(0.0).astype(float)
+    df["average_rating"] = (
+        pd.to_numeric(df["average_rating"], errors="coerce").fillna(0.0).astype(float)
+    )
     df["ratings_count"] = pd.to_numeric(df["ratings_count"], errors="coerce").fillna(0).astype(int)
     df["page_count"] = pd.to_numeric(df["page_count"], errors="coerce").fillna(0).astype(int)
     df["isbn13"] = df["isbn13"].fillna("").astype(str)
@@ -106,7 +111,9 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     # Popularity score based on normalized rating and ratings_count.
     max_rating = df["average_rating"].max() if not df["average_rating"].empty else 5.0
     max_count = df["ratings_count"].max() if not df["ratings_count"].empty else 1
-    df["_norm_rating"] = df["average_rating"].apply(lambda value: normalize_rating(value, max_rating))
+    df["_norm_rating"] = df["average_rating"].apply(
+        lambda value: normalize_rating(value, max_rating)
+    )
     df["_norm_count"] = df["ratings_count"].apply(lambda value: normalize_count(value, max_count))
     df["popularity_score"] = 0.7 * df["_norm_rating"] + 0.3 * df["_norm_count"]
     df = df.drop(columns=["_norm_rating", "_norm_count"])

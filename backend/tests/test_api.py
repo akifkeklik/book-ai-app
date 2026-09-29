@@ -20,13 +20,13 @@ Run:
 import json
 
 import pytest
-
 from backend.app import create_app
-
+from backend.routes.routes import _svc
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Fixtures
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def client():
@@ -37,9 +37,26 @@ def client():
         yield c
 
 
+@pytest.fixture
+def auth_headers(monkeypatch):
+    """Fixture to mock JWT verification and provide auth headers."""
+
+    class DummyUser:
+        id = "test-user-123"
+
+    def mock_verify_token(token):
+        if token == "valid-token":
+            return DummyUser()
+        raise Exception("Invalid token")
+
+    monkeypatch.setattr(_svc, "verify_token", mock_verify_token)
+    return {"Authorization": "Bearer valid-token"}
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # 1. ROOT & HEALTH
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestRootAndHealth:
     def test_root_returns_manifest(self, client):
@@ -63,6 +80,7 @@ class TestRootAndHealth:
 # ═════════════════════════════════════════════════════════════════════════════
 # 2. BOOKS — LIST
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestBooksList:
     def test_get_books_default(self, client):
@@ -105,6 +123,7 @@ class TestBooksList:
 # 3. BOOKS — POPULAR
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestPopularBooks:
     def test_get_popular(self, client):
         resp = client.get("/api/books/popular")
@@ -134,6 +153,7 @@ class TestPopularBooks:
 # 4. BOOKS — ISBN LOOKUP
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestISBNLookup:
     def test_get_book_by_isbn(self, client):
         # Use a known ISBN from our dataset
@@ -153,6 +173,7 @@ class TestISBNLookup:
 # ═════════════════════════════════════════════════════════════════════════════
 # 5. SEARCH
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestSearch:
     def test_search_by_title(self, client):
@@ -190,6 +211,7 @@ class TestSearch:
 # ═════════════════════════════════════════════════════════════════════════════
 # 6. RECOMMENDATIONS
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestRecommendations:
     def test_recommend(self, client):
@@ -230,42 +252,78 @@ class TestRecommendations:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 7. ACTIVITY TRACKING
+# 7. ACTIVITY TRACKING & AUTHENTICATION
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestActivityTracking:
-    def test_track_activity(self, client):
+    def test_track_activity(self, client, auth_headers):
         resp = client.post(
             "/api/track",
-            data=json.dumps({
-                "user_id": "test-user-123",
-                "book_name": "Dune",
-                "action": "view",
-            }),
+            headers=auth_headers,
+            data=json.dumps(
+                {
+                    "book_name": "Dune",
+                    "book_id": "9780441013593",
+                    "action": "view",
+                }
+            ),
             content_type="application/json",
         )
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["status"] == "tracked"
         assert data["user_id"] == "test-user-123"
-        assert data["book_name"] == "Dune"
 
-    def test_track_missing_fields(self, client):
+    def test_track_missing_fields(self, client, auth_headers):
         resp = client.post(
             "/api/track",
-            data=json.dumps({"user_id": "test-user"}),
+            headers=auth_headers,
+            data=json.dumps({"action": "view"}),
             content_type="application/json",
         )
         assert resp.status_code == 400
 
-    def test_track_no_json(self, client):
-        resp = client.post("/api/track")
+    def test_track_no_json(self, client, auth_headers):
+        resp = client.post("/api/track", headers=auth_headers)
+        assert resp.status_code == 400
+
+    def test_track_unauthenticated_rejected(self, client):
+        resp = client.post(
+            "/api/track",
+            data=json.dumps({"book_name": "Dune"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 401
+
+    def test_track_invalid_jwt_rejected(self, client, auth_headers):
+        resp = client.post(
+            "/api/track",
+            headers={"Authorization": "Bearer invalid-token"},
+            data=json.dumps({"book_name": "Dune", "action": "view"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 401
+
+    def test_track_invalid_action(self, client, auth_headers):
+        resp = client.post(
+            "/api/track",
+            headers=auth_headers,
+            data=json.dumps(
+                {
+                    "book_name": "Dune",
+                    "action": "invalid_action",
+                }
+            ),
+            content_type="application/json",
+        )
         assert resp.status_code == 400
 
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 8. ERROR HANDLING
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestErrorHandling:
     def test_404(self, client):
@@ -279,3 +337,65 @@ class TestErrorHandling:
         assert resp.status_code == 405
         data = resp.get_json()
         assert "error" in data
+
+    def test_internal_exception_disclosure(self, client, monkeypatch):
+        def mock_raise(*args, **kwargs):
+            raise Exception("Super secret database error detail")
+
+        monkeypatch.setattr("backend.routes.routes._svc.get_recommendations", mock_raise)
+        resp = client.get("/api/recommend?book=Dune")
+        assert resp.status_code == 500
+        data = resp.get_json()
+        assert "error" in data
+        assert data["error"] == "Internal server error"
+        assert "Super secret database error detail" not in str(data)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 9. MUTATION ENDPOINTS (AUTH REQUIRED)
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+class TestMutationEndpoints:
+    def test_onboarding_success(self, client, auth_headers):
+        resp = client.post(
+            "/api/onboarding",
+            headers=auth_headers,
+            data=json.dumps({"book_ids": ["123"], "genres": ["Sci-Fi"]}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+
+    def test_onboarding_unauthenticated(self, client):
+        resp = client.post(
+            "/api/onboarding", data=json.dumps({"book_ids": []}), content_type="application/json"
+        )
+        assert resp.status_code == 401
+
+    def test_feedback_success(self, client, auth_headers):
+        resp = client.post(
+            "/api/feedback",
+            headers=auth_headers,
+            data=json.dumps({"book_id": "123", "interaction": "like"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+
+    def test_feedback_missing_fields(self, client, auth_headers):
+        resp = client.post(
+            "/api/feedback",
+            headers=auth_headers,
+            data=json.dumps({"interaction": "like"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_personalized_recs_success(self, client, auth_headers):
+        resp = client.get("/api/recommend/personalized", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "recommendations" in data
+
+    def test_personalized_recs_unauthenticated(self, client):
+        resp = client.get("/api/recommend/personalized")
+        assert resp.status_code == 401

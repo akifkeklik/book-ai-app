@@ -46,7 +46,7 @@ def create_app(config_class=Config) -> Flask:
         # Allow root manifest and health checks without key potentially
         if request.path == "/" or request.path == "/api/health":
             return None
-        
+
         if request.path.startswith("/api/"):
             # Misconfiguration guard: never run "open" by accident
             if not app.config.get("LIBRIS_API_KEY"):

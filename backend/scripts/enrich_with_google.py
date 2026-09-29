@@ -22,7 +22,6 @@ Requirements:
 
 import argparse
 import csv
-import json
 import logging
 import os
 import sys
@@ -38,7 +37,7 @@ _BACKEND_DIR = _SCRIPT_DIR.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-from config import Config
+from config import Config  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -105,7 +104,7 @@ def search_google_books(
 
                 if resp.status_code == 429:
                     # Rate limited — wait and retry
-                    wait = 2 ** attempt * 5
+                    wait = 2**attempt * 5
                     logger.warning(f"  Rate limited. Waiting {wait}s...")
                     time.sleep(wait)
                     continue
@@ -146,6 +145,7 @@ def extract_description(volume_info: Dict[str, Any]) -> str:
         desc = volume_info.get("textSnippet", "")
     # Clean HTML tags
     import re
+
     desc = re.sub(r"<[^>]+>", " ", desc)
     desc = re.sub(r"\s+", " ", desc).strip()
     return desc
@@ -204,7 +204,7 @@ def enrich_csv(
     if dry_run:
         logger.info(f"\n{_YELLOW}DRY RUN — no API calls will be made.{_RESET}")
         sample = df.loc[indices_to_process[:5], ["title", "authors"]]
-        logger.info(f"\n  Sample books to be enriched:")
+        logger.info("\n  Sample books to be enriched:")
         for _, row in sample.iterrows():
             logger.info(f"    • {row['title']}")
         return {"processed": 0, "thumbnails_added": 0, "descriptions_added": 0}
@@ -273,9 +273,7 @@ def enrich_csv(
                     df.at[idx, "published_date"] = new_date
                     stats["dates_added"] += 1
 
-            logger.info(
-                f"  {_GREEN}✓{_RESET} {progress} {title[:45]:45s}"
-            )
+            logger.info(f"  {_GREEN}✓{_RESET} {progress} {title[:45]:45s}")
         else:
             # No result — generate OpenLibrary fallback for thumbnail
             current_thumb = str(row.get("thumbnail", ""))
@@ -315,6 +313,7 @@ def enrich_csv(
 # ═════════════════════════════════════════════════════════════════════════════
 # Main
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -382,7 +381,9 @@ Examples:
 
     # ── Banner ────────────────────────────────────────────────────────────────
     logger.info(f"\n{_CYAN}{'═' * 55}{_RESET}")
-    logger.info(f"{_CYAN}║  {_BOLD}BookAI — Google Books Enrichment{_RESET}{_CYAN}{'':>18s}║{_RESET}")
+    logger.info(
+        f"{_CYAN}║  {_BOLD}BookAI — Google Books Enrichment{_RESET}{_CYAN}{'':>18s}║{_RESET}"
+    )
     logger.info(f"{_CYAN}{'═' * 55}{_RESET}\n")
 
     # ── Run ───────────────────────────────────────────────────────────────────
@@ -396,7 +397,7 @@ Examples:
 
     if not args.dry_run and stats["processed"] > 0:
         logger.info(f"  {_BOLD}Next step:{_RESET}")
-        logger.info(f"  python train_model.py --force --validate\n")
+        logger.info("  python train_model.py --force --validate\n")
 
     return 0
 
