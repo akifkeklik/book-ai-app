@@ -49,7 +49,8 @@ class TestBookServiceRegression:
 
     @patch("backend.services.book_service.create_client")
     @patch("backend.services.book_service.Config")
-    def test_submit_feedback_upsert_logic(self, mock_config, mock_create_client):
+    @patch("backend.services.book_service.BookRecommender")
+    def test_submit_feedback_upsert_logic(self, mock_recommender, mock_config, mock_create_client):
         mock_config.SUPABASE_URL = "test_url"
         mock_config.SUPABASE_ANON_KEY = "test_key"
 
