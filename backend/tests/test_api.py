@@ -53,6 +53,40 @@ def auth_headers(monkeypatch):
     return {"Authorization": "Bearer valid-token"}
 
 
+@pytest.fixture
+def fake_supabase(monkeypatch):
+    """Minimal Supabase test double for mutation/activity success paths."""
+
+    class FakeTable:
+        def __init__(self, table_name, calls):
+            self._table_name = table_name
+            self._calls = calls
+
+        def upsert(self, payload):
+            self._calls.append((self._table_name, "upsert", payload))
+            return self
+
+        def insert(self, payload):
+            self._calls.append((self._table_name, "insert", payload))
+            return self
+
+        def execute(self):
+            self._calls.append((self._table_name, "execute", None))
+            return type("FakeResponse", (), {"data": []})()
+
+    class FakeSupabase:
+        def __init__(self):
+            self.calls = []
+
+        def table(self, table_name):
+            self.calls.append((table_name, "table", None))
+            return FakeTable(table_name, self.calls)
+
+    fake = FakeSupabase()
+    monkeypatch.setattr(_svc, "_supabase", fake)
+    return fake
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # 1. ROOT & HEALTH
 # ═════════════════════════════════════════════════════════════════════════════
@@ -257,7 +291,7 @@ class TestRecommendations:
 
 
 class TestActivityTracking:
-    def test_track_activity(self, client, auth_headers):
+    def test_track_activity(self, client, auth_headers, fake_supabase):
         resp = client.post(
             "/api/track",
             headers=auth_headers,
@@ -274,6 +308,16 @@ class TestActivityTracking:
         data = resp.get_json()
         assert data["status"] == "tracked"
         assert data["user_id"] == "test-user-123"
+        track_inserts = [
+            call
+            for call in fake_supabase.calls
+            if call[0] == "user_activities" and call[1] == "insert"
+        ]
+        assert track_inserts
+        assert track_inserts[0][2]["user_id"] == "test-user-123"
+        assert track_inserts[0][2]["activity_type"] == "view"
+        assert track_inserts[0][2]["book_id"] == "9780441013593"
+
 
     def test_track_missing_fields(self, client, auth_headers):
         resp = client.post(
@@ -357,7 +401,7 @@ class TestErrorHandling:
 
 
 class TestMutationEndpoints:
-    def test_onboarding_success(self, client, auth_headers):
+    def test_onboarding_success(self, client, auth_headers, fake_supabase):
         resp = client.post(
             "/api/onboarding",
             headers=auth_headers,
@@ -365,6 +409,25 @@ class TestMutationEndpoints:
             content_type="application/json",
         )
         assert resp.status_code == 200
+        interaction_upserts = [
+            call
+            for call in fake_supabase.calls
+            if call[0] == "user_interactions" and call[1] == "upsert"
+        ]
+        assert interaction_upserts
+        assert interaction_upserts[0][2] == [
+            {"user_id": "test-user-123", "book_id": "123", "interaction_type": "like"}
+        ]
+
+        profile_upserts = [
+            call
+            for call in fake_supabase.calls
+            if call[0] == "user_profiles" and call[1] == "upsert"
+        ]
+        assert profile_upserts
+        assert profile_upserts[0][2]["user_id"] == "test-user-123"
+        assert profile_upserts[0][2]["preferred_genres"] == ["Sci-Fi"]
+        assert profile_upserts[0][2]["updated_at"].endswith("+00:00")
 
     def test_onboarding_unauthenticated(self, client):
         resp = client.post(
@@ -372,7 +435,7 @@ class TestMutationEndpoints:
         )
         assert resp.status_code == 401
 
-    def test_feedback_success(self, client, auth_headers):
+    def test_feedback_success(self, client, auth_headers, fake_supabase):
         resp = client.post(
             "/api/feedback",
             headers=auth_headers,
@@ -380,6 +443,17 @@ class TestMutationEndpoints:
             content_type="application/json",
         )
         assert resp.status_code == 200
+        feedback_upserts = [
+            call
+            for call in fake_supabase.calls
+            if call[0] == "user_interactions" and call[1] == "upsert"
+        ]
+        assert feedback_upserts
+        assert feedback_upserts[0][2] == {
+            "user_id": "test-user-123",
+            "book_id": "123",
+            "interaction_type": "like",
+        }
 
     def test_feedback_missing_fields(self, client, auth_headers):
         resp = client.post(
