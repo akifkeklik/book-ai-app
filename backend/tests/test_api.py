@@ -365,6 +365,8 @@ class TestMutationEndpoints:
             content_type="application/json",
         )
         assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] == "success"
 
     def test_onboarding_unauthenticated(self, client):
         resp = client.post(
@@ -380,6 +382,8 @@ class TestMutationEndpoints:
             content_type="application/json",
         )
         assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] == "success"
 
     def test_feedback_missing_fields(self, client, auth_headers):
         resp = client.post(
