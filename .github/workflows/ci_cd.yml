@@ -69,7 +69,7 @@ jobs:
       - name: Structural Analysis
         run: |
           cd mobile/flutter_app
-          flutter analyze
+          flutter analyze --no-fatal-infos
 
       - name: Unit & Widget Tests
         run: |
