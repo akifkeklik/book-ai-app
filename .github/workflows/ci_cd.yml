@@ -45,8 +45,7 @@ jobs:
 
       - name: Execute Pytest Suite
         run: |
-          cd backend
-          pytest tests/ -v --tb=short
+          python -m pytest backend/tests/ -v --tb=short
 
   # ── 🛡️ Frontend CI (Flutter/Dart) ──────────────────────────────────────────
   frontend-ci:
