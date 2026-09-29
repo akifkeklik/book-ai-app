@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
 import openai
-
 from backend.services.embedding_service import EmbeddingService
 
 _DIM = 1536
