@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
-import pytest
+
 from backend.services.book_service import BookService
+
 
 class TestBookServiceRegression:
     @patch("backend.services.book_service.create_client")
@@ -10,11 +11,11 @@ class TestBookServiceRegression:
         # Setup mock Config
         mock_config.SUPABASE_URL = "test_url"
         mock_config.SUPABASE_ANON_KEY = "test_key"
-        
+
         # Setup mock Supabase client
         mock_supabase = MagicMock()
         mock_create_client.return_value = mock_supabase
-        
+
         # Setup mock Recommender
         mock_recommender_instance = MagicMock()
         mock_recommender_instance.is_fitted = True
@@ -24,11 +25,11 @@ class TestBookServiceRegression:
             {"isbn13": "333", "title": "Book 3"}
         ]
         mock_recommender.return_value = mock_recommender_instance
-        
+
         # Instantiate service
         service = BookService()
         service._enrich = lambda x: x # Disable enrichment for test
-        
+
         # Mock Supabase response for interactions
         mock_interactions_resp = MagicMock()
         mock_interactions_resp.data = [
@@ -36,10 +37,10 @@ class TestBookServiceRegression:
             {"book_id": "222", "interaction_type": "dislike"}
         ]
         mock_supabase.table().select().eq().execute.return_value = mock_interactions_resp
-        
+
         # Execute
         recs = service.get_personalized_recommendations(user_id="user_123", limit=10)
-        
+
         # Assert
         assert len(recs) == 2
         assert any(r["isbn13"] == "111" for r in recs)
@@ -51,12 +52,12 @@ class TestBookServiceRegression:
     def test_submit_feedback_upsert_logic(self, mock_config, mock_create_client):
         mock_config.SUPABASE_URL = "test_url"
         mock_config.SUPABASE_ANON_KEY = "test_key"
-        
+
         mock_supabase = MagicMock()
         mock_create_client.return_value = mock_supabase
-        
+
         service = BookService()
-        
+
         # Submit like
         res = service.submit_feedback("user_123", "999", "like")
         assert res["status"] == "success"
@@ -64,7 +65,7 @@ class TestBookServiceRegression:
             {"user_id": "user_123", "book_id": "999", "interaction_type": "like"},
             on_conflict="user_id,book_id"
         )
-        
+
         # Submit dislike
         res2 = service.submit_feedback("user_123", "999", "dislike")
         assert res2["status"] == "success"
