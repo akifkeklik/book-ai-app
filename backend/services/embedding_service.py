@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import time
 from typing import List, Optional
 
 import openai
@@ -56,27 +57,51 @@ class EmbeddingService:
         """
         return hashlib.sha256(canonical_text.encode("utf-8")).hexdigest()
 
-    def generate_embedding(self, text: str) -> Optional[List[float]]:
+    def generate_embedding(self, text: str, max_retries: int = 3) -> Optional[List[float]]:
         """
         OpenAI API'sini çağırarak metnin embedding'ini oluşturur.
+        Sabit (bounded) retry mekanizması içerir.
         """
         if not self.is_configured():
             logger.warning("OpenAI API key not configured. Cannot generate embedding.")
             return None
 
-        try:
-            response = self._client.embeddings.create(
-                input=[text],
-                model=self._model,
-                dimensions=self._dimension
-            )
-            return response.data[0].embedding
-        except openai.APIError as e:
-            logger.error(f"OpenAI API Error: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Unexpected error during embedding generation: {e}")
-            return None
+        attempt = 0
+        while attempt < max_retries:
+            try:
+                response = self._client.embeddings.create(
+                    input=[text],
+                    model=self._model,
+                    dimensions=self._dimension
+                )
+
+                embedding = response.data[0].embedding
+
+                # Boyut (dimension) doğrulaması
+                if len(embedding) != self._dimension:
+                    logger.error(f"Dimension mismatch. Expected {self._dimension}, got {len(embedding)}.")
+                    return None
+
+                return embedding
+
+            except (openai.APIConnectionError, openai.RateLimitError, openai.InternalServerError) as e:
+                attempt += 1
+                if attempt == max_retries:
+                    logger.error(f"OpenAI API failed after {max_retries} attempts. Last error: {e}")
+                    return None
+
+                # Basit exponential backoff: 2, 4, 8 saniye...
+                sleep_time = 2 ** attempt
+                logger.warning(f"Transient error: {e}. Retrying in {sleep_time}s (Attempt {attempt}/{max_retries})")
+                time.sleep(sleep_time)
+
+            except openai.APIError as e:
+                # Permanent API error (örn. AuthenticationError, BadRequestError) - retry yapma
+                logger.error(f"Permanent OpenAI API Error: {e}")
+                return None
+            except Exception as e:
+                logger.error(f"Unexpected error during embedding generation: {e}")
+                return None
 
     def get_existing_metadata(self, book_id: str) -> Optional[dict]:
         """
@@ -94,6 +119,23 @@ class EmbeddingService:
         except Exception as e:
             logger.error(f"Error fetching embedding metadata: {e}")
             return None
+
+    def is_stale(self, book_id: str, current_content_hash: str) -> bool:
+        """
+        Mevcut embedding'in güncel olup olmadığını kontrol eder.
+        Hash değişmişse VEYA model versiyonu değişmişse STALE kabul edilir (True döner).
+        """
+        meta = self.get_existing_metadata(book_id)
+        if not meta:
+            return True # Yoksa stale sayılır (yeniden üretilmelidir)
+
+        if meta.get("content_hash") != current_content_hash:
+            return True
+
+        if meta.get("model_version") != self._model:
+            return True
+
+        return False
 
     def upsert_embedding(self, book_id: str, embedding: List[float], content_hash: str) -> bool:
         """

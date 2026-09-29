@@ -118,3 +118,23 @@ def test_upsert_embedding():
         },
         on_conflict="book_id"
     )
+
+def test_is_stale():
+    service = EmbeddingService(supabase_client=MagicMock())
+    service._model = "model-v2"
+
+    # No metadata in DB -> Stale
+    service.get_existing_metadata = MagicMock(return_value=None)
+    assert service.is_stale("book1", "hash123") is True
+
+    # Same hash, same model -> Not Stale
+    service.get_existing_metadata = MagicMock(return_value={"content_hash": "hash123", "model_version": "model-v2"})
+    assert service.is_stale("book1", "hash123") is False
+
+    # Different hash, same model -> Stale
+    service.get_existing_metadata = MagicMock(return_value={"content_hash": "hash-old", "model_version": "model-v2"})
+    assert service.is_stale("book1", "hash123") is True
+
+    # Same hash, different model -> Stale
+    service.get_existing_metadata = MagicMock(return_value={"content_hash": "hash123", "model_version": "model-v1"})
+    assert service.is_stale("book1", "hash123") is True

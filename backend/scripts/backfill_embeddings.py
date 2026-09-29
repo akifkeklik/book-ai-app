@@ -62,8 +62,7 @@ def backfill_embeddings(batch_size: int = 100, max_books: int = None, force_reco
 
             # Check staleness
             if not force_recompute:
-                meta = embedding_service.get_existing_metadata(book_id)
-                if meta and meta.get("content_hash") == content_hash and meta.get("model_version") == embedding_service._model:
+                if not embedding_service.is_stale(book_id, content_hash):
                     logger.debug(f"Book {book_id} is up-to-date. Skipping.")
                     skipped += 1
                     continue

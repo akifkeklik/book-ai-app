@@ -48,9 +48,9 @@ def test_backfill_loop(mock_config, mock_create_client, mock_embedding_service):
 
     # Book 1 is up-to-date, Book 2 needs update
     mock_service_instance._model = "model-v1"
-    mock_service_instance.get_existing_metadata.side_effect = [
-        {"content_hash": "hash1", "model_version": "model-v1"}, # Skip book1
-        None # Process book2
+    mock_service_instance.is_stale.side_effect = [
+        False, # Skip book1 (not stale)
+        True # Process book2 (stale)
     ]
 
     mock_service_instance.generate_embedding.return_value = [0.1, 0.2]
