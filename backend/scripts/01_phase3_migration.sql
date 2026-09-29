@@ -1,7 +1,9 @@
 -- 1. Ensure user_interactions has unique constraint
--- Delete exact duplicates first if they exist
+-- Delete exact duplicates first if they exist (keep the most recent one)
 DELETE FROM public.user_interactions a USING public.user_interactions b
-WHERE a.id < b.id AND a.user_id = b.user_id AND a.book_id = b.book_id;
+WHERE a.user_id = b.user_id 
+  AND a.book_id = b.book_id 
+  AND (a.created_at < b.created_at OR (a.created_at = b.created_at AND a.id < b.id));
 
 -- Now add unique constraint
 DO $$ 
@@ -16,10 +18,11 @@ BEGIN
 END $$;
 
 -- 2. Backfill existing favorites into user_interactions as 'like'
+-- Use DO NOTHING to prevent overwriting existing dislikes or newer interactions
 INSERT INTO public.user_interactions (user_id, book_id, interaction_type, created_at)
 SELECT user_id, isbn13, 'like', added_at
 FROM public.favorites
-ON CONFLICT (user_id, book_id) DO UPDATE SET interaction_type = 'like';
+ON CONFLICT (user_id, book_id) DO NOTHING;
 
 -- 3. Create Trigger to keep user_interactions updated when Flutter app modifies favorites
 CREATE OR REPLACE FUNCTION sync_favorites_to_interactions()
