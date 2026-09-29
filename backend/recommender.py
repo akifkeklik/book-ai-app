@@ -10,9 +10,8 @@ import logging
 import math
 import os
 import pickle
-import random
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -53,6 +52,7 @@ def _normalize_category_text(value: Any) -> str:
 # ── Configuration ─────────────────────────────────────────────────────────────
 class EngineConfig:
     """Typed configuration for the recommendation engine."""
+
     model_version: str = MODEL_VERSION
     tfidf_max_df: float = TFIDF_MAX_DF
     tfidf_min_df: int = TFIDF_MIN_DF
@@ -119,7 +119,9 @@ class RecommenderEngine:
 
         # If any row has no features, similarity on that row collapses; retry with min_df=1.
         if (self.tfidf_matrix.getnnz(axis=1) == 0).any() and min_df != 1:
-            logger.warning("Detected empty TF-IDF rows with min_df=%s; refitting with min_df=1", min_df)
+            logger.warning(
+                "Detected empty TF-IDF rows with min_df=%s; refitting with min_df=1", min_df
+            )
             self.tfidf_vectorizer = TfidfVectorizer(
                 stop_words="english",
                 max_df=self.config.tfidf_max_df,
@@ -140,7 +142,7 @@ class RecommenderEngine:
         """Find the DataFrame index for a book by its title or ISBN."""
         if not isinstance(book_identifier, str):
             return None
-            
+
         # Prioritize ISBN matching
         if len(book_identifier) == 13 and book_identifier.isdigit():
             matches = self.df.index[self.df["isbn13"] == book_identifier].tolist()
@@ -151,8 +153,9 @@ class RecommenderEngine:
         matches = self.df.index[self.df["title"].str.lower() == book_identifier.lower()].tolist()
         if matches:
             return matches[0]
-            
+
         return None
+
 
 # ── Orchestrator Class ────────────────────────────────────────────────────────
 class BookRecommender:
@@ -200,7 +203,9 @@ class BookRecommender:
                 return
             df = pd.DataFrame(response.data)
             self.engine.df = preprocess_dataframe(df)
-            logger.info(f"Data loaded from Supabase and preprocessed. Shape: {self.engine.df.shape}")
+            logger.info(
+                f"Data loaded from Supabase and preprocessed. Shape: {self.engine.df.shape}"
+            )
         except Exception as e:
             logger.error(f"Failed to load data from Supabase: {e}")
             self.engine.df = pd.DataFrame()
@@ -246,7 +251,10 @@ class BookRecommender:
                 logger.info("Legacy RecommenderEngine loaded successfully from %s.", path)
                 return self.is_fitted
 
-            if not hasattr(loaded_model, 'config') or loaded_model.config.model_version != self.config.model_version:
+            if (
+                not hasattr(loaded_model, "config")
+                or loaded_model.config.model_version != self.config.model_version
+            ):
                 logger.warning(
                     f"Model version mismatch. Found {getattr(loaded_model, 'config', 'N/A')}, "
                     f"expected {self.config.model_version}. Refusing to load."
@@ -254,7 +262,7 @@ class BookRecommender:
                 return False
 
             self.__dict__.update(loaded_model.__dict__)
-            self.is_fitted = getattr(self, 'is_fitted', False)
+            self.is_fitted = getattr(self, "is_fitted", False)
             logger.info(f"Model loaded successfully from {path}.")
             return self.is_fitted
         except Exception as e:
@@ -342,8 +350,12 @@ class BookRecommender:
             best_candidate_idx = -1
 
             for cand_idx in candidate_indices:
-                sim_to_selected = self.cosine_sim[cand_idx, selected_indices].max() if selected_indices else 0.0
-                mmr = (self.config.diversity_lambda * scores[cand_idx]) - ((1 - self.config.diversity_lambda) * sim_to_selected)
+                sim_to_selected = (
+                    self.cosine_sim[cand_idx, selected_indices].max() if selected_indices else 0.0
+                )
+                mmr = (self.config.diversity_lambda * scores[cand_idx]) - (
+                    (1 - self.config.diversity_lambda) * sim_to_selected
+                )
 
                 if mmr > max_mmr:
                     max_mmr = mmr
@@ -353,19 +365,23 @@ class BookRecommender:
                 selected_indices.append(best_candidate_idx)
                 candidate_indices.remove(best_candidate_idx)
             else:
-                break # No more candidates to add
+                break  # No more candidates to add
 
         recs = self.df.iloc[selected_indices].to_dict(orient="records")
         # Add scores and diversity penalty for transparency
         for rec in recs:
             idx = self.engine.find_index(rec["isbn13"])
             if idx is not None:
-                sim_to_selected = self.cosine_sim[idx, selected_indices].max() if selected_indices else 0.0
+                sim_to_selected = (
+                    self.cosine_sim[idx, selected_indices].max() if selected_indices else 0.0
+                )
                 rec["final_score"] = scores[idx]
                 rec["diversity_penalty"] = (1 - self.config.diversity_lambda) * sim_to_selected
         return recs
 
-    def _explain_recommendation(self, recommended_book: Dict[str, Any], seed_indices: List[int]) -> Dict[str, str]:
+    def _explain_recommendation(
+        self, recommended_book: Dict[str, Any], seed_indices: List[int]
+    ) -> Dict[str, str]:
         """Generate a simple explanation for a recommendation."""
         rec_idx = self.engine.find_index(recommended_book["isbn13"])
         if rec_idx is None or not seed_indices:
@@ -377,24 +393,23 @@ class BookRecommender:
         most_similar_seed_idx = seed_indices[np.argmax(sim_scores)]
         source_book = self.df.iloc[most_similar_seed_idx]
 
-        rec_cats = set(re.split(r'\s*[,|]\s*', recommended_book.get("categories", "").lower()))
-        source_cats = set(re.split(r'\s*[,|]\s*', source_book.get("categories", "").lower()))
+        rec_cats = set(re.split(r"\s*[,|]\s*", recommended_book.get("categories", "").lower()))
+        source_cats = set(re.split(r"\s*[,|]\s*", source_book.get("categories", "").lower()))
         common_genres = rec_cats.intersection(source_cats)
 
         if common_genres:
             explanation = f"'{source_book['title']}' kitabını sevdiğiniz için, ortak {', '.join(list(common_genres)[:2])} türündeki bu kitabı önerdik."
         else:
-            explanation = f"'{source_book['title']}' kitabına benzer bir atmosferi olduğu için önerdik."
-        return {
-            "explanation": explanation,
-            "explanation_source_book": source_book['title']
-        }
+            explanation = (
+                f"'{source_book['title']}' kitabına benzer bir atmosferi olduğu için önerdik."
+            )
+        return {"explanation": explanation, "explanation_source_book": source_book["title"]}
 
     def search_books(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search for books by title, author, or description."""
         if not self.is_fitted:
             return []
-        
+
         # A simple search implementation: check for query in combined features
         # A more robust search would use a dedicated search index or more advanced matching.
         mask = self.df["combined_features"].str.contains(query, case=False, na=False, regex=False)
@@ -408,7 +423,9 @@ class BookRecommender:
         sorted_df = self.df.sort_values(by="popularity_score", ascending=False)
         return sorted_df.head(limit).to_dict(orient="records")
 
-    def get_all_books(self, page: int = 1, per_page: int = 20, category: Optional[str] = None) -> Dict[str, Any]:
+    def get_all_books(
+        self, page: int = 1, per_page: int = 20, category: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Get a paginated list of all books, optionally filtered by category."""
         if self.df.empty:
             return {"books": [], "total": 0, "page": page, "per_page": per_page, "total_pages": 0}
@@ -416,10 +433,14 @@ class BookRecommender:
         df = self.df
         if category:
             cat = category.strip()
-            if cat and cat.lower() != 'all':
+            if cat and cat.lower() != "all":
                 # Senior Solution: Explicitly cast to string to handle list-like objects from Supabase/CSV
                 # and use a case-insensitive search.
-                mask = df["categories"].astype(str).str.contains(cat, case=False, na=False, regex=False)
+                mask = (
+                    df["categories"]
+                    .astype(str)
+                    .str.contains(cat, case=False, na=False, regex=False)
+                )
                 df = df[mask]
 
         start = (page - 1) * per_page
@@ -443,8 +464,7 @@ class BookRecommender:
         raw = self.df["categories"].dropna().astype(str)
         exploded = raw.str.split(r"\s*[,|;/]\s*").explode().str.strip()
         cleaned = exploded[
-            exploded.ne("")
-            & ~exploded.str.lower().isin({"nan", "none", "null", "unknown"})
+            exploded.ne("") & ~exploded.str.lower().isin({"nan", "none", "null", "unknown"})
         ]
         return sorted(cleaned.str.title().unique().tolist())
 

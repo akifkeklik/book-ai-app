@@ -4,8 +4,9 @@ The BookService is instantiated once at module import time (singleton pattern).
 """
 
 import logging
+from functools import wraps
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 
 from ..services.book_service import BookService
 
@@ -17,9 +18,32 @@ books_bp = Blueprint("books", __name__)
 _svc = BookService()
 
 
+def require_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Unauthorized: Missing or invalid Authorization header"}), 401
+
+        token = auth_header.split(" ")[1]
+        try:
+            user = _svc.verify_token(token)
+            if not user or not user.id:
+                return jsonify({"error": "Unauthorized: Invalid token"}), 401
+            g.user_id = user.id
+        except Exception as exc:
+            logger.warning(f"JWT verification failed: {exc}")
+            return jsonify({"error": "Unauthorized: Invalid or expired token"}), 401
+
+        return f(*args, **kwargs)
+
+    return decorated
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Health
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @books_bp.route("/health", methods=["GET"])
 def health_check():
@@ -38,6 +62,7 @@ def get_categories():
 # ─────────────────────────────────────────────────────────────────────────────
 # Books
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @books_bp.route("/books", methods=["GET"])
 def get_books():
@@ -79,6 +104,7 @@ def get_book_by_isbn(isbn: str):
 # Search
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @books_bp.route("/search", methods=["GET"])
 def search_books():
     query = request.args.get("q", "").strip()
@@ -98,6 +124,7 @@ def search_books():
 # ─────────────────────────────────────────────────────────────────────────────
 # Recommendations
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @books_bp.route("/recommend", methods=["GET"])
 def get_recommendations():
@@ -126,93 +153,109 @@ def get_recommendations():
                 "total": len(recommendations),
             }
         ), 200
-    except Exception as exc:
+    except Exception:
         logger.exception("GET /recommend error")
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @books_bp.route("/recommend/personalized", methods=["GET"])
+@require_auth
 def get_personalized():
-    user_id = request.args.get("user_id", "").strip()
+    user_id = g.user_id
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
     try:
         limit = min(max(1, int(request.args.get("limit", 10))), 50)
         recommendations = _svc.get_personalized_recommendations(user_id=user_id, limit=limit)
-        return jsonify({
-            "user_id": user_id,
-            "recommendations": recommendations,
-            "total": len(recommendations)
-        }), 200
-    except Exception as exc:
+        return jsonify(
+            {"user_id": user_id, "recommendations": recommendations, "total": len(recommendations)}
+        ), 200
+    except Exception:
         logger.exception("GET /recommend/personalized error")
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @books_bp.route("/onboarding", methods=["POST"])
+@require_auth
 def onboarding():
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "JSON body required"}), 400
-    
-    user_id = data.get("user_id")
+
+    user_id = g.user_id
     book_ids = data.get("book_ids", [])
     genres = data.get("genres", [])
-    
+
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
-        
+
     try:
         result = _svc.submit_onboarding(user_id, book_ids, genres)
         return jsonify(result), 200 if result["status"] == "success" else 500
-    except Exception as exc:
+    except Exception:
         logger.exception("POST /onboarding error")
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @books_bp.route("/feedback", methods=["POST"])
+@require_auth
 def feedback():
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "JSON body required"}), 400
-        
-    user_id = data.get("user_id")
+
+    user_id = g.user_id
     book_id = data.get("book_id")
-    interaction = data.get("interaction") # 'like' or 'dislike'
-    
+    interaction = data.get("interaction")  # 'like' or 'dislike'
+
     if not all([user_id, book_id, interaction]):
         return jsonify({"error": "user_id, book_id, and interaction are required"}), 400
-        
+
     try:
         result = _svc.submit_feedback(user_id, book_id, interaction)
         return jsonify(result), 200 if result["status"] == "success" else 500
-    except Exception as exc:
+    except Exception:
         logger.exception("POST /feedback error")
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Internal server error"}), 500
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Activity tracking
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @books_bp.route("/track", methods=["POST"])
+@require_auth
 def track_activity():
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "JSON body required"}), 400
 
-    user_id = data.get("user_id", "").strip()
+    user_id = g.user_id
     book_name = data.get("book_name", "").strip()
+    book_id = data.get("book_id", "").strip()
     action = data.get("action", "view").strip()
 
-    if not user_id or not book_name:
-        return jsonify({"error": "'user_id' and 'book_name' are required"}), 400
+    if not book_id:
+        return jsonify({"error": "book_id is required"}), 400
+
+    valid_actions = [
+        "view",
+        "book_view",
+        "book_like",
+        "book_dislike",
+        "book_favorite",
+        "recommendation_click",
+        "search",
+    ]
+    if action not in valid_actions:
+        return jsonify({"error": f"Invalid action. Supported: {valid_actions}"}), 400
 
     try:
         result = _svc.track_user_activity(
-            user_id=user_id, book_name=book_name, action=action
+            user_id=user_id, action=action, book_id=book_id, book_name=book_name
         )
         return jsonify(result), 200
-    except Exception as exc:
+    except Exception:
         logger.exception("POST /track error")
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": "Internal server error"}), 500
