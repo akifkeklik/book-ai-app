@@ -62,8 +62,8 @@ def fake_supabase(monkeypatch):
             self._table_name = table_name
             self._calls = calls
 
-        def upsert(self, payload):
-            self._calls.append((self._table_name, "upsert", payload))
+        def upsert(self, payload, **kwargs):
+            self._calls.append((self._table_name, "upsert", payload, kwargs))
             return self
 
         def insert(self, payload):
@@ -418,6 +418,7 @@ class TestMutationEndpoints:
         assert interaction_upserts[0][2] == [
             {"user_id": "test-user-123", "book_id": "123", "interaction_type": "like"}
         ]
+        assert interaction_upserts[0][3] == {"on_conflict": "user_id,book_id"}
 
         profile_upserts = [
             call
@@ -454,6 +455,7 @@ class TestMutationEndpoints:
             "book_id": "123",
             "interaction_type": "like",
         }
+        assert feedback_upserts[0][3] == {"on_conflict": "user_id,book_id"}
 
     def test_feedback_missing_fields(self, client, auth_headers):
         resp = client.post(

@@ -119,13 +119,15 @@ class BookService:
             return self.get_popular_books(limit=limit)
 
         try:
-            # 1. Get user interactions (Likes)
-            fav_resp = (
-                self._supabase.table("favorites").select("book_id").eq("user_id", user_id).execute()
+            # 1. Get user interactions (Likes and Dislikes)
+            interactions_resp = (
+                self._supabase.table("user_interactions").select("book_id, interaction_type").eq("user_id", user_id).execute()
             )
-            likes = [f["book_id"] for f in getattr(fav_resp, "data", [])]
+            interactions_data = getattr(interactions_resp, "data", [])
+            likes = [f["book_id"] for f in interactions_data if f.get("interaction_type") == "like"]
+            dislikes = [f["book_id"] for f in interactions_data if f.get("interaction_type") == "dislike"]
             likes = list(set(likes))  # dedupe
-            dislikes = []  # Initializing dislikes
+            dislikes = list(set(dislikes))
 
             seed_titles = []
             if likes:
@@ -192,7 +194,7 @@ class BookService:
                 {"user_id": user_id, "book_id": bid, "interaction_type": "like"} for bid in book_ids
             ]
             if entries:
-                self._supabase.table("user_interactions").upsert(entries).execute()
+                self._supabase.table("user_interactions").upsert(entries, on_conflict="user_id,book_id").execute()
 
             import datetime
 
@@ -216,7 +218,8 @@ class BookService:
             return {"status": "error"}
         try:
             self._supabase.table("user_interactions").upsert(
-                {"user_id": user_id, "book_id": book_id, "interaction_type": interaction}
+                {"user_id": user_id, "book_id": book_id, "interaction_type": interaction},
+                on_conflict="user_id,book_id"
             ).execute()
             return {"status": "success"}
         except Exception as e:
