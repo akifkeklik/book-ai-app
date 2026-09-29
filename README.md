@@ -42,7 +42,7 @@
 
 ### Backend (Python/Flask)
 
-- **AI Core:** RAG implementation for deep semantic searches.
+- **AI Core:** RAG implementation backed by `pgvector` for deep semantic searches.
 - **API:** Fast, scalable endpoints for recommendation generation.
 - **Integration:** Seamless bridge between Supabase data and AI models.
 
@@ -91,13 +91,19 @@ Libris follows a **Clean Architecture** pattern:
 
 ---
 
-## 🛡️ Engineering Excellence (Zero-Overflow Phase)
+## 🛡️ Engineering Excellence
 
-We recently completed a surgical strike on UI stability:
+### Phase 3.2: Advanced Vector Search (Completed)
+We have successfully implemented the production-grade vector embedding infrastructure:
+- ✅ **pgvector Integration:** Established `book_embeddings` with HNSW indexing and Cosine similarity for high-performance retrieval.
+- ✅ **Embedding Service:** Robust OpenAI integration with deterministic SHA-256 content hashing, model version freshness detection, and bounded exponential backoff.
+- ✅ **Idempotent Backfill:** Scalable embedding generation with cursor pagination and failure isolation.
+- ✅ **Zero-Downtime:** Seamless integration alongside the existing TF-IDF engine, preparing the foundation for Phase 3.3 Hybrid Scoring.
 
+### UI Stability (Zero-Overflow)
 - ✅ **Dynamic Constraints:** Replaced all fixed-dimension containers with `Flexible` and `Expanded` wrappers.
-- ✅ **Empty State Management:** Integrated `LibrisEmptyState` and `ErrorView` to ensure the UI never feels broken, even without a connection.
-- ✅ **Title Resilience:** Implemented multi-line text guards to prevent layout breakage from long book titles.
+- ✅ **Empty State Management:** Integrated `LibrisEmptyState` and `ErrorView` to ensure the UI never feels broken.
+- ✅ **Title Resilience:** Implemented multi-line text guards to prevent layout breakage.
 
 ---
 
@@ -121,6 +127,6 @@ Libris is built with corporate-grade stability. Every commit is automatically ve
 
 - **API Environment:** Hosted on **Render.com** with automated health monitoring.
 - **Database:** **Supabase** (PostgreSQL) for high-performance real-time data sync.
-- **AI Core:** Hybrid recommendation engine utilizing TF-IDF and semantic scoring.
+- **AI Core:** Dual-engine approach utilizing TF-IDF (active) and semantic vector scoring via `pgvector` (infrastructure ready).
 
 ---
