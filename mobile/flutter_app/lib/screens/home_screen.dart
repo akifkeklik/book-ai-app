@@ -8,6 +8,7 @@ import '../providers/auth_provider.dart';
 import '../providers/book_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/language_provider.dart';
+import '../services/supabase_service.dart';
 import '../widgets/book_card.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/skeleton_loader.dart';
@@ -57,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // We check if the list is still empty after loading.
       if (favs.favorites.isEmpty && mounted) {
         // Double check profile to avoid loop if they already onboarded but didn't favorite
-        final profile = await _supabase.getUserProfile(auth.currentUser!.id);
+        final profile = await SupabaseService.instance.getUserProfile(auth.currentUser!.id);
         if (profile == null && mounted) {
           context.go('/onboarding');
           return;
