@@ -36,6 +36,7 @@ class BookProvider extends ChangeNotifier {
   // ── Personalized Recommendations ──────────────────────────────────────────
   List<Book> _personalizedRecs = [];
   BookStatus _personalizedStatus = BookStatus.initial;
+  String? _lastPersonalizedUserId;
 
   List<Book> get personalizedRecs => _personalizedRecs;
   BookStatus get personalizedStatus => _personalizedStatus;
@@ -173,17 +174,24 @@ class BookProvider extends ChangeNotifier {
   // ── Personalized ─────────────────────────────────────────────────────────
   Future<void> fetchPersonalizedRecs(String userId,
       {bool force = false}) async {
-    if (_personalizedStatus == BookStatus.loading) return;
+    if (_personalizedStatus == BookStatus.loading && _lastPersonalizedUserId == userId) return;
+    _lastPersonalizedUserId = userId;
     _personalizedStatus = BookStatus.loading;
     notifyListeners();
     try {
-      _personalizedRecs = await _getPersonalizedRecs.execute(userId, _rawPopularBooks);
-      _personalizedStatus = BookStatus.loaded;
+      final recs = await _getPersonalizedRecs.execute(userId, _rawPopularBooks);
+      if (_lastPersonalizedUserId == userId) {
+        _personalizedRecs = recs;
+        _personalizedStatus = BookStatus.loaded;
+        notifyListeners();
+      }
     } catch (e) {
       debugPrint('Personalized Recs error: $e.');
-      _personalizedStatus = BookStatus.error;
+      if (_lastPersonalizedUserId == userId) {
+        _personalizedStatus = BookStatus.error;
+        notifyListeners();
+      }
     }
-    notifyListeners();
   }
 
   Future<void> submitFeedback({

@@ -37,7 +37,10 @@ class AppConfig {
 
   static String get librisApiKey {
     if (_envApiKey.isNotEmpty) return _envApiKey;
-    return 'MhTxZ39Pl/mkP79ayEnmMrXIkVHuCQ/M1cBxTbeLrmd3i1wEpLFCNLZx7t0N+txP';
+    if (kReleaseMode) {
+      throw Exception('API Key is missing in release mode! Use --dart-define=LIBRIS_API_KEY=...');
+    }
+    return 'MhTxZ39Pl/mkP79ayEnmMrXIkVHuCQ/M1cBxTbeLrmd3i1wEpLFCNLZx7t0N+txP'; // Debug fallback
   }
 
   // ── Supabase ───────────────────────────────────────────────────────────────
