@@ -19,18 +19,51 @@ on:
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:
+  # ── 🛡️ Database / Migration CI ──────────────────────────────────────────────
+  database-ci:
+    name: Migration Validation
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: ankane/pgvector:v0.5.1
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Apply Migrations
+        env:
+          PGPASSWORD: postgrespassword
+        run: |
+          echo "Applying CI Stubs..."
+          psql -h localhost -U postgres -d postgres -f "backend/ci_stubs.sql"
+          for sql in $(ls backend/scripts/*.sql | sort); do
+            echo "Applying $sql..."
+            psql -h localhost -U postgres -d postgres -f "$sql"
+          done
+
   # ── 🛡️ Backend CI (Python/Flask) ───────────────────────────────────────────
   backend-ci:
     name: Backend Lint & Test
     runs-on: ubuntu-latest
+    needs: database-ci
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
-          cache: 'pip' # Automated caching for faster builds
+          python-version: "3.12"
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -45,7 +78,18 @@ jobs:
 
       - name: Execute Pytest Suite
         run: |
-          python -m pytest backend/tests/ -v --tb=short
+          PYTHONPATH=backend python -m pytest backend/tests/ -v --tb=short
+
+  # ── 🛡️ Docker Build CI ─────────────────────────────────────────────────────
+  docker-ci:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build Backend Image
+        run: |
+          docker build --no-cache -t libris-backend backend/
 
   # ── 🛡️ Frontend CI (Flutter/Dart) ──────────────────────────────────────────
   frontend-ci:
@@ -57,7 +101,6 @@ jobs:
       - name: Set up Flutter Environment
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.5'
           channel: 'stable'
           cache: true
 
