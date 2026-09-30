@@ -336,7 +336,7 @@ Examples:
     logger.info(f"\n{_BOLD}Step 3/3 — Summary{_RESET}")
     logger.info(f"  Books         : {len(engine.df)}")
     logger.info(f"  TF-IDF shape  : {engine.tfidf_matrix.shape}")
-    logger.info(f"  Vocab size    : {len(engine.vectorizer.vocabulary_):,}")
+    logger.info(f"  Vocab size    : {len(engine.engine.vectorizer.vocabulary_):,}")
     logger.info(f"  Total time    : {t_load + t_train:.2f}s")
 
     # ── Validation (optional) ─────────────────────────────────────────────────

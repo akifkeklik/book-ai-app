@@ -16,3 +16,8 @@ backend/data/*backup*.csv
 
 # Tmp
 tmpclaude*
+checks.json
+ci_logs.txt
+*.json
+ruff.zip
+ruff_bin/

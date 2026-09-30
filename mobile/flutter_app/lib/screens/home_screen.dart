@@ -7,7 +7,6 @@ import '../models/book_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/book_provider.dart';
 import '../providers/favorites_provider.dart';
-import '../providers/language_provider.dart';
 import '../services/supabase_service.dart';
 import '../widgets/book_card.dart';
 import '../widgets/empty_state.dart';
@@ -125,6 +124,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     actions: [
+                      IconButton(
+                        icon: const Icon(Icons.auto_awesome),
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          context.push('/ai');
+                        },
+                      ),
                       IconButton(
                         icon: const Icon(Icons.settings_outlined),
                         onPressed: () {

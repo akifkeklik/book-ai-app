@@ -327,60 +327,102 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _buildActionButtons(BuildContext context, Book book) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: () =>
-                context.push('/recommend/${Uri.encodeComponent(book.title)}'),
-            icon: const Icon(Icons.auto_awesome),
-            label: Text(context.tr('ai_insight')),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () =>
+                    context.push('/recommend/${Uri.encodeComponent(book.title)}'),
+                icon: const Icon(Icons.auto_awesome),
+                label: Text(context.tr('ai_insight')),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
             ),
-          ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _InteractionButton(book: book, interaction: 'like', icon: Icons.thumb_up_outlined, label: 'Like'),
+            _InteractionButton(book: book, interaction: 'want_to_read', icon: Icons.bookmark_add_outlined, label: 'Want to Read'),
+            _InteractionButton(book: book, interaction: 'finished', icon: Icons.check_circle_outline, label: 'Finished'),
+          ],
         ),
       ],
     );
   }
 
   Widget _buildDescription(BuildContext context, Book book) {
-    if (book.description.isEmpty) return const SizedBox.shrink();
+    if (book.description.isEmpty && book.explanation == null) return const SizedBox.shrink();
     final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(context.tr('about'), style: theme.textTheme.titleLarge),
-        const SizedBox(height: 12),
-        AnimatedCrossFade(
-          firstChild: Text(
-            book.description,
-            maxLines: 5,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+        if (book.explanation != null) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.only(bottom: 24),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.3)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.auto_awesome, color: theme.colorScheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    book.explanation!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
+              ],
+            ),
           ),
-          secondChild: Text(
-            book.description,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-                ),
+        ],
+        if (book.description.isNotEmpty) ...[
+          Text(context.tr('about'), style: theme.textTheme.titleLarge),
+          const SizedBox(height: 12),
+          AnimatedCrossFade(
+            firstChild: Text(
+              book.description,
+              maxLines: 5,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color:
+                        Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                  ),
+            ),
+            secondChild: Text(
+              book.description,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color:
+                        Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                  ),
+            ),
+            crossFadeState: _descExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
           ),
-          crossFadeState: _descExpanded
-              ? CrossFadeState.showSecond
-              : CrossFadeState.showFirst,
-          duration: const Duration(milliseconds: 300),
-        ),
-        TextButton(
-          onPressed: () => setState(() => _descExpanded = !_descExpanded),
-          child: Text(_descExpanded ? context.tr('show_less') : context.tr('read_more')),
-        ),
+          TextButton(
+            onPressed: () => setState(() => _descExpanded = !_descExpanded),
+            child: Text(_descExpanded ? context.tr('show_less') : context.tr('read_more')),
+          ),
+        ],
       ],
     );
   }
@@ -445,6 +487,34 @@ class _LoadingScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       body: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _InteractionButton extends StatelessWidget {
+  final Book book;
+  final String interaction;
+  final IconData icon;
+  final String label;
+
+  const _InteractionButton({required this.book, required this.interaction, required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton.icon(
+      onPressed: () async {
+        final auth = context.read<AuthProvider>();
+        if (!auth.isLoggedIn) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please log in first')));
+          return;
+        }
+        final success = await ApiService.instance.submitFeedback(userId: auth.currentUser!.id, bookId: book.isbn13, interaction: interaction);
+        if (success && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Marked as $label')));
+        }
+      },
+      icon: Icon(icon),
+      label: Text(label),
     );
   }
 }

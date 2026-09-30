@@ -2,7 +2,7 @@
 # Multi-stage build for a slim, production-ready image.
 
 # ── 1. Build Stage ──────────────────────────────────────────────────────────
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.12.10-slim-bookworm AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # ── 2. Runtime Stage ────────────────────────────────────────────────────────
-FROM python:3.11-slim-bookworm
+FROM python:3.12.10-slim-bookworm
 
 WORKDIR /app
 
