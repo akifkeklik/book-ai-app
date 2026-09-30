@@ -5,6 +5,28 @@ import '../domain/entities/book.dart';
 import '../data/models/book_dto.dart';
 
 class ApiService {
+  static String mapError(dynamic e) {
+    if (e is DioException) {
+      if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
+        return 'Bağlantı zaman aşımına uğradı.';
+      }
+      if (e.response != null) {
+        final code = e.response!.statusCode;
+        if (code == 400) return 'Geçersiz istek (400).';
+        if (code == 401) return 'Oturum süresi doldu (401).';
+        if (code == 403) return 'Yetkisiz erişim (403).';
+        if (code == 404) return 'Kaynak bulunamadı (404).';
+        if (code == 409) return 'İşlem çakışması (409).';
+        if (code == 422) return 'Doğrulama hatası (422).';
+        if (code == 429) return 'Çok fazla istek (429).';
+        if (code! >= 500) return 'Sunucu hatası ($code).';
+        return 'Bilinmeyen hata ($code).';
+      }
+      return 'İnternet bağlantınızı kontrol edin.';
+    }
+    return 'Beklenmeyen hata: $e';
+  }
+
   Future<List<String>> getCategories() async {
     final resp = await _dio.get(AppConfig.apiCategories);
     final List<dynamic> list =
@@ -64,12 +86,12 @@ class ApiService {
       InterceptorsWrapper(
         onRequest: (options, handler) {
           // ignore: avoid_print
-          print('[API] ${options.method} ${options.uri}');
+          // print removed
           handler.next(options);
         },
         onError: (error, handler) {
           // ignore: avoid_print
-          print('[API] Error: ${error.message}');
+          // print removed
           handler.next(error);
         },
       ),
@@ -150,7 +172,7 @@ class ApiService {
       }
     } catch (e) {
       // ignore: avoid_print
-      print('[API] Personalized recommendations failed: $e');
+      // print removed
     }
     return [];
   }

@@ -50,29 +50,31 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     final auth = context.read<AuthProvider>();
-    final success = await auth.login(
-      email: _emailCtrl.text.trim(),
-      password: _passCtrl.text,
-    );
+    final favs = context.read<FavoritesProvider>();
+    final email = _emailCtrl.text.trim();
+    final password = _passCtrl.text;
+    final rememberMe = _rememberMe;
+
+    final success = await auth.login(email: email, password: password);
 
     if (!mounted) return;
 
     if (success) {
       // Save credentials if remember me is checked
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('remember_me', _rememberMe);
-      if (_rememberMe) {
-        await prefs.setString('saved_email', _emailCtrl.text.trim());
+      if (!mounted) return;
+      await prefs.setBool('remember_me', rememberMe);
+      if (rememberMe) {
+        await prefs.setString('saved_email', email);
       } else {
         await prefs.remove('saved_email');
       }
 
-      // Load favorites
-      context
-          .read<FavoritesProvider>()
-          .loadFavorites(auth.currentUser!.id);
+      if (!mounted) return;
+      final userId = auth.currentUser?.id;
+      if (userId != null) favs.loadFavorites(userId);
       context.go('/');
     }
   }

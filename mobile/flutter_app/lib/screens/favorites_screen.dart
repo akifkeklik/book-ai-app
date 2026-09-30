@@ -162,8 +162,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.delete_outline, color: Colors.white),
-                SizedBox(height: 4),
+                const Icon(Icons.delete_outline, color: Colors.white),
+                const SizedBox(height: 4),
                 Text(context.tr('remove'),
                     style: const TextStyle(color: Colors.white, fontSize: 11)),
               ],
@@ -201,7 +201,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               child: CachedNetworkImage(
                 imageUrl: fav.thumbnail.isNotEmpty
                     ? fav.thumbnail
-                    : 'https://via.placeholder.com/56x80.png?text=Book',
+                    : 'https://placehold.co/56x80.png?text=Book',
                 width: 56,
                 height: 80,
                 fit: BoxFit.cover,

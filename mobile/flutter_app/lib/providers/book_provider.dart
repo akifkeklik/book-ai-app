@@ -129,6 +129,7 @@ class BookProvider extends ChangeNotifier {
 
   // ── Popular (Infinite Scroll) ───────────────────────────────────────────
   Future<void> fetchPopular({bool force = false}) async {
+    if (_popularStatus == BookStatus.loading) return;
     if (!force &&
         _lastFetchTime != null &&
         DateTime.now().difference(_lastFetchTime!).inMinutes < 2) {
@@ -146,7 +147,7 @@ class BookProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _popularStatus = BookStatus.error;
-      _popularError = e.toString();
+      _popularError = ApiService.mapError(e);
       notifyListeners();
     }
   }
@@ -172,6 +173,7 @@ class BookProvider extends ChangeNotifier {
   // ── Personalized ─────────────────────────────────────────────────────────
   Future<void> fetchPersonalizedRecs(String userId,
       {bool force = false}) async {
+    if (_personalizedStatus == BookStatus.loading) return;
     _personalizedStatus = BookStatus.loading;
     notifyListeners();
     try {
@@ -270,7 +272,7 @@ class BookProvider extends ChangeNotifier {
       _searchStatus = results.isEmpty ? BookStatus.initial : BookStatus.loaded;
     } catch (e) {
       _searchStatus = BookStatus.error;
-      _searchError = e.toString();
+      _searchError = ApiService.mapError(e);
     }
     notifyListeners();
   }
@@ -293,6 +295,5 @@ class BookProvider extends ChangeNotifier {
   // ── Helpers ──────────────────────────────────────────────────────────────
   void _applyGlobalFilters() {
     _filteredPopularBooks = List.from(_rawPopularBooks);
-    notifyListeners();
   }
 }

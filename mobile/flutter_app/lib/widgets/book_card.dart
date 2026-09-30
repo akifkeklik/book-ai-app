@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../domain/entities/book.dart';
 import '../providers/auth_provider.dart';
 import '../providers/book_provider.dart';
+import '../providers/language_provider.dart';
 import 'book_cover_fallback.dart';
 
 // ── Shared Multi-layer Fallback Cover ───────────────────────────────────────
@@ -130,15 +131,15 @@ class BookCard extends StatelessWidget {
                                 blurRadius: 4),
                           ],
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.auto_awesome,
+                            const Icon(Icons.auto_awesome,
                                 size: 10, color: Colors.white),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 4),
                             Text(
-                              "SİZİN İÇİN",
-                              style: TextStyle(
+                              context.tr('for_you').toUpperCase(),
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
@@ -146,22 +147,6 @@ class BookCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                      ),
-                    ),
-
-                  // Debug Visibility Tooltip (Top Left)
-                  if (book.finalScore != null)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.bug_report,
-                            size: 10, color: Colors.white70),
                       ),
                     ),
                 ],
@@ -639,59 +624,8 @@ class _InteractionButtons extends StatelessWidget {
           splashRadius: 14,
           color: colors.error,
         ),
-        if (book.finalScore != null) ...[
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  backgroundColor: Theme.of(context).cardColor,
-                  title: const Text("AI Analizi (Debug)",
-                      style: TextStyle(color: Colors.white, fontSize: 16)),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Kaynak: ${book.explanationSourceBook}",
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 12)),
-                      const Divider(color: Colors.white10),
-                      _debugScoreRow(
-                          "İçerik Benzerliği", book.rawSimilarityScore),
-                      _debugScoreRow(
-                          "Çeşitlilik Cezası", book.diversityPenalty),
-                      const SizedBox(height: 8),
-                      Text("Final Skor: ${book.finalScore}",
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: colors.primary,
-                              fontSize: 14)),
-                    ],
-                  ),
-                ),
-              );
-            },
-            child: Icon(Icons.info_outline,
-                size: 12, color: colors.onSurface.withOpacity(0.3)),
-          ),
-        ],
       ],
     );
   }
 
-  Widget _debugScoreRow(String label, double? score) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: const TextStyle(color: Colors.white54, fontSize: 10)),
-          Text(score?.toStringAsFixed(4) ?? "0.0000",
-              style: const TextStyle(color: Colors.white, fontSize: 10)),
-        ],
-      ),
-    );
-  }
 }

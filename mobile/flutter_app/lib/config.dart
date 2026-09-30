@@ -65,5 +65,5 @@ class AppConfig {
 
   static const String appName = 'Libris';
   static const String placeholderCover =
-      'https://via.placeholder.com/120x180.png?text=Book';
+      'https://placehold.co/120x180.png?text=Book';
 }

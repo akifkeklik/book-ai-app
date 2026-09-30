@@ -75,13 +75,6 @@ class FavoritesProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> removeFavoriteByBookId({
-    required String userId,
-    required String bookId,
-  }) async {
-    await _removeFavorite(userId: userId, bookId: bookId);
-  }
-
   Future<void> removeFavoriteByIsbn({
     required String userId,
     required String isbn13,
@@ -110,8 +103,7 @@ class FavoritesProvider extends ChangeNotifier {
         author: book.author,
         imageUrl: book.thumbnail,
       );
-      // Reload to get real ID
-      await loadFavorites(userId);
+      // Stream subscription delivers the real record automatically.
     } catch (e) {
       // Rollback
       _favorites.removeWhere((f) => f.isbn13 == book.isbn13 && f.id.isEmpty);

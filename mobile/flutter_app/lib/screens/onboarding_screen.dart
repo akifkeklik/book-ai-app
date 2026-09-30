@@ -341,8 +341,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 selected: isSelected,
                 onSelected: (val) {
                   setState(() {
-                    if (val) _selectedAuthors.add(author);
-                    else _selectedAuthors.remove(author);
+                    if (val) { _selectedAuthors.add(author); }
+                    else { _selectedAuthors.remove(author); }
                   });
                 },
                 backgroundColor: theme.cardColor.withOpacity(0.3),
@@ -492,8 +492,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           activeColor: theme.colorScheme.primary,
                           onChanged: (val) {
                             setState(() {
-                              if (val == true) _selectedBooks.add(book.isbn13);
-                              else _selectedBooks.remove(book.isbn13);
+                              if (val == true) { _selectedBooks.add(book.isbn13); }
+                              else { _selectedBooks.remove(book.isbn13); }
                             });
                           },
                         ),
