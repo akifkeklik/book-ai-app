@@ -58,8 +58,11 @@ class EngineConfig:
     tfidf_min_df: int = TFIDF_MIN_DF
     tfidf_max_features: int = TFIDF_MAX_FEATURES
     diversity_lambda: float = DIVERSITY_LAMBDA
-    weight_similarity: float = WEIGHT_SIMILARITY
-    weight_popularity: float = WEIGHT_POPULARITY
+    
+    # Hybrid Weights
+    weight_semantic: float = 0.5
+    weight_tfidf: float = 0.3
+    weight_popularity: float = 0.2
 
 
 # ── Core Engine ───────────────────────────────────────────────────────────────
@@ -274,9 +277,11 @@ class BookRecommender:
         seed_titles: List[str] | str,
         top_n: int = 10,
         use_diversity: bool = True,
+        semantic_scores: Optional[Dict[str, float]] = None,
+        dislikes: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Generate book recommendations based on seed titles.
+        Generate book recommendations based on seed titles, optionally merging semantic scores.
         """
         if not self.is_fitted:
             logger.info("Model not fitted. Fitting now...")
@@ -305,15 +310,39 @@ class BookRecommender:
         # Calculate raw similarity scores
         raw_scores = cosine_similarity(centroid_vec, self.tfidf_matrix).flatten()
 
+        # Process semantic scores if provided
+        semantic_vec = np.zeros(len(self.df))
+        if semantic_scores:
+            for isbn, score in semantic_scores.items():
+                idx = self.engine.find_index(isbn)
+                if idx is not None:
+                    semantic_vec[idx] = score
+
         # Hybrid Scoring
         popularity_scores = self.df["popularity_score"].to_numpy()
-        final_scores = (
-            self.config.weight_similarity * raw_scores
-            + self.config.weight_popularity * popularity_scores
-        )
+        
+        if semantic_scores:
+            final_scores = (
+                self.config.weight_tfidf * raw_scores
+                + self.config.weight_semantic * semantic_vec
+                + self.config.weight_popularity * popularity_scores
+            )
+        else:
+            # Fallback for when semantic search is unavailable
+            final_scores = (
+                0.7 * raw_scores
+                + 0.3 * popularity_scores
+            )
 
         # Set scores of seed books to a very low value to exclude them
         final_scores[seed_indices] = -1.0
+        
+        # Hard filter for dislikes
+        if dislikes:
+            for isbn in dislikes:
+                idx = self.engine.find_index(isbn)
+                if idx is not None:
+                    final_scores[idx] = -1.0
 
         if use_diversity:
             # Maximal Marginal Relevance (MMR) for diversity
