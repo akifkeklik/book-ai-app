@@ -147,7 +147,7 @@ class BookProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _popularStatus = BookStatus.error;
-      _popularError = ApiService.mapError(e);
+      _popularError = e.toString();
       notifyListeners();
     }
   }
@@ -272,7 +272,7 @@ class BookProvider extends ChangeNotifier {
       _searchStatus = results.isEmpty ? BookStatus.initial : BookStatus.loaded;
     } catch (e) {
       _searchStatus = BookStatus.error;
-      _searchError = ApiService.mapError(e);
+      _searchError = e.toString();
     }
     notifyListeners();
   }

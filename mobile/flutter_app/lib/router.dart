@@ -103,20 +103,20 @@ class AppRouter {
         GoRoute(
           path: '/category/:genre',
           builder: (context, state) => CategoryTimelineScreen(
-            genre: Uri.decodeComponent(state.pathParameters['genre'] ?? ''),
+            genre: Uri.decodeComponent(state.pathParameters['genre']!),
           ),
         ),
         GoRoute(
           path: '/book/:isbn',
           builder: (context, state) => DetailScreen(
-            isbn: state.pathParameters['isbn'] ?? '',
+            isbn: state.pathParameters['isbn']!,
             initialBook: state.extra is Book ? state.extra as Book : null,
           ),
         ),
         GoRoute(
           path: '/recommend/:title',
           builder: (context, state) => RecommendationScreen(
-            bookTitle: Uri.decodeComponent(state.pathParameters['title'] ?? ''),
+            bookTitle: Uri.decodeComponent(state.pathParameters['title']!),
           ),
         ),
         GoRoute(

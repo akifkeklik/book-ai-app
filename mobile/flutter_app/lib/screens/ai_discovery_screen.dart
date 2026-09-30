@@ -18,12 +18,6 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
   String _answer = "";
   List<Book> _referencedBooks = [];
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
   Future<void> _submitQuery() async {
     if (_isLoading) return;
     final query = _controller.text.trim();
@@ -47,12 +41,10 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
         }
       });
     } catch (e) {
-      if (!mounted) return;
       setState(() {
         _answer = "${context.tr('error')}: $e";
       });
     } finally {
-      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
