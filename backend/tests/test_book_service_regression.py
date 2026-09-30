@@ -38,6 +38,11 @@ class TestBookServiceRegression:
         ]
         mock_supabase.table().select().eq().execute.return_value = mock_interactions_resp
 
+        # Mock Supabase RPC response for hybrid search
+        mock_rpc_resp = MagicMock()
+        mock_rpc_resp.data = []  # No semantic scores, fallback to pure TF-IDF for test
+        mock_supabase.rpc().execute.return_value = mock_rpc_resp
+
         # Execute
         recs = service.get_personalized_recommendations(user_id="user_123", limit=10)
 

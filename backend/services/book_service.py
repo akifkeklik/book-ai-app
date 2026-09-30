@@ -171,9 +171,31 @@ class BookService:
             logger.info(
                 f"Generating personalized recs for {user_id} with {len(seed_titles)} seeds."
             )
-            recs = self.recommender.recommend(seed_titles, top_n=limit, use_diversity=True)
 
-            # 4. Filter out dislikes (if not already handled by engine)
+            # --- PHASE 3.3: Fetch Semantic Candidates via pgvector RPC ---
+            semantic_scores = None
+            if likes:
+                try:
+                    rpc_resp = self._supabase.rpc(
+                        "match_book_embeddings",
+                        {"seed_book_ids": likes, "match_threshold": 0.0, "match_count": 100}
+                    ).execute()
+                    rpc_data = getattr(rpc_resp, "data", [])
+                    if rpc_data:
+                        semantic_scores = {row["book_id"]: row["similarity"] for row in rpc_data}
+                        logger.info(f"Retrieved {len(semantic_scores)} semantic candidates.")
+                except Exception as e:
+                    logger.warning(f"Semantic candidate generation failed: {e}. Degrading to TF-IDF only.")
+
+            recs = self.recommender.recommend(
+                seed_titles,
+                top_n=limit,
+                use_diversity=True,
+                semantic_scores=semantic_scores,
+                dislikes=dislikes
+            )
+
+            # Dislikes are now hard-filtered during recommendation, but double-check
             final_recs = [r for r in recs if r.get("isbn13") not in dislikes]
 
             return self._enrich(final_recs)
