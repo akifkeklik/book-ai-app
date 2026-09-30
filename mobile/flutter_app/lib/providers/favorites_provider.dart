@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../models/book_model.dart';
+import '../domain/entities/book.dart';
+import '../data/models/book_dto.dart';
 import '../services/supabase_service.dart';
 
 class FavoritesProvider extends ChangeNotifier {
@@ -34,7 +35,7 @@ class FavoritesProvider extends ChangeNotifier {
           .eq('user_id', userId)
           .order('added_at', ascending: false)
           .listen((data) {
-        _favorites = data.map((j) => FavoriteBook.fromJson(j)).toList();
+        _favorites = data.map((j) => FavoriteBookDto.fromJson(j)).toList();
         _isLoading = false;
         notifyListeners();
       }, onError: (e) {

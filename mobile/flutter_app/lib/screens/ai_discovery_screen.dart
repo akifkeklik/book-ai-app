@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../models/book_model.dart';
+import '../domain/entities/book.dart';
+import '../data/models/book_dto.dart';
 import '../widgets/book_card.dart';
 
 class AiDiscoveryScreen extends StatefulWidget {
@@ -32,7 +33,7 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
         _answer = res['answer'] ?? "No response.";
         if (res['referenced_books'] != null) {
           _referencedBooks = (res['referenced_books'] as List)
-              .map((b) => Book.fromJson(b as Map<String, dynamic>))
+              .map((b) => BookDto.fromJson(b as Map<String, dynamic>))
               .toList();
         }
       });

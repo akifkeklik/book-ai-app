@@ -43,5 +43,5 @@ class GenericLlmAdapter(LlmPort):
                 return None
                 
         except Exception as e:
-            logger.error(f"LLM provider error: {e}")
+            logger.error(f"LLM provider error", extra={"extra_data": {"provider": self._provider, "error": str(e), "error_type": type(e).__name__}})
             return None

@@ -55,3 +55,8 @@ class LlmPort(Protocol):
         Should handle its own timeouts and fallbacks.
         """
         ...
+
+
+class EmbeddingPort(Protocol):
+    def generate_embedding(self, text: str, max_retries: int = 3) -> Optional[List[float]]:
+        ...

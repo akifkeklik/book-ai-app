@@ -33,6 +33,7 @@ def client():
     """Create a Flask test client with the default config."""
     app = create_app()
     app.config["TESTING"] = True
+    app.config["PROPAGATE_EXCEPTIONS"] = False
     with app.test_client() as c:
         yield c
 

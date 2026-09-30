@@ -1,7 +1,8 @@
 import 'package:dio/dio.dart';
 
 import '../config.dart';
-import '../models/book_model.dart';
+import '../domain/entities/book.dart';
+import '../data/models/book_dto.dart';
 
 class ApiService {
   Future<List<String>> getCategories() async {
@@ -35,7 +36,7 @@ class ApiService {
     final List<dynamic> list = resp.data['books'] as List;
     return {
       'books':
-          list.map((j) => Book.fromJson(j as Map<String, dynamic>)).toList(),
+          list.map((j) => BookDto.fromJson(j as Map<String, dynamic>)).toList(),
       'total': resp.data['total'],
       'total_pages': resp.data['total_pages'],
     };
@@ -84,7 +85,7 @@ class ApiService {
       queryParameters: {'limit': limit},
     );
     final List<dynamic> list = resp.data['books'] as List;
-    return list.map((j) => Book.fromJson(j as Map<String, dynamic>)).toList();
+    return list.map((j) => BookDto.fromJson(j as Map<String, dynamic>)).toList();
   }
 
   Future<Map<String, dynamic>> getAllBooks(
@@ -97,7 +98,7 @@ class ApiService {
     final List<dynamic> list = resp.data['books'] as List;
     return {
       'books':
-          list.map((j) => Book.fromJson(j as Map<String, dynamic>)).toList(),
+          list.map((j) => BookDto.fromJson(j as Map<String, dynamic>)).toList(),
       'total': resp.data['total'],
       'total_pages': resp.data['total_pages'],
     };
@@ -106,7 +107,7 @@ class ApiService {
   Future<Book?> getBookByIsbn(String isbn) async {
     try {
       final resp = await _dio.get('/api/books/$isbn');
-      return Book.fromJson(resp.data['book'] as Map<String, dynamic>);
+      return BookDto.fromJson(resp.data['book'] as Map<String, dynamic>);
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return null;
       rethrow;
@@ -122,7 +123,7 @@ class ApiService {
       queryParameters: {'q': query, 'limit': limit},
     );
     final List<dynamic> list = resp.data['books'] as List;
-    return list.map((j) => Book.fromJson(j as Map<String, dynamic>)).toList();
+    return list.map((j) => BookDto.fromJson(j as Map<String, dynamic>)).toList();
   }
 
   // ── Recommendations ────────────────────────────────────────────────────────
@@ -134,7 +135,7 @@ class ApiService {
       queryParameters: {'book': bookTitle, 'top_n': topN, 'hybrid': 'true'},
     );
     final List<dynamic> list = resp.data['recommendations'] as List;
-    return list.map((j) => Book.fromJson(j as Map<String, dynamic>)).toList();
+    return list.map((j) => BookDto.fromJson(j as Map<String, dynamic>)).toList();
   }
 
   Future<List<Book>> getPersonalizedRecommendations(
@@ -144,7 +145,7 @@ class ApiService {
           queryParameters: {'user_id': userId});
       if (response.data != null && response.data['recommendations'] != null) {
         return (response.data['recommendations'] as List)
-            .map((json) => Book.fromJson(json))
+            .map((json) => BookDto.fromJson(json))
             .toList();
       }
     } catch (e) {

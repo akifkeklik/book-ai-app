@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/book_model.dart';
+import '../domain/entities/book.dart';
+import '../data/models/book_dto.dart';
 import '../utils/category_mapper.dart';
 
 class SupabaseService {
@@ -45,7 +46,7 @@ class SupabaseService {
           .limit(limit)
           .timeout(const Duration(seconds: 10));
 
-      return (response as List).map((j) => Book.fromJson(j)).toList();
+      return (response as List).map((j) => BookDto.fromJson(j)).toList();
     } catch (e) {
       throw Exception('Ağ bağlantısı zaman aşımına uğradı veya koptu. Lütfen tekrar deneyin.');
     }
@@ -59,7 +60,7 @@ class SupabaseService {
           .or('title.ilike.*$query*,authors.ilike.*$query*,categories.ilike.*$query*')
           .limit(50)
           .timeout(const Duration(seconds: 15));
-      return (response as List).map((j) => Book.fromJson(j)).toList();
+      return (response as List).map((j) => BookDto.fromJson(j)).toList();
     } catch (e) {
       throw Exception('Arama sırasında ağ hatası oluştu.');
     }
@@ -109,10 +110,10 @@ class SupabaseService {
             .textSearch('title', category, config: 'english')
             .limit(limit)
             .timeout(const Duration(seconds: 10));
-        return (broaderResponse as List).map((j) => Book.fromJson(j)).toList();
+        return (broaderResponse as List).map((j) => BookDto.fromJson(j)).toList();
       }
 
-      return data.map((j) => Book.fromJson(j)).toList();
+      return data.map((j) => BookDto.fromJson(j)).toList();
     } catch (e) {
       debugPrint('Supabase Category Error: $e');
       throw Exception('Kategoriler yüklenirken ağ zaman aşımı oluştu.');
@@ -226,7 +227,7 @@ class SupabaseService {
           .timeout(const Duration(seconds: 10));
           
       if (response == null) return null;
-      return Book.fromJson(response);
+      return BookDto.fromJson(response);
     } catch (e) {
       debugPrint('Error fetching book details: $e');
       return null;
