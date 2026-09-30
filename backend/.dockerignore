@@ -1,0 +1,11 @@
+.env
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+venv/
+tests/
+scripts/
+data/
+test_recommender_out.txt
+*.pyc
+*.pyo
