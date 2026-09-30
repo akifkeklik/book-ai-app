@@ -4,14 +4,19 @@ import os
 import time
 from typing import List, Optional
 
+try:
+    from ..domain.ports import BookDataPort
+except ImportError:
+    from domain.ports import BookDataPort
+
 import openai
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
 class EmbeddingService:
-    def __init__(self, supabase_client=None):
-        self._supabase = supabase_client
+    def __init__(self, book_data_port: Optional[BookDataPort] = None):
+        self._book_data_port = book_data_port
         self._model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
         self._dimension = int(os.getenv("EMBEDDING_DIMENSION", "1536"))
         self._client = None
@@ -107,15 +112,11 @@ class EmbeddingService:
         """
         Veritabanında bu kitap için embedding olup olmadığını kontrol eder.
         """
-        if not self._supabase:
+        if not self._book_data_port:
             return None
 
         try:
-            resp = self._supabase.table("book_embeddings").select("content_hash, model_version").eq("book_id", book_id).execute()
-            data = getattr(resp, "data", [])
-            if data:
-                return data[0]
-            return None
+            return self._book_data_port.get_embedding_metadata(book_id)
         except Exception as e:
             logger.error(f"Error fetching embedding metadata: {e}")
             return None
@@ -141,21 +142,16 @@ class EmbeddingService:
         """
         Oluşturulan embedding'i veritabanına kaydeder.
         """
-        if not self._supabase:
+        if not self._book_data_port:
             return False
 
         try:
-            payload = {
-                "book_id": book_id,
-                "embedding": embedding,
-                "content_hash": content_hash,
-                "model_version": self._model
-            }
-            # book_embeddings tablosunda book_id primary key, bu nedenle on_conflict ile doğrudan update edilebilir.
-            self._supabase.table("book_embeddings").upsert(
-                payload,
-                on_conflict="book_id"
-            ).execute()
+            self._book_data_port.upsert_embedding(
+                book_id=book_id,
+                embedding=embedding,
+                content_hash=content_hash,
+                model_version=self._model,
+            )
             return True
         except Exception as e:
             logger.error(f"Error upserting embedding: {e}")

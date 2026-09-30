@@ -17,6 +17,7 @@ from supabase import Client, create_client
 
 from ..config import Config
 from ..recommender import BookRecommender
+from ..domain.ports import UserInteractionRepository, BookDataPort, AuthPort
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +25,17 @@ logger = logging.getLogger(__name__)
 class BookService:
     """Singleton-style service initialised once when the blueprint is imported."""
 
-    def __init__(self) -> None:
-        self.recommender = BookRecommender()
-        self._supabase: Optional[Client] = None
-        if Config.SUPABASE_URL and Config.SUPABASE_ANON_KEY:
-            self._supabase = create_client(Config.SUPABASE_URL, Config.SUPABASE_ANON_KEY)
+    def __init__(
+        self,
+        recommender: "BookRecommender",
+        interaction_repo: Optional["UserInteractionRepository"] = None,
+        book_data_port: Optional["BookDataPort"] = None,
+        auth_port: Optional["AuthPort"] = None,
+    ) -> None:
+        self.recommender = recommender
+        self.interaction_repo = interaction_repo
+        self.book_data_port = book_data_port
+        self.auth_port = auth_port
         self._bootstrap()
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -37,8 +44,8 @@ class BookService:
 
     def _bootstrap(self) -> None:
         """Fetch from Supabase and train; fallback to CSV only if no Supabase."""
-        # 1. Try Supabase first (Higher priority (Senior upgrade))
-        if self._supabase:
+        # 1. Try DB Port first (Higher priority (Senior upgrade))
+        if self.book_data_port:
             try:
                 # Check if model already exists and matches Supabase data hash (Performance Optimization)
                 if self.recommender.load_model(Config.MODEL_PATH):
@@ -49,12 +56,20 @@ class BookService:
                     return
 
                 logger.info("Bootstrap: Loading data from Supabase for training...")
-                self.recommender.load_from_supabase(self._supabase)
+                # We need to adapt the recommender to load from our new port.
+                raw_data = self.book_data_port.get_all_books_raw()
+                if raw_data:
+                    import pandas as pd
+                    from ..utils.preprocess import preprocess_dataframe
+                    df = pd.DataFrame(raw_data)
+                    self.recommender.engine.df = preprocess_dataframe(df)
+                    
                 self.recommender.fit(save_path=Config.MODEL_PATH)
                 logger.info("Recommendation model trained on Supabase data.")
                 return
             except Exception as e:
                 logger.error(f"Failed to bootstrap from Supabase: {e}")
+
 
         # 2. Fallback to pickle or CSV
         if self.recommender.load_model(Config.MODEL_PATH):
@@ -118,32 +133,24 @@ class BookService:
         1. Fetch Likes, Dislikes and Profile Genres.
         2. Pass them as hashable tuples to the cached recommendation computation.
         """
-        if not self._supabase:
+        if not self.interaction_repo:
             return self.get_popular_books(limit=limit)
 
         try:
             # 1. Get user interactions (Likes and Dislikes)
-            interactions_resp = (
-                self._supabase.table("user_interactions").select("book_id, interaction_type").eq("user_id", user_id).execute()
-            )
-            interactions_data = getattr(interactions_resp, "data", [])
+            interactions_data = self.interaction_repo.get_user_interactions(user_id)
             likes = [f["book_id"] for f in interactions_data if f.get("interaction_type") == "like"]
             dislikes = [f["book_id"] for f in interactions_data if f.get("interaction_type") == "dislike"]
+
 
             likes_tuple = tuple(sorted(set(likes)))
             dislikes_tuple = tuple(sorted(set(dislikes)))
 
             genres_tuple = ()
             if not likes_tuple:
-                profile_resp = (
-                    self._supabase.table("user_profiles")
-                    .select("preferred_genres")
-                    .eq("user_id", user_id)
-                    .execute()
-                )
-                profile_data = getattr(profile_resp, "data", [])
+                profile_data = self.interaction_repo.get_user_profile(user_id)
                 if profile_data:
-                    genres = profile_data[0].get("preferred_genres", [])
+                    genres = profile_data.get("preferred_genres", [])
                     if genres:
                         genres_tuple = tuple(sorted(set(genres)))
 
@@ -195,17 +202,12 @@ class BookService:
                 f"Generating personalized recs for {user_id} with {len(seed_titles)} seeds."
             )
 
-            # --- PHASE 3.3: Fetch Semantic Candidates via pgvector RPC ---
+            # --- PHASE 3.3: Fetch Semantic Candidates via port ---
             semantic_scores = None
-            if likes:
+            if likes and self.book_data_port:
                 try:
-                    rpc_resp = self._supabase.rpc(
-                        "match_book_embeddings",
-                        {"seed_book_ids": list(likes), "match_threshold": 0.0, "match_count": 100}
-                    ).execute()
-                    rpc_data = getattr(rpc_resp, "data", [])
-                    if rpc_data:
-                        semantic_scores = {row["book_id"]: row["similarity"] for row in rpc_data}
+                    semantic_scores = self.book_data_port.get_semantic_candidates(list(likes), limit=100)
+                    if semantic_scores:
                         logger.info(f"Retrieved {len(semantic_scores)} semantic candidates.")
                 except Exception as e:
                     logger.warning(f"Semantic candidate generation failed: {e}. Degrading to TF-IDF only.")
@@ -230,8 +232,8 @@ class BookService:
         self, user_id: str, book_ids: List[str], genres: List[str]
     ) -> Dict[str, Any]:
         """Record initial preferences."""
-        if not self._supabase:
-            return {"status": "error", "message": "No Supabase"}
+        if not self.interaction_repo:
+            return {"status": "error", "message": "No Interation Repo"}
 
         try:
             # 1. Record selected books as 'like'
@@ -239,18 +241,16 @@ class BookService:
                 {"user_id": user_id, "book_id": bid, "interaction_type": "like"} for bid in book_ids
             ]
             if entries:
-                self._supabase.table("user_interactions").upsert(entries, on_conflict="user_id,book_id").execute()
+                self.interaction_repo.upsert_interactions(entries)
 
             import datetime
 
             # 2. Update profile with genres
-            self._supabase.table("user_profiles").upsert(
-                {
-                    "user_id": user_id,
-                    "preferred_genres": genres,
-                    "updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                }
-            ).execute()
+            self.interaction_repo.upsert_profile(
+                user_id=user_id,
+                genres=genres,
+                updated_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            )
 
             return {"status": "success", "message": "Onboarding complete"}
         except Exception as e:
@@ -259,13 +259,12 @@ class BookService:
 
     def submit_feedback(self, user_id: str, book_id: str, interaction: str) -> Dict[str, Any]:
         """Submit like/dislike."""
-        if not self._supabase:
+        if not self.interaction_repo:
             return {"status": "error"}
         try:
-            self._supabase.table("user_interactions").upsert(
-                {"user_id": user_id, "book_id": book_id, "interaction_type": interaction},
-                on_conflict="user_id,book_id"
-            ).execute()
+            self.interaction_repo.upsert_interactions([
+                {"user_id": user_id, "book_id": book_id, "interaction_type": interaction}
+            ])
             return {"status": "success"}
         except Exception as e:
             logger.error(f"Feedback error: {e}")
@@ -290,8 +289,8 @@ class BookService:
             action,
         )
 
-        if not self._supabase:
-            return {"status": "error", "message": "Supabase not initialized"}
+        if not self.interaction_repo:
+            return {"status": "error", "message": "Interaction repo not initialized"}
 
         try:
             import datetime
@@ -304,7 +303,7 @@ class BookService:
             if book_id:
                 payload["book_id"] = book_id
 
-            self._supabase.table("user_activities").insert(payload).execute()
+            self.interaction_repo.track_activity(payload)
 
             return {"status": "tracked", "user_id": user_id, "action": action}
         except Exception as e:
@@ -312,11 +311,10 @@ class BookService:
             raise e
 
     def verify_token(self, token: str):
-        """Verifies JWT with Supabase auth."""
-        if not self._supabase:
-            raise Exception("Supabase client not initialized")
-        user_response = self._supabase.auth.get_user(token)
-        return user_response.user
+        """Verifies JWT with auth port."""
+        if not self.auth_port:
+            raise Exception("Auth port not initialized")
+        return self.auth_port.verify_token(token)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Cover enrichment

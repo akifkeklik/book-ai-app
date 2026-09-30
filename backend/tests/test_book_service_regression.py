@@ -4,18 +4,7 @@ from backend.services.book_service import BookService
 
 
 class TestBookServiceRegression:
-    @patch("backend.services.book_service.create_client")
-    @patch("backend.services.book_service.Config")
-    @patch("backend.services.book_service.BookRecommender")
-    def test_personalized_recommendations_filters_dislikes(self, mock_recommender, mock_config, mock_create_client):
-        # Setup mock Config
-        mock_config.SUPABASE_URL = "test_url"
-        mock_config.SUPABASE_ANON_KEY = "test_key"
-
-        # Setup mock Supabase client
-        mock_supabase = MagicMock()
-        mock_create_client.return_value = mock_supabase
-
+    def test_personalized_recommendations_filters_dislikes(self):
         # Setup mock Recommender
         mock_recommender_instance = MagicMock()
         mock_recommender_instance.is_fitted = True
@@ -24,24 +13,24 @@ class TestBookServiceRegression:
             {"isbn13": "222", "title": "Book 2"}, # This will be disliked
             {"isbn13": "333", "title": "Book 3"}
         ]
-        mock_recommender.return_value = mock_recommender_instance
 
-        # Instantiate service
-        service = BookService()
-        service._enrich = lambda x: x # Disable enrichment for test
-
-        # Mock Supabase response for interactions
-        mock_interactions_resp = MagicMock()
-        mock_interactions_resp.data = [
+        # Setup mock Ports
+        mock_interaction_repo = MagicMock()
+        mock_interaction_repo.get_user_interactions.return_value = [
             {"book_id": "111", "interaction_type": "like"},
             {"book_id": "222", "interaction_type": "dislike"}
         ]
-        mock_supabase.table().select().eq().execute.return_value = mock_interactions_resp
+        
+        mock_book_data_port = MagicMock()
+        mock_book_data_port.get_semantic_candidates.return_value = {}
 
-        # Mock Supabase RPC response for hybrid search
-        mock_rpc_resp = MagicMock()
-        mock_rpc_resp.data = []  # No semantic scores, fallback to pure TF-IDF for test
-        mock_supabase.rpc().execute.return_value = mock_rpc_resp
+        # Instantiate service
+        service = BookService(
+            recommender=mock_recommender_instance,
+            interaction_repo=mock_interaction_repo,
+            book_data_port=mock_book_data_port
+        )
+        service._enrich = lambda x: x # Disable enrichment for test
 
         # Execute
         recs = service.get_personalized_recommendations(user_id="user_123", limit=10)
@@ -52,30 +41,25 @@ class TestBookServiceRegression:
         assert any(r["isbn13"] == "333" for r in recs)
         assert not any(r["isbn13"] == "222" for r in recs) # Disliked book must be filtered
 
-    @patch("backend.services.book_service.create_client")
-    @patch("backend.services.book_service.Config")
-    @patch("backend.services.book_service.BookRecommender")
-    def test_submit_feedback_upsert_logic(self, mock_recommender, mock_config, mock_create_client):
-        mock_config.SUPABASE_URL = "test_url"
-        mock_config.SUPABASE_ANON_KEY = "test_key"
-
-        mock_supabase = MagicMock()
-        mock_create_client.return_value = mock_supabase
-
-        service = BookService()
+    def test_submit_feedback_upsert_logic(self):
+        mock_recommender_instance = MagicMock()
+        mock_interaction_repo = MagicMock()
+        
+        service = BookService(
+            recommender=mock_recommender_instance,
+            interaction_repo=mock_interaction_repo
+        )
 
         # Submit like
         res = service.submit_feedback("user_123", "999", "like")
         assert res["status"] == "success"
-        mock_supabase.table().upsert.assert_called_with(
-            {"user_id": "user_123", "book_id": "999", "interaction_type": "like"},
-            on_conflict="user_id,book_id"
-        )
+        mock_interaction_repo.upsert_interactions.assert_called_with([
+            {"user_id": "user_123", "book_id": "999", "interaction_type": "like"}
+        ])
 
         # Submit dislike
         res2 = service.submit_feedback("user_123", "999", "dislike")
         assert res2["status"] == "success"
-        mock_supabase.table().upsert.assert_called_with(
-            {"user_id": "user_123", "book_id": "999", "interaction_type": "dislike"},
-            on_conflict="user_id,book_id"
-        )
+        mock_interaction_repo.upsert_interactions.assert_called_with([
+            {"user_id": "user_123", "book_id": "999", "interaction_type": "dislike"}
+        ])

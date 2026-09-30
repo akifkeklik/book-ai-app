@@ -11,16 +11,43 @@ from flask import Blueprint, g, jsonify, request
 from ..services.book_service import BookService
 from ..services.embedding_service import EmbeddingService
 from ..services.ai_service import AIService
-from ..services.book_service import BookService
+from ..recommender import BookRecommender
+from ..config import Config
 
 logger = logging.getLogger(__name__)
 
 books_bp = Blueprint("books", __name__)
 
-# Singleton — created when the blueprint is first imported
-_svc = BookService()
-_emb_svc = EmbeddingService(supabase_client=_svc._supabase)
-_ai_svc = AIService(supabase_client=_svc._supabase, embedding_service=_emb_svc, book_service=_svc)
+# Composition Root - Singleton Creation
+_supabase = None
+if Config.SUPABASE_URL and Config.SUPABASE_ANON_KEY:
+    from supabase import create_client
+    _supabase = create_client(Config.SUPABASE_URL, Config.SUPABASE_ANON_KEY)
+
+from ..infrastructure.persistence.supabase_adapters import (
+    SupabaseInteractionRepository,
+    SupabaseBookDataPort,
+    SupabaseAuthPort,
+)
+
+_interaction_repo = SupabaseInteractionRepository(_supabase) if _supabase else None
+_book_data_port = SupabaseBookDataPort(_supabase) if _supabase else None
+_auth_port = SupabaseAuthPort(_supabase) if _supabase else None
+_recommender = BookRecommender()
+
+_svc = BookService(
+    recommender=_recommender,
+    interaction_repo=_interaction_repo,
+    book_data_port=_book_data_port,
+    auth_port=_auth_port,
+)
+_emb_svc = EmbeddingService(book_data_port=_book_data_port)
+_ai_svc = AIService(
+    book_data_port=_book_data_port,
+    interaction_repo=_interaction_repo,
+    embedding_service=_emb_svc,
+    book_service=_svc
+)
 
 
 def require_auth(f):
