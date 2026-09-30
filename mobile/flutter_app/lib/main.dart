@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'data/repositories/book_repository_impl.dart';
+import 'domain/repositories/book_repository.dart';
+import 'services/api_service.dart';
+import 'services/supabase_service.dart';
 import 'package:go_router/go_router.dart';
 
 import 'config.dart';
@@ -41,14 +45,21 @@ Future<void> main() async {
     debugPrint('Startup Initialization Error: $e');
   }
 
+  // Composition Root
+  final apiService = ApiService.instance;
+  apiService.init();
+  final supabaseService = SupabaseService.instance;
+  final bookRepository = BookRepositoryImpl(apiService, supabaseService);
+
   runApp(
     MultiProvider(
       providers: [
+        Provider<BookRepository>.value(value: bookRepository),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => BookProvider()),
-        ChangeNotifierProvider(create: (_) => FavoritesProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider(supabaseService)),
+        ChangeNotifierProvider(create: (_) => BookProvider(bookRepository)),
+        ChangeNotifierProvider(create: (_) => FavoritesProvider(supabaseService)),
         ChangeNotifierProvider(create: (_) => ErrorProvider()),
       ],
       child: const LibrisApp(),

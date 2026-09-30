@@ -1,11 +1,11 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../services/supabase_service.dart';
+import '../services/auth_service_base.dart';
 
 class AuthProvider extends ChangeNotifier {
-  final _svc = SupabaseService.instance;
+  final AuthServiceBase _svc;
 
   User? _user;
   bool _isLoading = true;
@@ -17,7 +17,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  AuthProvider() {
+  AuthProvider(this._svc) {
     _initAuth();
   }
 

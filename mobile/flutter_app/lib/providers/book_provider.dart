@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../domain/entities/book.dart';
 import '../domain/repositories/book_repository.dart';
-import '../data/repositories/book_repository_impl.dart';
+
 import '../application/use_cases/get_popular_books_use_case.dart';
 import '../application/use_cases/get_personalized_recs_use_case.dart';
-import '../services/api_service.dart';
-import '../services/supabase_service.dart';
+
+
 
 enum BookStatus { initial, loading, loaded, error }
 
@@ -86,13 +86,10 @@ class BookProvider extends ChangeNotifier {
   List<String> _genres = List<String>.from(_fallbackGenres);
   List<String> get defaultGenres => _genres;
 
-  BookProvider() {
-    // Inject dependencies
-    _repository = BookRepositoryImpl(ApiService.instance, SupabaseService.instance);
+  BookProvider(this._repository) {
     _getPopularBooks = GetPopularBooksUseCase(_repository);
     _getPersonalizedRecs = GetPersonalizedRecsUseCase(_repository);
     
-    ApiService.instance.init();
     _loadFromCache();
     _fetchTotalCount();
     fetchGenres();

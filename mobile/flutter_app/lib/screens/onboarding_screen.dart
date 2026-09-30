@@ -5,7 +5,7 @@ import '../providers/auth_provider.dart';
 import '../domain/entities/book.dart';
 import '../providers/book_provider.dart';
 import '../providers/language_provider.dart';
-import '../services/supabase_service.dart';
+import '../domain/repositories/book_repository.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -60,7 +60,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     try {
       // 1. Classic profile update (legacy support)
-      await SupabaseService.instance.upsertUserProfile(
+      await context.read<BookRepository>().upsertUserProfile(
         userId: userId,
         preferredGenres: _selectedCategories,
         readingFrequency: _readingFrequency,

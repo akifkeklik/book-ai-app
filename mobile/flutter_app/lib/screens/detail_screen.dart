@@ -8,8 +8,8 @@ import '../domain/entities/book.dart';
 import '../providers/auth_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/language_provider.dart';
-import '../services/api_service.dart';
-import '../services/supabase_service.dart';
+import '../domain/repositories/book_repository.dart';
+
 import '../widgets/book_card.dart';
 
 class DetailScreen extends StatefulWidget {
@@ -65,10 +65,10 @@ class _DetailScreenState extends State<DetailScreen> {
     });
     try {
       // 1. Try Supabase (Most reliable for 6k+ books)
-      Book? book = await SupabaseService.instance.getBookByIsbn(isbn);
+      Book? book = await context.read<BookRepository>().getBookByIsbn(isbn);
 
-      // 2. Fallback to Flask Api (If Supabase fails or doesn't have it)
-      book ??= await ApiService.instance.getBookByIsbn(isbn);
+      // 2. Fallback to Flask Api handled inside BookRepositoryImpl.getBookByIsbn
+      if (!mounted) return;
 
     if (!mounted) return;
       setState(() {
@@ -94,7 +94,7 @@ class _DetailScreenState extends State<DetailScreen> {
   Future<void> _fetchSimilar(String title) async {
     setState(() => _loadingSimilar = true);
     try {
-      final recs = await ApiService.instance.getRecommendations(title);
+      final recs = await context.read<BookRepository>().getRecommendations(title);
       if (mounted) setState(() => _similar = recs);
     } catch (_) {
     } finally {
@@ -106,8 +106,7 @@ class _DetailScreenState extends State<DetailScreen> {
     final auth = context.read<AuthProvider>();
     if (!auth.isLoggedIn) return;
     final uid = auth.currentUser!.id;
-    ApiService.instance.trackActivity(userId: uid, bookName: book.title);
-    SupabaseService.instance.trackActivity(
+    context.read<BookRepository>().trackActivity(
       userId: uid,
       activityType: 'view',
       bookId: book.isbn13,
@@ -507,7 +506,7 @@ class _InteractionButton extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.tr('please_log_in'))));
           return;
         }
-        final success = await ApiService.instance.submitFeedback(userId: auth.currentUser!.id, bookId: book.isbn13, interaction: interaction);
+        final success = await context.read<BookRepository>().submitFeedback(userId: auth.currentUser!.id, bookId: book.isbn13, interaction: interaction);
         if (success && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.tr('marked_as', args: {'label': label}))));
         }
