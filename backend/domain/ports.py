@@ -46,3 +46,12 @@ class BookDataPort(Protocol):
 class AuthPort(Protocol):
     def verify_token(self, token: str) -> Any:
         ...
+
+
+class LlmPort(Protocol):
+    def generate_response(self, system_prompt: str, user_prompt: str) -> Optional[str]:
+        """
+        Generate a text response given a system and user prompt.
+        Should handle its own timeouts and fallbacks.
+        """
+        ...

@@ -10,7 +10,6 @@ from flask import Blueprint, g, jsonify, request
 
 from ..services.book_service import BookService
 from ..services.embedding_service import EmbeddingService
-from ..services.ai_service import AIService
 from ..recommender import BookRecommender
 from ..config import Config
 
@@ -39,8 +38,11 @@ from ..application.services.enrichment_service import BookEnrichmentService
 from ..application.use_cases.catalog import GetBooksUseCase, SearchBooksUseCase, GetPopularBooksUseCase, GetBookDetailsUseCase
 from ..application.use_cases.recommendations import GetRecommendationsUseCase, GetPersonalizedRecommendationsUseCase
 from ..application.use_cases.interactions import SubmitOnboardingUseCase, SubmitFeedbackUseCase, TrackUserActivityUseCase
+from ..application.use_cases.ai_rag import ProcessRagQueryUseCase
+from ..infrastructure.llm.adapters import GenericLlmAdapter
 
 _enrichment_service = BookEnrichmentService()
+_llm_port = GenericLlmAdapter(provider=Config.LLM_PROVIDER, api_key=Config.LLM_API_KEY)
 
 _get_books_uc = GetBooksUseCase(_recommender, _enrichment_service)
 _search_books_uc = SearchBooksUseCase(_recommender, _enrichment_service)
@@ -64,11 +66,13 @@ _svc = BookService(
     auth_port=_auth_port,
 )
 _emb_svc = EmbeddingService(book_data_port=_book_data_port)
-_ai_svc = AIService(
+_process_rag_query_uc = ProcessRagQueryUseCase(
+    embedding_service=_emb_svc,
     book_data_port=_book_data_port,
     interaction_repo=_interaction_repo,
-    embedding_service=_emb_svc,
-    book_service=_svc # AI Service still depends on BookService for its _enrich and recommend internal calls for now
+    recommender=_recommender,
+    enrichment_service=_enrichment_service,
+    llm_port=_llm_port
 )
 
 
@@ -291,7 +295,7 @@ def ai_chat():
 
     user_id = getattr(g, "user_id", None) # Optional if auth is not strictly enforced here
     try:
-        result = _ai_svc.process_rag_query(query, user_id=user_id)
+        result = _process_rag_query_uc.execute(query, user_id=user_id)
         # result contains: answer, referenced_books, status
         return jsonify(result), 200
     except Exception as exc:
