@@ -546,3 +546,33 @@ class TestStatistics:
     def test_stats_not_fitted(self):
         engine = BookRecommender()
         assert engine.is_fitted is False
+
+def test_hybrid_recommendation_with_semantic_scores(trained_engine):
+    """
+    Test Phase 3.3 hybrid scoring:
+    When semantic scores are provided, they should be blended into the final score.
+    When a dislike is provided, it should be hard-filtered.
+    """
+    # Create fake semantic scores from pgvector (mocked)
+    semantic_scores = {
+        "9780553293357": 0.95,  # Foundation (very similar)
+        "9780439064873": 0.1,   # Chamber of Secrets (not similar)
+    }
+
+    # Even though Foundation is semantically similar, user dislikes it
+    dislikes = ["9780553293357"]
+
+    # Call recommend with Dune as seed
+    recs = trained_engine.recommend(
+        "Dune",
+        top_n=5,
+        use_diversity=False, # Disable MMR to easily verify raw scoring
+        semantic_scores=semantic_scores,
+        dislikes=dislikes
+    )
+
+    # Assert Foundation is excluded due to dislikes
+    assert not any(r["isbn13"] == "9780553293357" for r in recs)
+
+    assert len(recs) > 0
+    assert all("final_score" in r for r in recs)
