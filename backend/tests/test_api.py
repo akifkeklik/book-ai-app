@@ -54,36 +54,28 @@ def auth_headers(monkeypatch):
 
 
 @pytest.fixture
-def fake_supabase(monkeypatch):
-    """Minimal Supabase test double for mutation/activity success paths."""
-
-    class FakeTable:
-        def __init__(self, table_name, calls):
-            self._table_name = table_name
-            self._calls = calls
-
-        def upsert(self, payload, **kwargs):
-            self._calls.append((self._table_name, "upsert", payload, kwargs))
-            return self
-
-        def insert(self, payload):
-            self._calls.append((self._table_name, "insert", payload))
-            return self
-
-        def execute(self):
-            self._calls.append((self._table_name, "execute", None))
-            return type("FakeResponse", (), {"data": []})()
-
-    class FakeSupabase:
+def fake_interaction_repo(monkeypatch):
+    class FakeInteractionRepo:
         def __init__(self):
             self.calls = []
 
-        def table(self, table_name):
-            self.calls.append((table_name, "table", None))
-            return FakeTable(table_name, self.calls)
+        def upsert_interactions(self, entries):
+            self.calls.append(("user_interactions", "upsert", entries))
 
-    fake = FakeSupabase()
-    monkeypatch.setattr(_svc, "_supabase", fake)
+        def upsert_profile(self, user_id, genres, updated_at):
+            self.calls.append(("user_profiles", "upsert", {"user_id": user_id, "preferred_genres": genres, "updated_at": updated_at}))
+
+        def track_activity(self, payload):
+            self.calls.append(("user_activities", "insert", payload))
+            
+        def get_user_interactions(self, user_id):
+            return []
+            
+        def get_user_profile(self, user_id):
+            return None
+
+    fake = FakeInteractionRepo()
+    monkeypatch.setattr(_svc, "interaction_repo", fake)
     return fake
 
 
@@ -291,7 +283,7 @@ class TestRecommendations:
 
 
 class TestActivityTracking:
-    def test_track_activity(self, client, auth_headers, fake_supabase):
+    def test_track_activity(self, client, auth_headers, fake_interaction_repo):
         resp = client.post(
             "/api/track",
             headers=auth_headers,
@@ -310,7 +302,7 @@ class TestActivityTracking:
         assert data["user_id"] == "test-user-123"
         track_inserts = [
             call
-            for call in fake_supabase.calls
+            for call in fake_interaction_repo.calls
             if call[0] == "user_activities" and call[1] == "insert"
         ]
         assert track_inserts
@@ -401,7 +393,7 @@ class TestErrorHandling:
 
 
 class TestMutationEndpoints:
-    def test_onboarding_success(self, client, auth_headers, fake_supabase):
+    def test_onboarding_success(self, client, auth_headers, fake_interaction_repo):
         resp = client.post(
             "/api/onboarding",
             headers=auth_headers,
@@ -411,18 +403,17 @@ class TestMutationEndpoints:
         assert resp.status_code == 200
         interaction_upserts = [
             call
-            for call in fake_supabase.calls
+            for call in fake_interaction_repo.calls
             if call[0] == "user_interactions" and call[1] == "upsert"
         ]
         assert interaction_upserts
         assert interaction_upserts[0][2] == [
             {"user_id": "test-user-123", "book_id": "123", "interaction_type": "like"}
         ]
-        assert interaction_upserts[0][3] == {"on_conflict": "user_id,book_id"}
 
         profile_upserts = [
             call
-            for call in fake_supabase.calls
+            for call in fake_interaction_repo.calls
             if call[0] == "user_profiles" and call[1] == "upsert"
         ]
         assert profile_upserts
@@ -436,7 +427,7 @@ class TestMutationEndpoints:
         )
         assert resp.status_code == 401
 
-    def test_feedback_success(self, client, auth_headers, fake_supabase):
+    def test_feedback_success(self, client, auth_headers, fake_interaction_repo):
         resp = client.post(
             "/api/feedback",
             headers=auth_headers,
@@ -446,16 +437,13 @@ class TestMutationEndpoints:
         assert resp.status_code == 200
         feedback_upserts = [
             call
-            for call in fake_supabase.calls
+            for call in fake_interaction_repo.calls
             if call[0] == "user_interactions" and call[1] == "upsert"
         ]
         assert feedback_upserts
-        assert feedback_upserts[0][2] == {
-            "user_id": "test-user-123",
-            "book_id": "123",
-            "interaction_type": "like",
-        }
-        assert feedback_upserts[0][3] == {"on_conflict": "user_id,book_id"}
+        assert feedback_upserts[0][2] == [
+            {"user_id": "test-user-123", "book_id": "123", "interaction_type": "like"}
+        ]
 
     def test_feedback_missing_fields(self, client, auth_headers):
         resp = client.post(

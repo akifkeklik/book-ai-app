@@ -1,9 +1,8 @@
 import logging
 from typing import Dict, Any, List, Optional
-from supabase import Client
-
 from .embedding_service import EmbeddingService
 from ..config import Config
+from ..domain.ports import UserInteractionRepository, BookDataPort
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +12,15 @@ class AIService:
     Provides isolation between LLM Provider and Core Recommendation Engine.
     """
     
-    def __init__(self, supabase_client: Optional[Client], embedding_service: EmbeddingService, book_service: Optional[Any] = None):
-        self._supabase = supabase_client
+    def __init__(
+        self, 
+        embedding_service: EmbeddingService, 
+        book_data_port: Optional[BookDataPort] = None,
+        interaction_repo: Optional[UserInteractionRepository] = None,
+        book_service: Optional[Any] = None
+    ):
+        self._book_data_port = book_data_port
+        self._interaction_repo = interaction_repo
         self._embedding_service = embedding_service
         self._book_service = book_service
         self._llm_provider = Config.LLM_PROVIDER
@@ -71,30 +77,23 @@ class AIService:
         }
 
     def _retrieve_books_by_embedding(self, embedding: List[float], top_k: int = 5, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        if not self._supabase:
-            logger.error("Supabase client not initialized. Cannot perform vector retrieval.")
+        if not self._book_data_port:
+            logger.error("BookDataPort not initialized. Cannot perform vector retrieval.")
             return []
             
         try:
-            # Utilizing RPC specifically for raw semantic query matching
-            response = self._supabase.rpc(
-                "match_query_embeddings",
-                {"query_embedding": embedding, "match_threshold": 0.0, "match_count": 100} # Get broad candidates
-            ).execute()
+            # Utilizing port specifically for raw semantic query matching
+            semantic_scores = self._book_data_port.match_query_embeddings(embedding, limit=100)
             
-            matches = getattr(response, "data", [])
-            if not matches:
+            if not semantic_scores:
                 return []
-                
-            semantic_scores = {m["book_id"]: m["similarity"] for m in matches}
             
             dislikes = []
             likes = []
-            if user_id:
-                interactions_resp = self._supabase.table("user_interactions").select("book_id, interaction_type").eq("user_id", user_id).execute()
-                data = getattr(interactions_resp, "data", [])
-                dislikes = [f["book_id"] for f in data if f.get("interaction_type") == "dislike"]
-                likes = [f["book_id"] for f in data if f.get("interaction_type") in ("like", "favorite")]
+            if user_id and self._interaction_repo:
+                interactions_data = self._interaction_repo.get_user_interactions(user_id)
+                dislikes = [f["book_id"] for f in interactions_data if f.get("interaction_type") == "dislike"]
+                likes = [f["book_id"] for f in interactions_data if f.get("interaction_type") in ("like", "favorite")]
 
             if self._book_service:
                 # Integrate with Recommendation Engine using both semantic scores and user's likes as seeds
@@ -109,8 +108,7 @@ class AIService:
             else:
                 # Fallback purely to DB if BookService not injected
                 book_ids = list(semantic_scores.keys())[:top_k]
-                books_response = self._supabase.table("books").select("*").in_("isbn13", book_ids).execute()
-                books = getattr(books_response, "data", [])
+                books = self._book_data_port.get_books_by_isbns(book_ids)
                 books_dict = {b["isbn13"]: b for b in books}
                 return [books_dict[bid] for bid in book_ids if bid in books_dict]
             

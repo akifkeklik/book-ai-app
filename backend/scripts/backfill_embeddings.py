@@ -5,9 +5,11 @@ import sys
 
 from supabase import Client, create_client
 
+import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import Config
 from services.embedding_service import EmbeddingService
+from infrastructure.persistence.supabase_adapters import SupabaseBookDataPort
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -20,7 +22,8 @@ def backfill_embeddings(batch_size: int = 100, max_books: int = None, force_reco
         sys.exit(1)
 
     supabase: Client = create_client(url, key)
-    embedding_service = EmbeddingService(supabase_client=supabase)
+    book_data_port = SupabaseBookDataPort(supabase)
+    embedding_service = EmbeddingService(book_data_port=book_data_port)
 
     if not embedding_service.is_configured():
         logger.error("EmbeddingService is not configured (missing OPENAI_API_KEY).")

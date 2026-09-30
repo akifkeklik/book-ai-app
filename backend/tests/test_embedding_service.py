@@ -218,51 +218,44 @@ def test_generate_embedding_permanent_error_no_retry(mock_getenv, mock_openai):
 
 
 def test_get_existing_metadata():
-    mock_supabase = MagicMock()
-    mock_resp = MagicMock()
-    mock_resp.data = [{"content_hash": "hash123", "model_version": "v1"}]
-    mock_supabase.table().select().eq().execute.return_value = mock_resp
+    mock_port = MagicMock()
+    mock_port.get_embedding_metadata.return_value = {"content_hash": "hash123", "model_version": "v1"}
 
-    service = EmbeddingService(supabase_client=mock_supabase)
+    service = EmbeddingService(book_data_port=mock_port)
     meta = service.get_existing_metadata("book1")
 
     assert meta == {"content_hash": "hash123", "model_version": "v1"}
-    mock_supabase.table().select().eq.assert_called_with("book_id", "book1")
+    mock_port.get_embedding_metadata.assert_called_with("book1")
 
 
 def test_get_existing_metadata_empty():
-    mock_supabase = MagicMock()
-    mock_resp = MagicMock()
-    mock_resp.data = []
-    mock_supabase.table().select().eq().execute.return_value = mock_resp
+    mock_port = MagicMock()
+    mock_port.get_embedding_metadata.return_value = None
 
-    service = EmbeddingService(supabase_client=mock_supabase)
+    service = EmbeddingService(book_data_port=mock_port)
     meta = service.get_existing_metadata("book1")
 
     assert meta is None
 
 
 def test_upsert_embedding():
-    mock_supabase = MagicMock()
-    service = EmbeddingService(supabase_client=mock_supabase)
+    mock_port = MagicMock()
+    service = EmbeddingService(book_data_port=mock_port)
     service._model = "test-model"
 
     res = service.upsert_embedding("book1", [0.1, 0.2], "hash123")
 
     assert res is True
-    mock_supabase.table().upsert.assert_called_once_with(
-        {
-            "book_id": "book1",
-            "embedding": [0.1, 0.2],
-            "content_hash": "hash123",
-            "model_version": "test-model",
-        },
-        on_conflict="book_id",
+    mock_port.upsert_embedding.assert_called_once_with(
+        book_id="book1",
+        embedding=[0.1, 0.2],
+        content_hash="hash123",
+        model_version="test-model",
     )
 
 
 def test_is_stale():
-    service = EmbeddingService(supabase_client=MagicMock())
+    service = EmbeddingService(book_data_port=MagicMock())
     service._model = "model-v2"
 
     # No metadata in DB -> Stale
