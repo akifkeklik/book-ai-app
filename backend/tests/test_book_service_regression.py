@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
-from backend.services.book_service import BookService
-
+from backend.application.use_cases.recommendations import GetPersonalizedRecommendationsUseCase
+from backend.application.use_cases.interactions import SubmitFeedbackUseCase
 
 class TestBookServiceRegression:
     def test_personalized_recommendations_filters_dislikes(self):
@@ -24,16 +24,19 @@ class TestBookServiceRegression:
         mock_book_data_port = MagicMock()
         mock_book_data_port.get_semantic_candidates.return_value = {}
 
+        mock_enrichment_service = MagicMock()
+        mock_enrichment_service.enrich.side_effect = lambda x: x
+        
         # Instantiate service
-        service = BookService(
+        service = GetPersonalizedRecommendationsUseCase(
             recommender=mock_recommender_instance,
             interaction_repo=mock_interaction_repo,
-            book_data_port=mock_book_data_port
+            book_data_port=mock_book_data_port,
+            enrichment_service=mock_enrichment_service
         )
-        service._enrich = lambda x: x # Disable enrichment for test
 
         # Execute
-        recs = service.get_personalized_recommendations(user_id="user_123", limit=10)
+        recs = service.execute(user_id="user_123", limit=10)
 
         # Assert
         assert len(recs) == 2
@@ -45,20 +48,19 @@ class TestBookServiceRegression:
         mock_recommender_instance = MagicMock()
         mock_interaction_repo = MagicMock()
         
-        service = BookService(
-            recommender=mock_recommender_instance,
+        service = SubmitFeedbackUseCase(
             interaction_repo=mock_interaction_repo
         )
 
         # Submit like
-        res = service.submit_feedback("user_123", "999", "like")
+        res = service.execute("user_123", "999", "like")
         assert res["status"] == "success"
         mock_interaction_repo.upsert_interactions.assert_called_with([
             {"user_id": "user_123", "book_id": "999", "interaction_type": "like"}
         ])
 
         # Submit dislike
-        res2 = service.submit_feedback("user_123", "999", "dislike")
+        res2 = service.execute("user_123", "999", "dislike")
         assert res2["status"] == "success"
         mock_interaction_repo.upsert_interactions.assert_called_with([
             {"user_id": "user_123", "book_id": "999", "interaction_type": "dislike"}

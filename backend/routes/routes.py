@@ -35,6 +35,28 @@ _book_data_port = SupabaseBookDataPort(_supabase) if _supabase else None
 _auth_port = SupabaseAuthPort(_supabase) if _supabase else None
 _recommender = BookRecommender()
 
+from ..application.services.enrichment_service import BookEnrichmentService
+from ..application.use_cases.catalog import GetBooksUseCase, SearchBooksUseCase, GetPopularBooksUseCase, GetBookDetailsUseCase
+from ..application.use_cases.recommendations import GetRecommendationsUseCase, GetPersonalizedRecommendationsUseCase
+from ..application.use_cases.interactions import SubmitOnboardingUseCase, SubmitFeedbackUseCase, TrackUserActivityUseCase
+
+_enrichment_service = BookEnrichmentService()
+
+_get_books_uc = GetBooksUseCase(_recommender, _enrichment_service)
+_search_books_uc = SearchBooksUseCase(_recommender, _enrichment_service)
+_get_popular_books_uc = GetPopularBooksUseCase(_recommender, _enrichment_service)
+_get_book_details_uc = GetBookDetailsUseCase(_recommender, _enrichment_service)
+_get_recommendations_uc = GetRecommendationsUseCase(_recommender, _enrichment_service)
+_get_personalized_recs_uc = GetPersonalizedRecommendationsUseCase(
+    recommender=_recommender,
+    interaction_repo=_interaction_repo,
+    book_data_port=_book_data_port,
+    enrichment_service=_enrichment_service
+)
+_submit_onboarding_uc = SubmitOnboardingUseCase(_interaction_repo)
+_submit_feedback_uc = SubmitFeedbackUseCase(_interaction_repo)
+_track_activity_uc = TrackUserActivityUseCase(_interaction_repo)
+
 _svc = BookService(
     recommender=_recommender,
     interaction_repo=_interaction_repo,
@@ -46,7 +68,7 @@ _ai_svc = AIService(
     book_data_port=_book_data_port,
     interaction_repo=_interaction_repo,
     embedding_service=_emb_svc,
-    book_service=_svc
+    book_service=_svc # AI Service still depends on BookService for its _enrich and recommend internal calls for now
 )
 
 
@@ -102,7 +124,7 @@ def get_books():
         page = max(1, int(request.args.get("page", 1)))
         per_page = min(max(1, int(request.args.get("per_page", 50))), 100)
         category = request.args.get("category", None)
-        return jsonify(_svc.get_all_books(page=page, per_page=per_page, category=category)), 200
+        return jsonify(_get_books_uc.execute(page=page, per_page=per_page, category=category)), 200
     except Exception as exc:
         logger.exception("GET /books error")
         return jsonify({"error": str(exc)}), 500
@@ -113,7 +135,7 @@ def get_popular_books():
     try:
         # Senior Update: Increased limit for "All Books" section
         limit = min(max(1, int(request.args.get("limit", 50))), 5000)
-        books = _svc.get_popular_books(limit=limit)
+        books = _get_popular_books_uc.execute(limit=limit)
         return jsonify({"books": books, "total": len(books)}), 200
     except Exception as exc:
         logger.exception("GET /books/popular error")
@@ -123,7 +145,7 @@ def get_popular_books():
 @books_bp.route("/books/<isbn>", methods=["GET"])
 def get_book_by_isbn(isbn: str):
     try:
-        book = _svc.get_book_by_isbn(isbn)
+        book = _get_book_details_uc.execute(isbn)
         if not book:
             return jsonify({"error": "Book not found"}), 404
         return jsonify({"book": book}), 200
@@ -146,7 +168,7 @@ def search_books():
         return jsonify({"error": "Query must be at least 2 characters"}), 400
     try:
         limit = min(max(1, int(request.args.get("limit", 20))), 100)
-        books = _svc.search_books(query=query, limit=limit)
+        books = _search_books_uc.execute(query=query, limit=limit)
         return jsonify({"books": books, "total": len(books), "query": query}), 200
     except Exception as exc:
         logger.exception("GET /search error")
@@ -166,7 +188,7 @@ def get_recommendations():
     try:
         top_n = min(max(1, int(request.args.get("top_n", 10))), 50)
         use_hybrid = request.args.get("hybrid", "true").lower() != "false"
-        recommendations = _svc.get_recommendations(
+        recommendations = _get_recommendations_uc.execute(
             book_title=book_title,
             top_n=top_n,
             use_hybrid=use_hybrid,
@@ -198,7 +220,7 @@ def get_personalized():
         return jsonify({"error": "user_id is required"}), 400
     try:
         limit = min(max(1, int(request.args.get("limit", 10))), 50)
-        recommendations = _svc.get_personalized_recommendations(user_id=user_id, limit=limit)
+        recommendations = _get_personalized_recs_uc.execute(user_id=user_id, limit=limit)
         return jsonify(
             {"user_id": user_id, "recommendations": recommendations, "total": len(recommendations)}
         ), 200
@@ -222,7 +244,7 @@ def onboarding():
         return jsonify({"error": "user_id is required"}), 400
 
     try:
-        result = _svc.submit_onboarding(user_id, book_ids, genres)
+        result = _submit_onboarding_uc.execute(user_id, book_ids, genres)
         return jsonify(result), 200 if result["status"] == "success" else 500
     except Exception:
         logger.exception("POST /onboarding error")
@@ -244,7 +266,7 @@ def feedback():
         return jsonify({"error": "user_id, book_id, and interaction are required"}), 400
 
     try:
-        result = _svc.submit_feedback(user_id, book_id, interaction)
+        result = _submit_feedback_uc.execute(user_id, book_id, interaction)
         return jsonify(result), 200 if result["status"] == "success" else 500
     except Exception:
         logger.exception("POST /feedback error")
@@ -310,7 +332,7 @@ def track_activity():
         return jsonify({"error": f"Invalid action. Supported: {valid_actions}"}), 400
 
     try:
-        result = _svc.track_user_activity(
+        result = _track_activity_uc.execute(
             user_id=user_id, action=action, book_id=book_id, book_name=book_name
         )
         return jsonify(result), 200

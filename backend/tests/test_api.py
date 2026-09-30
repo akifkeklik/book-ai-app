@@ -75,7 +75,10 @@ def fake_interaction_repo(monkeypatch):
             return None
 
     fake = FakeInteractionRepo()
-    monkeypatch.setattr(_svc, "interaction_repo", fake)
+    monkeypatch.setattr("backend.routes.routes._submit_onboarding_uc._interaction_repo", fake)
+    monkeypatch.setattr("backend.routes.routes._submit_feedback_uc._interaction_repo", fake)
+    monkeypatch.setattr("backend.routes.routes._track_activity_uc._interaction_repo", fake)
+    monkeypatch.setattr("backend.routes.routes._get_personalized_recs_uc._interaction_repo", fake)
     return fake
 
 
@@ -378,7 +381,7 @@ class TestErrorHandling:
         def mock_raise(*args, **kwargs):
             raise Exception("Super secret database error detail")
 
-        monkeypatch.setattr("backend.routes.routes._svc.get_recommendations", mock_raise)
+        monkeypatch.setattr("backend.routes.routes._get_recommendations_uc.execute", mock_raise)
         resp = client.get("/api/recommend?book=Dune")
         assert resp.status_code == 500
         data = resp.get_json()
