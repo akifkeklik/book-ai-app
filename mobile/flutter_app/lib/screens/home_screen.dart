@@ -11,7 +11,7 @@ import '../services/supabase_service.dart';
 import '../widgets/book_card.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/skeleton_loader.dart';
-
+import '../providers/language_provider.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
