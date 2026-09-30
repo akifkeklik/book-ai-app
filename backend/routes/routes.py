@@ -9,6 +9,9 @@ from functools import wraps
 from flask import Blueprint, g, jsonify, request
 
 from ..services.book_service import BookService
+from ..services.embedding_service import EmbeddingService
+from ..services.ai_service import AIService
+from ..services.book_service import BookService
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +19,8 @@ books_bp = Blueprint("books", __name__)
 
 # Singleton — created when the blueprint is first imported
 _svc = BookService()
+_emb_svc = EmbeddingService(supabase_client=_svc._supabase)
+_ai_svc = AIService(supabase_client=_svc._supabase, embedding_service=_emb_svc, book_service=_svc)
 
 
 def require_auth(f):
@@ -216,6 +221,32 @@ def feedback():
         return jsonify(result), 200 if result["status"] == "success" else 500
     except Exception:
         logger.exception("POST /feedback error")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AI / Semantic Discovery
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@books_bp.route("/ai/chat", methods=["POST"])
+# @require_auth  # Optionally require auth, uncomment if Flutter sends token for this
+def ai_chat():
+    data = request.get_json(silent=True)
+    if not data or "query" not in data:
+        return jsonify({"error": "JSON body with 'query' is required"}), 400
+
+    query = data["query"].strip()
+    if not query:
+        return jsonify({"error": "Query cannot be empty"}), 400
+
+    user_id = getattr(g, "user_id", None) # Optional if auth is not strictly enforced here
+    try:
+        result = _ai_svc.process_rag_query(query, user_id=user_id)
+        # result contains: answer, referenced_books, status
+        return jsonify(result), 200
+    except Exception as exc:
+        logger.exception("POST /ai/chat error")
         return jsonify({"error": "Internal server error"}), 500
 
 

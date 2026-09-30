@@ -15,6 +15,7 @@ import 'screens/recommendation_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/ai_discovery_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -94,6 +95,10 @@ class AppRouter {
         GoRoute(
           path: '/settings',
           builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/ai',
+          builder: (context, state) => const AiDiscoveryScreen(),
         ),
         GoRoute(
           path: '/category/:genre',

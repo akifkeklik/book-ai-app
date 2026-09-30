@@ -14,6 +14,14 @@ class ApiService {
         .toList();
   }
 
+  Future<Map<String, dynamic>> chatWithAI(String query) async {
+    final resp = await _dio.post(
+      '/api/ai/chat',
+      data: {'query': query},
+    );
+    return resp.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> getBooksByCategory(
       {required String category, int page = 1, int perPage = 40}) async {
     final resp = await _dio.get(

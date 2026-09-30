@@ -293,22 +293,21 @@ class BookRecommender:
         if isinstance(seed_titles, str):
             seed_titles = [seed_titles]
 
-        if not seed_titles:
-            logger.info("No seed titles provided. Returning popular books.")
+        if not seed_titles and not semantic_scores:
+            logger.info("No seed titles or semantic scores provided. Returning popular books.")
             return self.get_popular_books(limit=top_n)
 
-        seed_indices = [self.engine.find_index(title) for title in seed_titles]
-        seed_indices = [idx for idx in seed_indices if idx is not None]
+        seed_indices = []
+        if seed_titles:
+            seed_indices = [self.engine.find_index(title) for title in seed_titles]
+            seed_indices = [idx for idx in seed_indices if idx is not None]
 
-        if not seed_indices:
-            logger.warning("None of the seed titles found in the dataset. Returning popular books.")
-            return self.get_popular_books(limit=top_n)
-
-        # Create a centroid vector from the seed books
-        centroid_vec = np.asarray(self.tfidf_matrix[seed_indices].mean(axis=0)).reshape(1, -1)
-
-        # Calculate raw similarity scores
-        raw_scores = cosine_similarity(centroid_vec, self.tfidf_matrix).flatten()
+        # Calculate raw similarity scores if seeds exist
+        if seed_indices:
+            centroid_vec = np.asarray(self.tfidf_matrix[seed_indices].mean(axis=0)).reshape(1, -1)
+            raw_scores = cosine_similarity(centroid_vec, self.tfidf_matrix).flatten()
+        else:
+            raw_scores = np.zeros(len(self.df))
 
         # Process semantic scores if provided
         semantic_vec = np.zeros(len(self.df))
@@ -358,7 +357,7 @@ class BookRecommender:
         for rec in recs:
             rec_idx = self.engine.find_index(rec.get("isbn13", ""))
             rec["raw_similarity_score"] = float(raw_scores[rec_idx]) if rec_idx is not None else 0.0
-            rec.update(self._explain_recommendation(rec, seed_indices))
+            rec.update(self._explain_recommendation(rec, seed_indices, semantic_scores))
 
         return recs
 
@@ -409,29 +408,50 @@ class BookRecommender:
         return recs
 
     def _explain_recommendation(
-        self, recommended_book: Dict[str, Any], seed_indices: List[int]
+        self, recommended_book: Dict[str, Any], seed_indices: List[int], semantic_scores: Optional[Dict[str, float]] = None
     ) -> Dict[str, str]:
         """Generate a simple explanation for a recommendation."""
         rec_idx = self.engine.find_index(recommended_book["isbn13"])
-        if rec_idx is None or not seed_indices:
-            return {"explanation": "Could not generate explanation.", "explanation_source_book": ""}
+        if rec_idx is None:
+            return {}
 
-        sim_scores = self.cosine_sim[rec_idx, seed_indices]
-        if sim_scores.size == 0:
-            return {"explanation": "Could not generate explanation.", "explanation_source_book": ""}
-        most_similar_seed_idx = seed_indices[np.argmax(sim_scores)]
-        source_book = self.df.iloc[most_similar_seed_idx]
+        isbn = recommended_book.get("isbn13", "")
+        has_semantic_match = semantic_scores and isbn in semantic_scores
 
         rec_cats = set(re.split(r"\s*[,|]\s*", recommended_book.get("categories", "").lower()))
+        cat_list = [c for c in rec_cats if c]
+
+        if not seed_indices:
+            # Pure semantic search case
+            if cat_list:
+                explanation = f"Bu kitap, aramanızla anlamsal olarak eşleşti ve {cat_list[0]} kategorisinde yer alıyor."
+            else:
+                explanation = "Bu kitap, arama niyetinizle en yüksek anlamsal benzerliğe sahip olduğu için önerildi."
+            return {"explanation": explanation, "explanation_source_book": ""}
+
+        # Hybrid case: we have both likes (seed_indices) and possibly semantic matches
+        sim_scores = self.cosine_sim[rec_idx, seed_indices]
+        if sim_scores.size == 0:
+            return {}
+
+        most_similar_seed_idx = seed_indices[np.argmax(sim_scores)]
+        source_book = self.df.iloc[most_similar_seed_idx]
         source_cats = set(re.split(r"\s*[,|]\s*", source_book.get("categories", "").lower()))
         common_genres = rec_cats.intersection(source_cats)
 
-        if common_genres:
-            explanation = f"'{source_book['title']}' kitabını sevdiğiniz için, ortak {', '.join(list(common_genres)[:2])} türündeki bu kitabı önerdik."
+        if has_semantic_match:
+            # Acknowledge both user preference and semantic query
+            if common_genres:
+                explanation = f"Aramanızla eşleşmesinin yanı sıra, '{source_book['title']}' kitabını sevdiğiniz için (ortak tür: {list(common_genres)[0]}) önerildi."
+            else:
+                explanation = f"Aramanızla güçlü bir eşleşme sağladı ve okuma geçmişinizdeki '{source_book['title']}' kitabına benzer bir atmosfere sahip."
         else:
-            explanation = (
-                f"'{source_book['title']}' kitabına benzer bir atmosferi olduğu için önerdik."
-            )
+            # Standard personalized recommendation
+            if common_genres:
+                explanation = f"'{source_book['title']}' kitabını sevdiğiniz için, ortak {', '.join(list(common_genres)[:2])} türündeki bu kitabı önerdik."
+            else:
+                explanation = f"'{source_book['title']}' kitabına benzer bir atmosferi olduğu için önerdik."
+
         return {"explanation": explanation, "explanation_source_book": source_book["title"]}
 
     def search_books(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:

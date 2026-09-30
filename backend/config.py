@@ -18,6 +18,8 @@ class Config:
     # In production these must be set via environment variables.
     SECRET_KEY: str = os.getenv("SECRET_KEY", "")
     LIBRIS_API_KEY: str = os.getenv("LIBRIS_API_KEY", "")
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini") # gemini or openai
+    LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
 
     # ── Paths ─────────────────────────────────────────────────────────────────
     BASE_DIR: str = os.path.dirname(os.path.abspath(__file__))

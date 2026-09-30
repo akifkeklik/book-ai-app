@@ -35,10 +35,9 @@ class AppTheme {
       seedColor: seedColor,
       brightness: Brightness.dark,
       surface: surfaceDark,
-      background: surfaceDark,
     ).copyWith(
       primary: seedColor,
-      surfaceVariant: cardDark,
+      surfaceContainerHighest: cardDark,
     );
 
     return ThemeData(
@@ -49,7 +48,7 @@ class AppTheme {
       cardColor: cardDark,
       textTheme: _buildTextTheme(Colors.white),
       
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         elevation: 0,
         color: cardDark,
         shape: RoundedRectangleBorder(
@@ -80,10 +79,9 @@ class AppTheme {
       seedColor: seedColor,
       brightness: Brightness.light,
       surface: surfaceLight,
-      background: surfaceLight,
     ).copyWith(
       primary: seedColor,
-      surfaceVariant: cardLight,
+      surfaceContainerHighest: cardLight,
     );
 
     return ThemeData(
@@ -94,7 +92,7 @@ class AppTheme {
       cardColor: cardLight,
       textTheme: _buildTextTheme(const Color(0xFF0F172A)),
 
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         elevation: 2,
         shadowColor: Colors.black.withOpacity(0.05),
         color: cardLight,

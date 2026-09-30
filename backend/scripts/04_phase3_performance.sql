@@ -17,8 +17,8 @@ DECLARE
 BEGIN
   -- 1. Calculate centroid of seed books
   SELECT AVG(embedding) INTO centroid
-  FROM public.book_embeddings
-  WHERE book_id = ANY(seed_book_ids);
+  FROM public.book_embeddings be
+  WHERE be.book_id = ANY(seed_book_ids);
 
   -- If no valid embeddings found for seeds, return empty
   IF centroid IS NULL THEN

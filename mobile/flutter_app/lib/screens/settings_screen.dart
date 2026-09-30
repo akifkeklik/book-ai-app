@@ -208,7 +208,7 @@ class _LangButton extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? colorScheme.primary : colorScheme.surfaceVariant.withOpacity(0.5),
+          color: isActive ? colorScheme.primary : colorScheme.surfaceContainerHighest.withOpacity(0.5),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isActive ? Colors.transparent : colorScheme.outline.withOpacity(0.1),
