@@ -3,8 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/entities/book.dart';
 import '../data/models/book_dto.dart';
 import '../utils/category_mapper.dart';
+import 'auth_service_base.dart';
 
-class SupabaseService {
+class SupabaseService implements AuthServiceBase {
   SupabaseService._internal();
   static final SupabaseService instance = SupabaseService._internal();
 
@@ -12,11 +13,14 @@ class SupabaseService {
 
   // ── Auth ───────────────────────────────────────────────────────────────────
 
+  @override
   User? get currentUser => client.auth.currentUser;
   bool get isLoggedIn => currentUser != null;
 
+  @override
   Stream<AuthState> get authStateStream => client.auth.onAuthStateChange;
 
+  @override
   Future<AuthResponse> signUp({
     required String email,
     required String password,
@@ -24,6 +28,7 @@ class SupabaseService {
     return client.auth.signUp(email: email, password: password);
   }
 
+  @override
   Future<AuthResponse> signIn({
     required String email,
     required String password,
@@ -31,6 +36,7 @@ class SupabaseService {
     return client.auth.signInWithPassword(email: email, password: password);
   }
 
+  @override
   Future<void> signOut() async {
     await client.auth.signOut();
   }

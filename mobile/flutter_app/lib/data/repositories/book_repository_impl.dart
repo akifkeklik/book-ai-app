@@ -146,4 +146,42 @@ class BookRepositoryImpl implements BookRepository {
   Future<int> getTotalBookCount() async {
     return await _supabase.getTotalBookCount();
   }
+
+  @override
+  Future<Map<String, dynamic>> getBooksByCategory({required String category, int page = 1, int perPage = 40}) async {
+    return await _api.getBooksByCategory(category: category, page: page, perPage: perPage);
+  }
+
+  @override
+  Future<Map<String, dynamic>> chatWithAI(String query) async {
+    return await _api.chatWithAI(query);
+  }
+
+  @override
+  Future<List<Book>> getRecommendations(String title) async {
+    return await _api.getRecommendations(title);
+  }
+
+  @override
+  Future<void> trackActivity({required String userId, required String activityType, required String bookId}) async {
+    await _api.trackActivity(userId: userId, bookName: bookId); // API uses bookName
+    await _supabase.trackActivity(userId: userId, activityType: activityType, bookId: bookId);
+  }
+
+  @override
+  Future<Book?> getBookByIsbn(String isbn) async {
+    Book? book = await _supabase.getBookByIsbn(isbn);
+    book ??= await _api.getBookByIsbn(isbn);
+    return book;
+  }
+
+  @override
+  Future<void> upsertUserProfile({required String userId, required List<String> preferredGenres, required int readingFrequency, required List<String> preferredAuthors, required String preferredVibe}) async {
+    await _supabase.upsertUserProfile(userId: userId, preferredGenres: preferredGenres, readingFrequency: readingFrequency, preferredAuthors: preferredAuthors, preferredVibe: preferredVibe);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+    return await _supabase.getUserProfile(userId);
+  }
 }

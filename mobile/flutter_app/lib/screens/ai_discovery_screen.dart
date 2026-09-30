@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../domain/repositories/book_repository.dart';
+import 'package:provider/provider.dart';
 import '../domain/entities/book.dart';
 import '../data/models/book_dto.dart';
 import '../widgets/book_card.dart';
@@ -30,7 +31,7 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
     });
 
     try {
-      final res = await ApiService.instance.chatWithAI(query);
+      final res = await context.read<BookRepository>().chatWithAI(query);
       if (!mounted) return;
       setState(() {
         _answer = res['answer'] ?? context.tr('no_response');

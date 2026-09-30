@@ -5,7 +5,7 @@ import '../data/models/book_dto.dart';
 import '../services/supabase_service.dart';
 
 class FavoritesProvider extends ChangeNotifier {
-  final _svc = SupabaseService.instance;
+  final SupabaseService _svc;
 
   List<FavoriteBook> _favorites = [];
   bool _isLoading = false;
@@ -15,6 +15,8 @@ class FavoritesProvider extends ChangeNotifier {
   List<FavoriteBook> get favorites => _favorites;
   bool get isLoading => _isLoading;
   String? get error => _error;
+
+  FavoritesProvider(this._svc);
 
   Set<String> get _favoriteIsbns => {for (final f in _favorites) f.isbn13};
 
