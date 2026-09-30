@@ -66,6 +66,7 @@ class BookService:
         self.recommender.fit(save_path=Config.MODEL_PATH)
         logger.info("Training complete. Model saved to %s", Config.MODEL_PATH)
 
+    @lru_cache(maxsize=1)
     def get_categories(self) -> List[str]:
         """Return all unique categories found in the dataset."""
         if not self.recommender.is_fitted:
@@ -76,6 +77,7 @@ class BookService:
     # Public API
     # ─────────────────────────────────────────────────────────────────────────
 
+    @lru_cache(maxsize=256)
     def get_all_books(
         self, page: int = 1, per_page: int = 20, category: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -83,14 +85,17 @@ class BookService:
         result["books"] = self._enrich(result["books"])
         return result
 
+    @lru_cache(maxsize=128)
     def get_popular_books(self, limit: int = 20) -> List[Dict[str, Any]]:
         books = self.recommender.get_popular_books(limit=limit)
         return self._enrich(books)
 
+    @lru_cache(maxsize=512)
     def search_books(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
         books = self.recommender.search_books(query=query, limit=limit)
         return self._enrich(books)
 
+    @lru_cache(maxsize=1024)
     def get_recommendations(
         self,
         book_title: str,
@@ -109,11 +114,9 @@ class BookService:
         self, user_id: str, limit: int = 10
     ) -> List[Dict[str, Any]]:
         """
-        Production-grade personalization:
-        1. Fetch Likes and Dislikes from Supabase.
-        2. Calculate centroid based on Likes.
-        3. Exclude Dislikes.
-        4. Apply MMR Diversity.
+        Production-grade personalization with LRU caching:
+        1. Fetch Likes, Dislikes and Profile Genres.
+        2. Pass them as hashable tuples to the cached recommendation computation.
         """
         if not self._supabase:
             return self.get_popular_books(limit=limit)
@@ -126,9 +129,40 @@ class BookService:
             interactions_data = getattr(interactions_resp, "data", [])
             likes = [f["book_id"] for f in interactions_data if f.get("interaction_type") == "like"]
             dislikes = [f["book_id"] for f in interactions_data if f.get("interaction_type") == "dislike"]
-            likes = list(set(likes))  # dedupe
-            dislikes = list(set(dislikes))
 
+            likes_tuple = tuple(sorted(set(likes)))
+            dislikes_tuple = tuple(sorted(set(dislikes)))
+
+            genres_tuple = ()
+            if not likes_tuple:
+                profile_resp = (
+                    self._supabase.table("user_profiles")
+                    .select("preferred_genres")
+                    .eq("user_id", user_id)
+                    .execute()
+                )
+                profile_data = getattr(profile_resp, "data", [])
+                if profile_data:
+                    genres = profile_data[0].get("preferred_genres", [])
+                    if genres:
+                        genres_tuple = tuple(sorted(set(genres)))
+
+            return self._compute_cached_personalized_recs(
+                user_id, likes_tuple, dislikes_tuple, genres_tuple, limit
+            )
+        except Exception as e:
+            logger.error(f"Failed fetching interactions for personalized recs: {e}")
+            return self.get_popular_books(limit=limit)
+
+    @lru_cache(maxsize=1024)
+    def _compute_cached_personalized_recs(
+        self, user_id: str, likes: tuple, dislikes: tuple, genres: tuple, limit: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Cached computation of recommendations. 
+        Invalidates naturally when the input tuples (likes/dislikes/genres) change.
+        """
+        try:
             seed_titles = []
             if likes:
                 # Convert ISBNs to Titles for the engine
@@ -138,31 +172,20 @@ class BookService:
                         seed_titles.append(self.recommender.engine.df.iloc[idx]["title"])
 
             # 2. If no direct likes found, check Profile Genres
-            if not seed_titles:
-                logger.info(f"User {user_id} has no book likes. Checking profile genres fallback.")
-                profile_resp = (
-                    self._supabase.table("user_profiles")
-                    .select("preferred_genres")
-                    .eq("user_id", user_id)
-                    .execute()
-                )
-                profile_data = getattr(profile_resp, "data", [])
+            if not seed_titles and genres:
+                logger.info(f"Using preferred genres as seed for {user_id}: {genres}")
+                genre_recs = []
+                for g in genres[:3]:  # Variety
+                    res = self.recommender.get_all_books(page=1, per_page=10, category=g)
+                    genre_recs.extend(res.get("books", []))
 
-                if profile_data:
-                    genres = profile_data[0].get("preferred_genres", [])
-                    if genres:
-                        logger.info(f"Using preferred genres as seed for {user_id}: {genres}")
-                        genre_recs = []
-                        for g in genres[:3]:  # Variety
-                            res = self.recommender.get_all_books(page=1, per_page=10, category=g)
-                            genre_recs.extend(res.get("books", []))
+                if genre_recs:
+                    unique_recs = {r["isbn13"]: r for r in genre_recs}.values()
+                    final_genre_recs = list(unique_recs)
+                    random.shuffle(final_genre_recs)
+                    return self._enrich(final_genre_recs[:limit])
 
-                        if genre_recs:
-                            unique_recs = {r["isbn13"]: r for r in genre_recs}.values()
-                            final_genre_recs = list(unique_recs)
-                            random.shuffle(final_genre_recs)
-                            return self._enrich(final_genre_recs[:limit])
-
+            if not seed_titles and not genres:
                 # 3. Final Fallback: Trending books
                 logger.info(f"User {user_id} has no profile info. Returning trending books.")
                 return self.get_popular_books(limit=limit)
@@ -178,7 +201,7 @@ class BookService:
                 try:
                     rpc_resp = self._supabase.rpc(
                         "match_book_embeddings",
-                        {"seed_book_ids": likes, "match_threshold": 0.0, "match_count": 100}
+                        {"seed_book_ids": list(likes), "match_threshold": 0.0, "match_count": 100}
                     ).execute()
                     rpc_data = getattr(rpc_resp, "data", [])
                     if rpc_data:
@@ -192,7 +215,7 @@ class BookService:
                 top_n=limit,
                 use_diversity=True,
                 semantic_scores=semantic_scores,
-                dislikes=dislikes
+                dislikes=list(dislikes)
             )
 
             # Dislikes are now hard-filtered during recommendation, but double-check
@@ -200,7 +223,7 @@ class BookService:
 
             return self._enrich(final_recs)
         except Exception as e:
-            logger.error(f"Failed personalized recs: {e}")
+            logger.error(f"Failed cached personalized recs computation: {e}")
             return self.get_popular_books(limit=limit)
 
     def submit_onboarding(
