@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models/book_model.dart';
+import '../domain/entities/book.dart';
 import '../services/api_service.dart';
 import '../widgets/book_card.dart';
 import '../widgets/shimmer_loader.dart';

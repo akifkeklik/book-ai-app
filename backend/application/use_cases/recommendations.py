@@ -1,5 +1,6 @@
 import logging
 import random
+import time
 from typing import Any, Dict, List, Optional
 from ...recommender import BookRecommender
 from ...domain.ports import UserInteractionRepository, BookDataPort
@@ -14,11 +15,14 @@ class GetRecommendationsUseCase:
         self._enrichment_service = enrichment_service
 
     def execute(self, book_title: str, top_n: int = 10, use_hybrid: bool = True) -> List[Dict[str, Any]]:
+        t0 = time.time()
         books = self._recommender.recommend(
             seed_titles=[book_title],
             top_n=top_n,
             use_diversity=True,
         )
+        latency = round((time.time() - t0) * 1000, 2)
+        logger.info("Recommendation generated", extra={"extra_data": {"recommendation_latency_ms": latency, "seed": book_title, "count": len(books)}})
         return self._enrichment_service.enrich(books)
 
 
@@ -107,6 +111,7 @@ class GetPersonalizedRecommendationsUseCase:
                 except Exception as e:
                     logger.warning(f"Semantic candidate generation failed: {e}. Degrading to TF-IDF only.")
 
+            t0 = time.time()
             recs = self._recommender.recommend(
                 seed_titles,
                 top_n=limit,
@@ -116,6 +121,13 @@ class GetPersonalizedRecommendationsUseCase:
             )
 
             final_recs = [r for r in recs if r.get("isbn13") not in dislikes]
+            latency = round((time.time() - t0) * 1000, 2)
+            logger.info("Personalized recommendation generated", extra={"extra_data": {
+                "personalized_latency_ms": latency, 
+                "seed_count": len(seed_titles), 
+                "semantic_candidates": len(semantic_scores) if semantic_scores else 0,
+                "count": len(final_recs)
+            }})
             return self._enrichment_service.enrich(final_recs)
         except Exception as e:
             logger.error(f"Failed cached personalized recs computation: {e}")

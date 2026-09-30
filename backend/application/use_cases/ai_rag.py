@@ -1,7 +1,7 @@
 import logging
+import time
 from typing import Dict, Any, List, Optional
-from ...services.embedding_service import EmbeddingService
-from ...domain.ports import UserInteractionRepository, BookDataPort, LlmPort
+from ...domain.ports import UserInteractionRepository, BookDataPort, LlmPort, EmbeddingPort
 from ...recommender import BookRecommender
 from ..services.enrichment_service import BookEnrichmentService
 
@@ -11,14 +11,14 @@ logger = logging.getLogger(__name__)
 class ProcessRagQueryUseCase:
     def __init__(
         self,
-        embedding_service: EmbeddingService,
+        embedding_port: EmbeddingPort,
         book_data_port: Optional[BookDataPort],
         interaction_repo: Optional[UserInteractionRepository],
         recommender: BookRecommender,
         enrichment_service: BookEnrichmentService,
         llm_port: LlmPort,
     ):
-        self._embedding_service = embedding_service
+        self._embedding_port = embedding_port
         self._book_data_port = book_data_port
         self._interaction_repo = interaction_repo
         self._recommender = recommender
@@ -34,9 +34,12 @@ class ProcessRagQueryUseCase:
         4. LLM response generation
         """
         # Step 1: Semantic Discovery / Embedding
-        embedding = self._embedding_service.generate_embedding(query)
+        t0 = time.time()
+        embedding = self._embedding_port.generate_embedding(query)
+        emb_latency = round((time.time() - t0) * 1000, 2)
+        
         if not embedding:
-            logger.warning("Embedding generation failed. RAG blocked.")
+            logger.warning("Embedding generation failed. RAG blocked.", extra={"extra_data": {"embedding_latency_ms": emb_latency, "status": "embedding_failed"}})
             return {
                 "answer": "I'm having trouble understanding your query right now. Please try again later.",
                 "referenced_books": [],
@@ -44,9 +47,12 @@ class ProcessRagQueryUseCase:
             }
 
         # Step 2: Vector Retrieval & Recommendation Engine Integration
+        t1 = time.time()
         retrieved_books = self._retrieve_books_by_embedding(embedding, top_k=5, user_id=user_id)
+        retrieval_latency = round((time.time() - t1) * 1000, 2)
         
         if not retrieved_books:
+            logger.info("RAG retrieval empty", extra={"extra_data": {"retrieval_latency_ms": retrieval_latency, "status": "empty_retrieval"}})
             return {
                 "answer": "I couldn't find any books in my library matching your description.",
                 "referenced_books": [],
@@ -67,16 +73,28 @@ class ProcessRagQueryUseCase:
         )
         user_prompt = f"<context>\n{context}\n</context>\n\n<user_query>\n{query}\n</user_query>"
 
+        t2 = time.time()
         answer = self._llm_port.generate_response(system_prompt, user_prompt)
+        llm_latency = round((time.time() - t2) * 1000, 2)
         
+        metrics = {
+            "embedding_latency_ms": emb_latency,
+            "retrieval_latency_ms": retrieval_latency,
+            "llm_latency_ms": llm_latency,
+            "total_rag_latency_ms": round((time.time() - t0) * 1000, 2),
+            "candidate_count": len(retrieved_books)
+        }
+
         if not answer:
             # Fallback mode
+            logger.warning("LLM generation failed, using fallback", extra={"extra_data": {**metrics, "status": "llm_fallback"}})
             return {
                 "answer": "I couldn't generate a personalized response right now, but here are some books matching your query:",
                 "referenced_books": retrieved_books,
                 "status": "llm_fallback"
             }
 
+        logger.info("RAG request successful", extra={"extra_data": {**metrics, "status": "success"}})
         return {
             "answer": answer,
             "referenced_books": retrieved_books,

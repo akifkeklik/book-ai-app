@@ -67,7 +67,7 @@ _svc = BookService(
 )
 _emb_svc = EmbeddingService(book_data_port=_book_data_port)
 _process_rag_query_uc = ProcessRagQueryUseCase(
-    embedding_service=_emb_svc,
+    embedding_port=_emb_svc,
     book_data_port=_book_data_port,
     interaction_repo=_interaction_repo,
     recommender=_recommender,
@@ -107,14 +107,26 @@ def require_auth(f):
 def health_check():
     return jsonify({"status": "healthy", "service": "book-ai-api"}), 200
 
+@books_bp.route("/health/ready", methods=["GET"])
+def readiness_check():
+    try:
+        # Check DB dependency
+        if _supabase:
+            _supabase.table("books").select("isbn13").limit(1).execute()
+        return jsonify({"status": "ready", "service": "book-ai-api"}), 200
+    except Exception as exc:
+        from .infrastructure.logging.structured_logger import log_event
+        import logging
+        log_event(__name__, logging.ERROR, msg="Readiness check failed", error=str(exc))
+        return jsonify({"status": "not_ready", "error": "Database unavailable"}), 503
+
 
 @books_bp.route("/categories", methods=["GET"])
 def get_categories():
     try:
         return jsonify({"categories": _svc.get_categories()}), 200
     except Exception as exc:
-        logger.exception("GET /categories error")
-        return jsonify({"error": str(exc)}), 500
+        raise exc
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -130,8 +142,7 @@ def get_books():
         category = request.args.get("category", None)
         return jsonify(_get_books_uc.execute(page=page, per_page=per_page, category=category)), 200
     except Exception as exc:
-        logger.exception("GET /books error")
-        return jsonify({"error": str(exc)}), 500
+        raise exc
 
 
 @books_bp.route("/books/popular", methods=["GET"])
@@ -142,8 +153,7 @@ def get_popular_books():
         books = _get_popular_books_uc.execute(limit=limit)
         return jsonify({"books": books, "total": len(books)}), 200
     except Exception as exc:
-        logger.exception("GET /books/popular error")
-        return jsonify({"error": str(exc)}), 500
+        raise exc
 
 
 @books_bp.route("/books/<isbn>", methods=["GET"])
@@ -154,8 +164,7 @@ def get_book_by_isbn(isbn: str):
             return jsonify({"error": "Book not found"}), 404
         return jsonify({"book": book}), 200
     except Exception as exc:
-        logger.exception("GET /books/%s error", isbn)
-        return jsonify({"error": str(exc)}), 500
+        raise exc
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -175,8 +184,7 @@ def search_books():
         books = _search_books_uc.execute(query=query, limit=limit)
         return jsonify({"books": books, "total": len(books), "query": query}), 200
     except Exception as exc:
-        logger.exception("GET /search error")
-        return jsonify({"error": str(exc)}), 500
+        raise exc
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -211,9 +219,8 @@ def get_recommendations():
                 "total": len(recommendations),
             }
         ), 200
-    except Exception:
-        logger.exception("GET /recommend error")
-        return jsonify({"error": "Internal server error"}), 500
+    except Exception as exc:
+        raise exc
 
 
 @books_bp.route("/recommend/personalized", methods=["GET"])
@@ -228,9 +235,8 @@ def get_personalized():
         return jsonify(
             {"user_id": user_id, "recommendations": recommendations, "total": len(recommendations)}
         ), 200
-    except Exception:
-        logger.exception("GET /recommend/personalized error")
-        return jsonify({"error": "Internal server error"}), 500
+    except Exception as exc:
+        raise exc
 
 
 @books_bp.route("/onboarding", methods=["POST"])
@@ -250,9 +256,8 @@ def onboarding():
     try:
         result = _submit_onboarding_uc.execute(user_id, book_ids, genres)
         return jsonify(result), 200 if result["status"] == "success" else 500
-    except Exception:
-        logger.exception("POST /onboarding error")
-        return jsonify({"error": "Internal server error"}), 500
+    except Exception as exc:
+        raise exc
 
 
 @books_bp.route("/feedback", methods=["POST"])
@@ -272,9 +277,8 @@ def feedback():
     try:
         result = _submit_feedback_uc.execute(user_id, book_id, interaction)
         return jsonify(result), 200 if result["status"] == "success" else 500
-    except Exception:
-        logger.exception("POST /feedback error")
-        return jsonify({"error": "Internal server error"}), 500
+    except Exception as exc:
+        raise exc
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -299,8 +303,7 @@ def ai_chat():
         # result contains: answer, referenced_books, status
         return jsonify(result), 200
     except Exception as exc:
-        logger.exception("POST /ai/chat error")
-        return jsonify({"error": "Internal server error"}), 500
+        raise exc
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -340,6 +343,5 @@ def track_activity():
             user_id=user_id, action=action, book_id=book_id, book_name=book_name
         )
         return jsonify(result), 200
-    except Exception:
-        logger.exception("POST /track error")
-        return jsonify({"error": "Internal server error"}), 500
+    except Exception as exc:
+        raise exc

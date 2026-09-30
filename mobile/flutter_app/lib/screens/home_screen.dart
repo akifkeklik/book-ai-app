@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../models/book_model.dart';
+import '../domain/entities/book.dart';
 import '../providers/auth_provider.dart';
 import '../providers/book_provider.dart';
 import '../providers/favorites_provider.dart';

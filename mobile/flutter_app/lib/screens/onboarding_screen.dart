@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../domain/entities/book.dart';
 import '../providers/book_provider.dart';
 import '../providers/language_provider.dart';
 import '../services/supabase_service.dart';
