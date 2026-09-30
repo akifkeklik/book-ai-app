@@ -25,6 +25,7 @@ class FavoritesProvider extends ChangeNotifier {
   Future<void> loadFavorites(String userId) async {
     _isLoading = true;
     _error = null;
+    _favorites = [];
     notifyListeners();
     
     _favoritesSub?.cancel();
