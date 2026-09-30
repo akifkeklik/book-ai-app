@@ -126,7 +126,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   const SizedBox(height: 8),
                   TextFormField(
                     initialValue: tempAuthor,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'e.g. İlber Ortaylı',
                       prefixIcon: Icon(Icons.person_outline),
                     ),

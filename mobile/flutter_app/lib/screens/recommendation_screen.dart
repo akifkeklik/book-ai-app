@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../domain/entities/book.dart';
+import '../providers/language_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/book_card.dart';
 import '../widgets/shimmer_loader.dart';
@@ -34,7 +35,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
           .getRecommendations(widget.bookTitle);
       if (mounted) setState(() => _recommendations = recs);
     } catch (e) {
-      if (mounted) setState(() => _error = 'Failed to load recommendations.');
+      if (mounted) setState(() => _error = context.tr('error_loading_books'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -47,7 +48,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Recommendations', style: TextStyle(fontSize: 18)),
+            Text(context.tr('similar_books'), style: const TextStyle(fontSize: 18)),
             Text(
               widget.bookTitle,
               style: TextStyle(
@@ -94,7 +95,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
             ElevatedButton.icon(
               onPressed: _load,
               icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+              label: Text(context.tr('retry')),
             ),
           ],
         ),
@@ -102,13 +103,13 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     }
 
     if (_recommendations.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 64, color: Colors.grey),
-            SizedBox(height: 12),
-            Text('No recommendations found.\nTry a different book.'),
+            const Icon(Icons.search_off, size: 64, color: Colors.grey),
+            const SizedBox(height: 12),
+            Text(context.tr('no_books_found')),
           ],
         ),
       );
@@ -130,7 +131,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                   size: 16, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
               Text(
-                '${_recommendations.length} books similar to "${widget.bookTitle}"',
+                context.tr('similar_to', args: {'count': _recommendations.length.toString(), 'title': widget.bookTitle}),
                 style: TextStyle(
                     fontSize: 13,
                     color: Theme.of(context).colorScheme.primary,

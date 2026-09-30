@@ -190,8 +190,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           // Personalized Recs
                           Consumer2<AuthProvider, FavoritesProvider>(
                             builder: (context, auth, favProv, _) {
-                              if (!auth.isLoggedIn)
+                              if (!auth.isLoggedIn) {
                                 return const SizedBox.shrink();
+                              }
 
                               if (favProv.favorites.isEmpty &&
                                   !favProv.isLoading) {

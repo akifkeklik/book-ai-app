@@ -18,32 +18,39 @@ class ShimmerBookCard extends StatelessWidget {
           color: base,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Column(
+        child: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 190,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-            ),
+            _ShimmerCoverBox(),
             Padding(
-              padding: const EdgeInsets.all(10),
+              padding: EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _Box(height: 14, width: double.infinity),
-                  const SizedBox(height: 6),
+                  SizedBox(height: 6),
                   _Box(height: 12, width: 90),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   _Box(height: 10, width: 70),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ShimmerCoverBox extends StatelessWidget {
+  const _ShimmerCoverBox();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 190,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
     );
   }
@@ -67,26 +74,19 @@ class ShimmerListTile extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Row(
+        child: const Row(
           children: [
-            Container(
-              width: 76,
-              height: 110,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.horizontal(left: Radius.circular(14)),
-              ),
-            ),
+            _ShimmerListTileLeading(),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _Box(height: 14, width: double.infinity),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     _Box(height: 12, width: 120),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     _Box(height: 10, width: 80),
                   ],
                 ),
@@ -94,6 +94,21 @@ class ShimmerListTile extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ShimmerListTileLeading extends StatelessWidget {
+  const _ShimmerListTileLeading();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 76,
+      height: 110,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.horizontal(left: Radius.circular(14)),
       ),
     );
   }

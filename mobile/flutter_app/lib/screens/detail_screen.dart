@@ -70,8 +70,7 @@ class _DetailScreenState extends State<DetailScreen> {
       // 2. Fallback to Flask Api (If Supabase fails or doesn't have it)
       book ??= await ApiService.instance.getBookByIsbn(isbn);
 
-      if (!mounted) return;
-      if (!mounted) return;
+    if (!mounted) return;
       setState(() {
         _book = book;
         _loadingBook = false;
@@ -350,9 +349,9 @@ class _DetailScreenState extends State<DetailScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _InteractionButton(book: book, interaction: 'like', icon: Icons.thumb_up_outlined, label: 'Like'),
-            _InteractionButton(book: book, interaction: 'want_to_read', icon: Icons.bookmark_add_outlined, label: 'Want to Read'),
-            _InteractionButton(book: book, interaction: 'finished', icon: Icons.check_circle_outline, label: 'Finished'),
+            _InteractionButton(book: book, interaction: 'like', icon: Icons.thumb_up_outlined, label: context.tr('like')),
+            _InteractionButton(book: book, interaction: 'want_to_read', icon: Icons.bookmark_add_outlined, label: context.tr('want_to_read')),
+            _InteractionButton(book: book, interaction: 'finished', icon: Icons.check_circle_outline, label: context.tr('finished')),
           ],
         ),
       ],
@@ -505,12 +504,12 @@ class _InteractionButton extends StatelessWidget {
       onPressed: () async {
         final auth = context.read<AuthProvider>();
         if (!auth.isLoggedIn) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please log in first')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.tr('please_log_in'))));
           return;
         }
         final success = await ApiService.instance.submitFeedback(userId: auth.currentUser!.id, bookId: book.isbn13, interaction: interaction);
         if (success && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Marked as $label')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.tr('marked_as', args: {'label': label}))));
         }
       },
       icon: Icon(icon),

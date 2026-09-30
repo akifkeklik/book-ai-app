@@ -3,9 +3,10 @@ import '../services/api_service.dart';
 import '../domain/entities/book.dart';
 import '../data/models/book_dto.dart';
 import '../widgets/book_card.dart';
+import '../providers/language_provider.dart';
 
 class AiDiscoveryScreen extends StatefulWidget {
-  const AiDiscoveryScreen({Key? key}) : super(key: key);
+  const AiDiscoveryScreen({super.key});
 
   @override
   State<AiDiscoveryScreen> createState() => _AiDiscoveryScreenState();
@@ -17,7 +18,14 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
   String _answer = "";
   List<Book> _referencedBooks = [];
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   Future<void> _submitQuery() async {
+    if (_isLoading) return;
     final query = _controller.text.trim();
     if (query.isEmpty) return;
 
@@ -29,8 +37,9 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
 
     try {
       final res = await ApiService.instance.chatWithAI(query);
+      if (!mounted) return;
       setState(() {
-        _answer = res['answer'] ?? "No response.";
+        _answer = res['answer'] ?? context.tr('no_response');
         if (res['referenced_books'] != null) {
           _referencedBooks = (res['referenced_books'] as List)
               .map((b) => BookDto.fromJson(b as Map<String, dynamic>))
@@ -38,10 +47,12 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
         }
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _answer = "Error connecting to AI: $e";
+        _answer = "${context.tr('error')}: $e";
       });
     } finally {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -52,7 +63,7 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("AI Discovery"),
+        title: Text(context.tr('ai_insight')),
       ),
       body: Column(
         children: [
@@ -75,7 +86,7 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
                 if (_referencedBooks.isNotEmpty) ...[
                   const SizedBox(height: 24),
                   Text(
-                    "Referenced Books",
+                    context.tr('referenced_books'),
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
@@ -109,9 +120,9 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    decoration: const InputDecoration(
-                      hintText: "E.g., Dark sci-fi books like Dune...",
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      hintText: context.tr('search_hint'),
+                      border: const OutlineInputBorder(),
                     ),
                     onSubmitted: (_) => _submitQuery(),
                   ),

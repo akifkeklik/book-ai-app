@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/favorites_provider.dart';
 import 'package:go_router/go_router.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -90,6 +91,9 @@ class SettingsScreen extends StatelessWidget {
                 leading: const Icon(Icons.logout, color: Colors.orangeAccent),
                 title: Text(context.tr('logout')),
                 onTap: () async {
+                  if (context.mounted) {
+                    context.read<FavoritesProvider>().clearFavorites();
+                  }
                   await auth.logout();
                   if (context.mounted) context.go('/login');
                 },
