@@ -171,7 +171,7 @@ class BookService:
             logger.info(
                 f"Generating personalized recs for {user_id} with {len(seed_titles)} seeds."
             )
-            
+
             # --- PHASE 3.3: Fetch Semantic Candidates via pgvector RPC ---
             semantic_scores = None
             if likes:
@@ -188,8 +188,8 @@ class BookService:
                     logger.warning(f"Semantic candidate generation failed: {e}. Degrading to TF-IDF only.")
 
             recs = self.recommender.recommend(
-                seed_titles, 
-                top_n=limit, 
+                seed_titles,
+                top_n=limit,
                 use_diversity=True,
                 semantic_scores=semantic_scores,
                 dislikes=dislikes

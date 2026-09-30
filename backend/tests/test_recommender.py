@@ -558,21 +558,21 @@ def test_hybrid_recommendation_with_semantic_scores(trained_engine):
         "9780553293357": 0.95,  # Foundation (very similar)
         "9780439064873": 0.1,   # Chamber of Secrets (not similar)
     }
-    
+
     # Even though Foundation is semantically similar, user dislikes it
     dislikes = ["9780553293357"]
 
     # Call recommend with Dune as seed
     recs = trained_engine.recommend(
-        "Dune", 
-        top_n=5, 
+        "Dune",
+        top_n=5,
         use_diversity=False, # Disable MMR to easily verify raw scoring
         semantic_scores=semantic_scores,
         dislikes=dislikes
     )
-    
+
     # Assert Foundation is excluded due to dislikes
     assert not any(r["isbn13"] == "9780553293357" for r in recs)
-    
+
     assert len(recs) > 0
     assert all("final_score" in r for r in recs)

@@ -58,7 +58,7 @@ class EngineConfig:
     tfidf_min_df: int = TFIDF_MIN_DF
     tfidf_max_features: int = TFIDF_MAX_FEATURES
     diversity_lambda: float = DIVERSITY_LAMBDA
-    
+
     # Hybrid Weights
     weight_semantic: float = 0.5
     weight_tfidf: float = 0.3
@@ -320,7 +320,7 @@ class BookRecommender:
 
         # Hybrid Scoring
         popularity_scores = self.df["popularity_score"].to_numpy()
-        
+
         if semantic_scores:
             final_scores = (
                 self.config.weight_tfidf * raw_scores
@@ -336,7 +336,7 @@ class BookRecommender:
 
         # Set scores of seed books to a very low value to exclude them
         final_scores[seed_indices] = -1.0
-        
+
         # Hard filter for dislikes
         if dislikes:
             for isbn in dislikes:
