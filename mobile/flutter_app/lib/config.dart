@@ -37,7 +37,10 @@ class AppConfig {
 
   static String get librisApiKey {
     if (_envApiKey.isNotEmpty) return _envApiKey;
-    return 'DUMMY_KEY_FOR_DEV_ONLY';
+    if (kReleaseMode) {
+      throw Exception('API Key is missing in release mode! Use --dart-define=LIBRIS_API_KEY=...');
+    }
+    return 'DUMMY_KEY_FOR_DEV_ONLY'; // Debug fallback
   }
 
   // ── Supabase ───────────────────────────────────────────────────────────────

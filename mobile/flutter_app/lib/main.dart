@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:go_router/go_router.dart';
 
 import 'config.dart';
@@ -31,10 +29,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    try {
-      await Firebase.initializeApp();
-      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-    } catch (_) {}
 
     await Supabase.initialize(
       url: AppConfig.supabaseUrl,
