@@ -299,21 +299,14 @@ class TestBookRecommenderTraining:
     def test_fit_sets_attributes(self, trained_engine):
         assert trained_engine.is_fitted is True
         assert trained_engine.engine.tfidf_matrix is not None
-        assert trained_engine.engine.cosine_sim is not None
+        assert trained_engine.engine.cosine_sim is None
         assert trained_engine.engine.vectorizer is not None
 
     def test_tfidf_matrix_shape(self, trained_engine):
         n_books = len(trained_engine.engine.df)
         assert trained_engine.engine.tfidf_matrix.shape[0] == n_books
 
-    def test_cosine_sim_diagonal(self, trained_engine):
-        diag = trained_engine.engine.cosine_sim.diagonal()
-        for d in diag:
-            assert abs(d - 1.0) < 1e-6, "Self-similarity must be 1.0"
 
-    def test_cosine_sim_is_square(self, trained_engine):
-        n = len(trained_engine.engine.df)
-        assert trained_engine.engine.cosine_sim.shape == (n, n)
 
     def test_metadata(self, trained_engine):
         # Update: metadata attribute might not exist or changed.

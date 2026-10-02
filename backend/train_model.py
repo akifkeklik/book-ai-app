@@ -124,7 +124,9 @@ def _validate(engine: BookRecommender) -> bool:
 
     # ── Check 3: Cosine similarity sanity ─────────────────────────────────────
     logger.info(f"\n{_BOLD}[Check 3] Cosine Similarity Matrix{_RESET}")
-    diag = engine.cosine_sim.diagonal()
+    from sklearn.metrics.pairwise import cosine_similarity
+    full_sim = cosine_similarity(engine.tfidf_matrix)
+    diag = full_sim.diagonal()
     diag_ok = all(abs(d - 1.0) < 1e-6 for d in diag)
 
     if diag_ok:
@@ -134,7 +136,7 @@ def _validate(engine: BookRecommender) -> bool:
         logger.error(f"  {_RED}✗ Diagonal values are wrong — model may be corrupt{_RESET}")
         failed += 1
 
-    avg_sim = engine.cosine_sim[engine.cosine_sim < 0.9999].mean()
+    avg_sim = full_sim[full_sim < 0.9999].mean()
     logger.info(f"  Avg pairwise similarity: {avg_sim:.4f}")
 
     if avg_sim > 0.8:
@@ -147,7 +149,7 @@ def _validate(engine: BookRecommender) -> bool:
     logger.info(f"\n{_BOLD}[Check 4] Recommendation Quality{_RESET}")
 
     for title, expected_genres, min_results in _VALIDATION_QUERIES:
-        recs = engine.recommend(title, top_n=5, use_hybrid=True)
+        recs = engine.recommend(title, top_n=5)
 
         if not recs:
             # Book might not be in dataset — just warn
