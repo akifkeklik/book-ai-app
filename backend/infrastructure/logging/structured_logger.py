@@ -1,9 +1,10 @@
 import json
 import logging
-from datetime import datetime, timezone
-from flask import request, has_request_context, g
-import traceback
 import re
+from datetime import datetime, timezone
+
+from flask import g, has_request_context, request
+
 
 class JSONFormatter(logging.Formatter):
     def format(self, record):
@@ -20,11 +21,11 @@ class JSONFormatter(logging.Formatter):
             log_record["method"] = request.method
             if getattr(g, "user_id", None):
                 log_record["user_id"] = g.user_id
-            
+
         if record.exc_info:
             log_record["error_type"] = record.exc_info[0].__name__
             # Only include traceback in debug mode or if explicitly requested, to avoid leaking secrets
-            # But usually we log tracebacks safely if we redact. 
+            # But usually we log tracebacks safely if we redact.
             # We will just log the error type and a safe string.
             log_record["error_details"] = str(record.exc_info[1])
 
@@ -61,15 +62,15 @@ class JSONFormatter(logging.Formatter):
 def setup_logger():
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    
+
     # Remove existing handlers
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
-        
+
     handler = logging.StreamHandler()
     handler.setFormatter(JSONFormatter())
     logger.addHandler(handler)
-    
+
     # Silence chatty loggers
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("werkzeug").setLevel(logging.WARNING)

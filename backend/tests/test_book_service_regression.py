@@ -1,7 +1,8 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from backend.application.use_cases.recommendations import GetPersonalizedRecommendationsUseCase
 from backend.application.use_cases.interactions import SubmitFeedbackUseCase
+from backend.application.use_cases.recommendations import GetPersonalizedRecommendationsUseCase
+
 
 class TestBookServiceRegression:
     def test_personalized_recommendations_filters_dislikes(self):
@@ -20,13 +21,13 @@ class TestBookServiceRegression:
             {"book_id": "111", "interaction_type": "like"},
             {"book_id": "222", "interaction_type": "dislike"}
         ]
-        
+
         mock_book_data_port = MagicMock()
         mock_book_data_port.get_semantic_candidates.return_value = {}
 
         mock_enrichment_service = MagicMock()
         mock_enrichment_service.enrich.side_effect = lambda x: x
-        
+
         # Instantiate service
         service = GetPersonalizedRecommendationsUseCase(
             recommender=mock_recommender_instance,
@@ -45,9 +46,8 @@ class TestBookServiceRegression:
         assert not any(r["isbn13"] == "222" for r in recs) # Disliked book must be filtered
 
     def test_submit_feedback_upsert_logic(self):
-        mock_recommender_instance = MagicMock()
         mock_interaction_repo = MagicMock()
-        
+
         service = SubmitFeedbackUseCase(
             interaction_repo=mock_interaction_repo
         )

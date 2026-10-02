@@ -4,16 +4,15 @@ Flask factory application with CORS, error handlers, and blueprint registration.
 """
 
 import logging
+import time
+import uuid
 
-from flask import Flask, jsonify, request, g
+from flask import Flask, g, jsonify, request
 from flask_cors import CORS
 
 from .config import Config
+from .infrastructure.logging.structured_logger import log_event, setup_logger
 from .routes.routes import books_bp
-
-import uuid
-import time
-from .infrastructure.logging.structured_logger import setup_logger, log_event
 
 setup_logger()
 logger = logging.getLogger(__name__)
@@ -42,7 +41,7 @@ def create_app(config_class=Config) -> Flask:
         # Generate Request ID
         g.request_id = request.headers.get("X-Request-Id", str(uuid.uuid4()))
         g.start_time = time.time()
-        
+
         # Don't enforce API keys in unit/integration tests
         if app.config.get("TESTING", False):
             return None
@@ -61,7 +60,7 @@ def create_app(config_class=Config) -> Flask:
             if not api_key or api_key != app.config["LIBRIS_API_KEY"]:
                 log_event(__name__, logging.WARNING, msg="Unauthorized access attempt", ip=request.remote_addr)
                 return jsonify({"error": "Unauthorized: Invalid or missing API Key"}), 401
-                
+
         return None
 
     @app.after_request
@@ -70,18 +69,18 @@ def create_app(config_class=Config) -> Flask:
         # Propagate request id back to client
         if hasattr(g, "request_id"):
             response.headers["X-Request-Id"] = g.request_id
-            
+
         # Don't log if testing or path is root/health
         if app.config.get("TESTING", False) or request.path in ("/", "/api/health"):
             return response
-            
+
         duration_ms = 0
         if hasattr(g, "start_time"):
             duration_ms = round((time.time() - g.start_time) * 1000, 2)
-            
+
         log_event(
-            __name__, 
-            logging.INFO, 
+            __name__,
+            logging.INFO,
             msg="Request completed",
             status=response.status_code,
             duration_ms=duration_ms,

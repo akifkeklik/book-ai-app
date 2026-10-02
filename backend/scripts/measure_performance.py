@@ -1,11 +1,13 @@
-import time
 import statistics
+import time
+
 from backend.app import create_app
 
 app = create_app()
 client = app.test_client()
 
-from unittest.mock import patch
+from unittest.mock import patch  # noqa: E402
+
 patch("backend.routes.routes._svc.verify_token", return_value=type("User", (), {"id": "test_user"})).start()
 token = "mock_token"
 headers = {"Authorization": f"Bearer {token}"}

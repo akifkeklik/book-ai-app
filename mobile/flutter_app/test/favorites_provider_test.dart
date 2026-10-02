@@ -110,7 +110,7 @@ void main() {
       final provider = FavoritesProvider(svc);
       provider.loadFavorites('user-1');
 
-      final book = Book(
+      const book = Book(
         isbn13: 'isbn-new',
         title: 'New Book',
         authors: 'Author',
@@ -143,7 +143,7 @@ void main() {
       final provider = FavoritesProvider(svc);
       provider.loadFavorites('user-1');
 
-      final book = Book(
+      const book = Book(
         isbn13: 'isbn-new',
         title: 'New Book',
         authors: 'Author',

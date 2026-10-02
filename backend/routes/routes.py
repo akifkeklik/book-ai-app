@@ -8,10 +8,10 @@ from functools import wraps
 
 from flask import Blueprint, g, jsonify, request
 
+from ..config import Config
+from ..recommender import BookRecommender
 from ..services.book_service import BookService
 from ..services.embedding_service import EmbeddingService
-from ..recommender import BookRecommender
-from ..config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +23,10 @@ if Config.SUPABASE_URL and Config.SUPABASE_ANON_KEY:
     from supabase import create_client
     _supabase = create_client(Config.SUPABASE_URL, Config.SUPABASE_ANON_KEY)
 
-from ..infrastructure.persistence.supabase_adapters import (
-    SupabaseInteractionRepository,
-    SupabaseBookDataPort,
+from ..infrastructure.persistence.supabase_adapters import (  # noqa: E402
     SupabaseAuthPort,
+    SupabaseBookDataPort,
+    SupabaseInteractionRepository,
 )
 
 _interaction_repo = SupabaseInteractionRepository(_supabase) if _supabase else None
@@ -34,12 +34,24 @@ _book_data_port = SupabaseBookDataPort(_supabase) if _supabase else None
 _auth_port = SupabaseAuthPort(_supabase) if _supabase else None
 _recommender = BookRecommender()
 
-from ..application.services.enrichment_service import BookEnrichmentService
-from ..application.use_cases.catalog import GetBooksUseCase, SearchBooksUseCase, GetPopularBooksUseCase, GetBookDetailsUseCase
-from ..application.use_cases.recommendations import GetRecommendationsUseCase, GetPersonalizedRecommendationsUseCase
-from ..application.use_cases.interactions import SubmitOnboardingUseCase, SubmitFeedbackUseCase, TrackUserActivityUseCase
-from ..application.use_cases.ai_rag import ProcessRagQueryUseCase
-from ..infrastructure.llm.adapters import GenericLlmAdapter
+from ..application.services.enrichment_service import BookEnrichmentService  # noqa: E402
+from ..application.use_cases.ai_rag import ProcessRagQueryUseCase  # noqa: E402
+from ..application.use_cases.catalog import (  # noqa: E402
+    GetBookDetailsUseCase,
+    GetBooksUseCase,
+    GetPopularBooksUseCase,
+    SearchBooksUseCase,
+)
+from ..application.use_cases.interactions import (  # noqa: E402
+    SubmitFeedbackUseCase,
+    SubmitOnboardingUseCase,
+    TrackUserActivityUseCase,
+)
+from ..application.use_cases.recommendations import (  # noqa: E402
+    GetPersonalizedRecommendationsUseCase,
+    GetRecommendationsUseCase,
+)
+from ..infrastructure.llm.adapters import GenericLlmAdapter  # noqa: E402
 
 _enrichment_service = BookEnrichmentService()
 _llm_port = GenericLlmAdapter(provider=Config.LLM_PROVIDER, api_key=Config.LLM_API_KEY)
@@ -115,8 +127,9 @@ def readiness_check():
             _supabase.table("books").select("isbn13").limit(1).execute()
         return jsonify({"status": "ready", "service": "book-ai-api"}), 200
     except Exception as exc:
-        from .infrastructure.logging.structured_logger import log_event
         import logging
+
+        from .infrastructure.logging.structured_logger import log_event
         log_event(__name__, logging.ERROR, msg="Readiness check failed", error=str(exc))
         return jsonify({"status": "not_ready", "error": "Database unavailable"}), 503
 

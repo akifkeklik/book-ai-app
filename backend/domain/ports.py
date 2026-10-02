@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Protocol
 
+
 class UserInteractionRepository(Protocol):
     def get_user_interactions(self, user_id: str) -> List[Dict[str, Any]]:
         ...

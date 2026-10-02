@@ -1,5 +1,6 @@
 import logging
 from typing import Optional
+
 from ...domain.ports import LlmPort
 
 logger = logging.getLogger(__name__)
@@ -13,7 +14,7 @@ class GenericLlmAdapter(LlmPort):
         if not self._api_key:
             logger.error("LLM_API_KEY is missing.")
             return None
-            
+
         try:
             if self._provider == "gemini":
                 import google.generativeai as genai
@@ -25,7 +26,7 @@ class GenericLlmAdapter(LlmPort):
                     request_options={"timeout": 15.0} # Added timeout to prevent hanging
                 )
                 return response.text
-                
+
             elif self._provider == "openai":
                 from openai import OpenAI
                 client = OpenAI(api_key=self._api_key, timeout=15.0) # Added timeout
@@ -41,7 +42,7 @@ class GenericLlmAdapter(LlmPort):
             else:
                 logger.error(f"Unsupported LLM provider: {self._provider}")
                 return None
-                
+
         except Exception as e:
-            logger.error(f"LLM provider error", extra={"extra_data": {"provider": self._provider, "error": str(e), "error_type": type(e).__name__}})
+            logger.error("LLM provider error", extra={"extra_data": {"provider": self._provider, "error": str(e), "error_type": type(e).__name__}})
             return None

@@ -41,7 +41,7 @@ class FakeAuthService implements AuthServiceBase {
   @override
   Future<void> signOut() async {
     _currentUser = null;
-    _ctrl.add(AuthState(AuthChangeEvent.signedOut, null));
+    _ctrl.add(const AuthState(AuthChangeEvent.signedOut, null));
   }
 
   User _fakeUser(String id, String email) => User(

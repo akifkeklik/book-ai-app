@@ -1,7 +1,8 @@
 import logging
 import time
-from typing import Dict, Any, List, Optional
-from ...domain.ports import UserInteractionRepository, BookDataPort, LlmPort, EmbeddingPort
+from typing import Any, Dict, List, Optional
+
+from ...domain.ports import BookDataPort, EmbeddingPort, LlmPort, UserInteractionRepository
 from ...recommender import BookRecommender
 from ..services.enrichment_service import BookEnrichmentService
 
@@ -37,7 +38,7 @@ class ProcessRagQueryUseCase:
         t0 = time.time()
         embedding = self._embedding_port.generate_embedding(query)
         emb_latency = round((time.time() - t0) * 1000, 2)
-        
+
         if not embedding:
             logger.warning("Embedding generation failed. RAG blocked.", extra={"extra_data": {"embedding_latency_ms": emb_latency, "status": "embedding_failed"}})
             return {
@@ -50,7 +51,7 @@ class ProcessRagQueryUseCase:
         t1 = time.time()
         retrieved_books = self._retrieve_books_by_embedding(embedding, top_k=5, user_id=user_id)
         retrieval_latency = round((time.time() - t1) * 1000, 2)
-        
+
         if not retrieved_books:
             logger.info("RAG retrieval empty", extra={"extra_data": {"retrieval_latency_ms": retrieval_latency, "status": "empty_retrieval"}})
             return {
@@ -61,7 +62,7 @@ class ProcessRagQueryUseCase:
 
         # Step 3: Build Grounded Context
         context = self._build_context(retrieved_books)
-        
+
         # Step 4: LLM Generation
         system_prompt = (
             "You are Libris, a knowledgeable AI book recommendation assistant. "
@@ -76,7 +77,7 @@ class ProcessRagQueryUseCase:
         t2 = time.time()
         answer = self._llm_port.generate_response(system_prompt, user_prompt)
         llm_latency = round((time.time() - t2) * 1000, 2)
-        
+
         metrics = {
             "embedding_latency_ms": emb_latency,
             "retrieval_latency_ms": retrieval_latency,
@@ -105,13 +106,13 @@ class ProcessRagQueryUseCase:
         if not self._book_data_port:
             logger.error("BookDataPort not initialized. Cannot perform vector retrieval.")
             return []
-            
+
         try:
             semantic_scores = self._book_data_port.match_query_embeddings(embedding, limit=100)
-            
+
             if not semantic_scores:
                 return []
-            
+
             dislikes = []
             likes = []
             if user_id and self._interaction_repo:
@@ -128,7 +129,7 @@ class ProcessRagQueryUseCase:
                 dislikes=dislikes
             )
             return self._enrichment_service.enrich(raw_recs)
-            
+
         except Exception as e:
             logger.error(f"Error in vector retrieval: {e}")
             return []
@@ -140,7 +141,7 @@ class ProcessRagQueryUseCase:
             authors = b.get("authors", "Unknown Author")
             desc = b.get("description", "No description available.")
             isbn = b.get("isbn13", "Unknown ISBN")
-            
+
             parts.append(
                 f"<book>\n"
                 f"  <title>{title}</title>\n"
