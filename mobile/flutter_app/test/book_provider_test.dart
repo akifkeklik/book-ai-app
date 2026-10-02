@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -265,7 +264,7 @@ void main() {
     test('clearUserData: clears personalized recs and status', () async {
       final repo = FakeBookRepository();
       repo.personalizedResult = [
-        Book(isbn13: '1', title: 'Personalized 1', authors: 'Author', categories: '', description: '', thumbnail: '', averageRating: 0, ratingsCount: 0, publishedDate: '', pageCount: 0)
+        const Book(isbn13: '1', title: 'Personalized 1', authors: 'Author', categories: '', description: '', thumbnail: '', averageRating: 0, ratingsCount: 0, publishedDate: '', pageCount: 0)
       ];
 
       final provider = BookProvider(repo);

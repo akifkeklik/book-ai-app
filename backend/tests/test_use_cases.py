@@ -1,8 +1,9 @@
-import pytest
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+
 from backend.application.use_cases.ai_rag import ProcessRagQueryUseCase
 from backend.application.use_cases.recommendations import GetPersonalizedRecommendationsUseCase
-from backend.domain.ports import LlmPort, EmbeddingPort, BookDataPort, UserInteractionRepository
+from backend.domain.ports import BookDataPort, EmbeddingPort, LlmPort, UserInteractionRepository
+
 
 # Fakes
 class FakeLlmPort(LlmPort):

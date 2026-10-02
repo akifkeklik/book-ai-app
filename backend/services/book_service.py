@@ -8,16 +8,12 @@ Responsibilities:
 """
 
 import logging
-import random
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
-
-import requests
-from supabase import Client, create_client
+from typing import List, Optional
 
 from ..config import Config
+from ..domain.ports import AuthPort, BookDataPort, UserInteractionRepository
 from ..recommender import BookRecommender
-from ..domain.ports import UserInteractionRepository, BookDataPort, AuthPort
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +56,7 @@ class BookService:
                 raw_data = self.book_data_port.get_all_books_raw()
                 if raw_data:
                     import pandas as pd
+
                     from ..utils.preprocess import preprocess_dataframe
                     df = pd.DataFrame(raw_data)
                     self.recommender.engine.df = preprocess_dataframe(df)

@@ -5,11 +5,10 @@ import sys
 
 from supabase import Client, create_client
 
-import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import Config
-from services.embedding_service import EmbeddingService
 from infrastructure.persistence.supabase_adapters import SupabaseBookDataPort
+from services.embedding_service import EmbeddingService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)

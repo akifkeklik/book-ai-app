@@ -68,10 +68,10 @@ def fake_interaction_repo(monkeypatch):
 
         def track_activity(self, payload):
             self.calls.append(("user_activities", "insert", payload))
-            
+
         def get_user_interactions(self, user_id):
             return []
-            
+
         def get_user_profile(self, user_id):
             return None
 

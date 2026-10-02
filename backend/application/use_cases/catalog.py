@@ -1,6 +1,8 @@
 from typing import Any, Dict, List, Optional
+
 from ...recommender import BookRecommender
 from ..services.enrichment_service import BookEnrichmentService
+
 
 class GetBooksUseCase:
     def __init__(self, recommender: BookRecommender, enrichment_service: BookEnrichmentService):

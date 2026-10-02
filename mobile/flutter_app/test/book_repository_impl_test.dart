@@ -61,10 +61,10 @@ void main() {
       final supabase = FakeSupabaseService();
 
       supabase.popularResult = [
-        Book(isbn13: '1', title: 'Supabase Book', authors: 'A', categories: '', description: '', thumbnail: '', averageRating: 0, ratingsCount: 0, publishedDate: '', pageCount: 0)
+        const Book(isbn13: '1', title: 'Supabase Book', authors: 'A', categories: '', description: '', thumbnail: '', averageRating: 0, ratingsCount: 0, publishedDate: '', pageCount: 0)
       ];
       api.popularResult = [
-        Book(isbn13: '2', title: 'API Book', authors: 'B', categories: '', description: '', thumbnail: '', averageRating: 0, ratingsCount: 0, publishedDate: '', pageCount: 0)
+        const Book(isbn13: '2', title: 'API Book', authors: 'B', categories: '', description: '', thumbnail: '', averageRating: 0, ratingsCount: 0, publishedDate: '', pageCount: 0)
       ];
 
       final repo = BookRepositoryImpl(api, supabase);
@@ -79,7 +79,7 @@ void main() {
 
       supabase.popularError = Exception('Supabase is down');
       api.popularResult = [
-        Book(isbn13: '2', title: 'API Book', authors: 'B', categories: '', description: '', thumbnail: '', averageRating: 0, ratingsCount: 0, publishedDate: '', pageCount: 0)
+        const Book(isbn13: '2', title: 'API Book', authors: 'B', categories: '', description: '', thumbnail: '', averageRating: 0, ratingsCount: 0, publishedDate: '', pageCount: 0)
       ];
 
       final repo = BookRepositoryImpl(api, supabase);
@@ -93,7 +93,7 @@ void main() {
       final supabase = FakeSupabaseService();
 
       supabase.bookByIsbnResult = null;
-      api.bookByIsbnResult = Book(isbn13: '123', title: 'API Book Details', authors: 'B', categories: '', description: '', thumbnail: '', averageRating: 0, ratingsCount: 0, publishedDate: '', pageCount: 0);
+      api.bookByIsbnResult = const Book(isbn13: '123', title: 'API Book Details', authors: 'B', categories: '', description: '', thumbnail: '', averageRating: 0, ratingsCount: 0, publishedDate: '', pageCount: 0);
 
       final repo = BookRepositoryImpl(api, supabase);
       final result = await repo.getBookByIsbn('123');

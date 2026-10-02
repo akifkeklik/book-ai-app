@@ -1,6 +1,7 @@
 import datetime
 import logging
 from typing import Any, Dict, List, Optional
+
 from ...domain.ports import UserInteractionRepository
 
 logger = logging.getLogger(__name__)

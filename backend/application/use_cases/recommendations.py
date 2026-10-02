@@ -2,8 +2,9 @@ import logging
 import random
 import time
 from typing import Any, Dict, List, Optional
+
+from ...domain.ports import BookDataPort, UserInteractionRepository
 from ...recommender import BookRecommender
-from ...domain.ports import UserInteractionRepository, BookDataPort
 from ..services.enrichment_service import BookEnrichmentService
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ class GetPersonalizedRecommendationsUseCase:
     def execute(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
         """
         Production-grade personalization.
-        Note: Caching can be handled by a decorator at the service level, 
+        Note: Caching can be handled by a decorator at the service level,
         but the business logic goes here.
         """
         if not self._interaction_repo:
@@ -118,8 +119,8 @@ class GetPersonalizedRecommendationsUseCase:
             final_recs = [r for r in recs if r.get("isbn13") not in dislikes]
             latency = round((time.time() - t0) * 1000, 2)
             logger.info("Personalized recommendation generated", extra={"extra_data": {
-                "personalized_latency_ms": latency, 
-                "seed_count": len(seed_titles), 
+                "personalized_latency_ms": latency,
+                "seed_count": len(seed_titles),
                 "semantic_candidates": len(semantic_scores) if semantic_scores else 0,
                 "count": len(final_recs)
             }})

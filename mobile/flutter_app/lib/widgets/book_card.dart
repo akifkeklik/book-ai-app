@@ -4,11 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 
 import '../domain/entities/book.dart';
-import '../providers/auth_provider.dart';
-import '../providers/book_provider.dart';
 import '../providers/language_provider.dart';
 import '../theme/design_system.dart';
 import 'book_cover_fallback.dart';
@@ -450,43 +447,3 @@ class _CategoryChip extends StatelessWidget {
       ),
     );
   }
-}
-
-class _InteractionButtons extends StatelessWidget {
-  final Book book;
-  const _InteractionButtons({required this.book});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final bp = context.read<BookProvider>();
-    final auth = context.read<AuthProvider>();
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          onPressed: () {
-            HapticFeedback.mediumImpact();
-            if (auth.currentUser != null) {
-              bp.submitFeedback(userId: auth.currentUser!.id, bookId: book.isbn13, interaction: 'like');
-            }
-          },
-          icon: const Icon(Icons.thumb_up_alt_outlined, size: 14),
-          color: colors.primary,
-        ),
-        const SizedBox(width: 4),
-        IconButton(
-          onPressed: () {
-            HapticFeedback.heavyImpact();
-            if (auth.currentUser != null) {
-              bp.submitFeedback(userId: auth.currentUser!.id, bookId: book.isbn13, interaction: 'dislike');
-            }
-          },
-          icon: const Icon(Icons.thumb_down_alt_outlined, size: 14),
-          color: colors.error,
-        ),
-      ],
-    );
-  }
-}

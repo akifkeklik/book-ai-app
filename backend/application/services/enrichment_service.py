@@ -1,7 +1,9 @@
 import logging
-import requests
 from functools import lru_cache
 from typing import Any, Dict, List, Optional
+
+import requests
+
 from ...config import Config
 
 logger = logging.getLogger(__name__)
