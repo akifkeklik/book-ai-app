@@ -8,84 +8,25 @@ from functools import wraps
 
 from flask import Blueprint, g, jsonify, request
 
-from ..config import Config
-from ..infrastructure.ml.recommender import BookRecommender
-from ..services.book_service import BookService
-from ..services.embedding_service import EmbeddingService
+from ..container import container
 
 logger = logging.getLogger(__name__)
 
 books_bp = Blueprint("books", __name__)
 
-# Composition Root - Singleton Creation
-_supabase = None
-if Config.SUPABASE_URL and Config.SUPABASE_ANON_KEY:
-    from supabase import create_client
-    _supabase = create_client(Config.SUPABASE_URL, Config.SUPABASE_ANON_KEY)
-
-from ..infrastructure.persistence.supabase_adapters import (  # noqa: E402
-    SupabaseAuthPort,
-    SupabaseBookDataPort,
-    SupabaseInteractionRepository,
-)
-
-_interaction_repo = SupabaseInteractionRepository(_supabase) if _supabase else None
-_book_data_port = SupabaseBookDataPort(_supabase) if _supabase else None
-_auth_port = SupabaseAuthPort(_supabase) if _supabase else None
-_recommender = BookRecommender()
-
-from ..application.services.enrichment_service import BookEnrichmentService  # noqa: E402
-from ..application.use_cases.ai_rag import ProcessRagQueryUseCase  # noqa: E402
-from ..application.use_cases.catalog import (  # noqa: E402
-    GetBookDetailsUseCase,
-    GetBooksUseCase,
-    GetPopularBooksUseCase,
-    SearchBooksUseCase,
-)
-from ..application.use_cases.interactions import (  # noqa: E402
-    SubmitFeedbackUseCase,
-    SubmitOnboardingUseCase,
-    TrackUserActivityUseCase,
-)
-from ..application.use_cases.recommendations import (  # noqa: E402
-    GetPersonalizedRecommendationsUseCase,
-    GetRecommendationsUseCase,
-)
-from ..infrastructure.llm.adapters import GenericLlmAdapter  # noqa: E402
-
-_enrichment_service = BookEnrichmentService()
-_llm_port = GenericLlmAdapter(provider=Config.LLM_PROVIDER, api_key=Config.LLM_API_KEY)
-
-_get_books_uc = GetBooksUseCase(_recommender, _enrichment_service)
-_search_books_uc = SearchBooksUseCase(_recommender, _enrichment_service)
-_get_popular_books_uc = GetPopularBooksUseCase(_recommender, _enrichment_service)
-_get_book_details_uc = GetBookDetailsUseCase(_recommender, _enrichment_service)
-_get_recommendations_uc = GetRecommendationsUseCase(_recommender, _enrichment_service)
-_get_personalized_recs_uc = GetPersonalizedRecommendationsUseCase(
-    recommender=_recommender,
-    interaction_repo=_interaction_repo,
-    book_data_port=_book_data_port,
-    enrichment_service=_enrichment_service
-)
-_submit_onboarding_uc = SubmitOnboardingUseCase(_interaction_repo)
-_submit_feedback_uc = SubmitFeedbackUseCase(_interaction_repo)
-_track_activity_uc = TrackUserActivityUseCase(_interaction_repo)
-
-_svc = BookService(
-    recommender=_recommender,
-    interaction_repo=_interaction_repo,
-    book_data_port=_book_data_port,
-    auth_port=_auth_port,
-)
-_emb_svc = EmbeddingService(book_data_port=_book_data_port)
-_process_rag_query_uc = ProcessRagQueryUseCase(
-    embedding_port=_emb_svc,
-    book_data_port=_book_data_port,
-    interaction_repo=_interaction_repo,
-    recommender=_recommender,
-    enrichment_service=_enrichment_service,
-    llm_port=_llm_port
-)
+# Re-exporting aliases for convenience and to avoid changing the rest of this file
+_supabase = container.supabase
+_svc = container.book_service
+_get_books_uc = container.get_books_uc
+_search_books_uc = container.search_books_uc
+_get_popular_books_uc = container.get_popular_books_uc
+_get_book_details_uc = container.get_book_details_uc
+_get_recommendations_uc = container.get_recommendations_uc
+_get_personalized_recs_uc = container.get_personalized_recs_uc
+_submit_onboarding_uc = container.submit_onboarding_uc
+_submit_feedback_uc = container.submit_feedback_uc
+_track_activity_uc = container.track_activity_uc
+_process_rag_query_uc = container.process_rag_query_uc
 
 
 def require_auth(f):
