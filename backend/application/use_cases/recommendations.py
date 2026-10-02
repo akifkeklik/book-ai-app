@@ -76,12 +76,7 @@ class GetPersonalizedRecommendationsUseCase:
         self, user_id: str, likes: tuple, dislikes: tuple, genres: tuple, limit: int
     ) -> List[Dict[str, Any]]:
         try:
-            seed_titles = []
-            if likes:
-                for bid in likes:
-                    idx = self._recommender.engine.find_index(bid)
-                    if idx is not None:
-                        seed_titles.append(self._recommender.engine.df.iloc[idx]["title"])
+            seed_titles = list(likes)
 
             if not seed_titles and genres:
                 logger.info(f"Using preferred genres as seed for {user_id}: {genres}")

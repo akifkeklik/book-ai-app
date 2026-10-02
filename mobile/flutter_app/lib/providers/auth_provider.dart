@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -28,24 +28,50 @@ class AuthProvider extends ChangeNotifier {
         msg.contains('SocketException') ||
         msg.contains('XMLHttpRequest error') ||
         msg.contains('Connection refused') ||
-        msg.contains('Network is unreachable');
+        msg.contains('Network is unreachable') ||
+        msg.contains('HandshakeException') ||
+        msg.contains('CERTIFICATE_VERIFY_FAILED') ||
+        msg.contains('Connection reset') ||
+        msg.contains('Connection closed');
+  }
+
+  /// Bir hata mesajının parse/format kaynaklı olup olmadığını kontrol eder.
+  /// Sunucu JSON yerine HTML döndürdüğünde oluşur.
+  bool _isFormatError(String msg) {
+    return msg.contains('FormatException') ||
+        msg.contains('Unexpected character') ||
+        msg.contains('<HTML>') ||
+        msg.contains('<html>') ||
+        msg.contains('is not a subtype of') ||
+        msg.contains('type \'String\' is not');
   }
 
   /// Ham exception'ı kullanıcı dostu Türkçe mesaja dönüştürür.
   String _friendlyError(dynamic e) {
     final raw = e.toString();
+
+    // Format / parse hataları (HTML response vs.)
+    if (_isFormatError(raw)) {
+      return '⚠️ Sunucu geçici olarak yanıt veremiyor.\n'
+          'Lütfen birkaç saniye bekleyip tekrar deneyin.';
+    }
+
+    // Ağ / bağlantı hataları
     if (_isNetworkError(raw)) {
       return '⚠️ Sunucuya bağlanılamadı.\n'
-          'Supabase projeniz uyku modunda olabilir. '
-          'supabase.com → Dashboard → "Restore Project" butonuna basın.';
+          'İnternet bağlantınızı kontrol edin veya birkaç dakika bekleyip tekrar deneyin.';
     }
+
     // AuthException mesajından ham teknik bilgiyi sil
     if (e is AuthException) {
       final msg = e.message;
+      if (_isFormatError(msg)) {
+        return '⚠️ Sunucu geçici olarak yanıt veremiyor.\n'
+            'Lütfen birkaç saniye bekleyip tekrar deneyin.';
+      }
       if (_isNetworkError(msg)) {
         return '⚠️ Sunucuya bağlanılamadı.\n'
-            'Supabase projeniz uyku modunda olabilir. '
-            'supabase.com → Dashboard → "Restore Project" butonuna basın.';
+            'İnternet bağlantınızı kontrol edin veya birkaç dakika bekleyip tekrar deneyin.';
       }
       if (msg.contains('Invalid login credentials')) {
         return 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.';
@@ -55,6 +81,12 @@ class AuthProvider extends ChangeNotifier {
       }
       if (msg.contains('User already registered')) {
         return 'Bu e-posta adresi zaten kayıtlı.';
+      }
+      if (msg.contains('email_address_invalid') || msg.contains('invalid_email')) {
+        return 'Geçersiz e-posta adresi. Lütfen kontrol edin.';
+      }
+      if (msg.contains('weak_password') || msg.contains('Password should be')) {
+        return 'Şifre çok zayıf. En az 6 karakter olmalı.';
       }
       return msg;
     }
@@ -70,7 +102,7 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
       }
 
-      // 2. Auth state değişimlerini dinle — hatalar SESsizce yutulur, UI'a yansımaz
+      // 2. Auth state değişimlerini dinle — hatalar SESSİZCE yutulur, UI'a yansımaz
       _authSubscription = _svc.authStateStream.listen((state) {
         final newUser = state.session?.user;
         if (_user?.id != newUser?.id || _isLoading) {

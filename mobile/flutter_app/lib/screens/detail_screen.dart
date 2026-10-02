@@ -11,6 +11,7 @@ import '../providers/language_provider.dart';
 import '../domain/repositories/book_repository.dart';
 
 import '../widgets/book_card.dart';
+import '../theme/design_system.dart';
 
 class DetailScreen extends StatefulWidget {
   const DetailScreen({super.key, required this.isbn, this.initialBook});
@@ -175,16 +176,16 @@ class _DetailScreenState extends State<DetailScreen> {
                   _buildActionButtons(context, book),
                   const SizedBox(height: 32),
                   _buildDescription(context, book),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: DesignSystem.spacing32),
                   if (_similar.isNotEmpty || _loadingSimilar) ...[
                     Text(
                       context.tr('similar_books'),
                       style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w900,
                         letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: DesignSystem.spacing20),
                     _buildSimilarList(),
                   ],
                   const SizedBox(height: 100),
@@ -268,14 +269,15 @@ class _DetailScreenState extends State<DetailScreen> {
           book.title,
           style: theme.textTheme.headlineLarge?.copyWith(
             height: 1.2,
+            fontWeight: FontWeight.w900,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: DesignSystem.spacing8),
         Text(
           book.authorsFormatted,
           style: theme.textTheme.titleMedium?.copyWith(
             color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
@@ -336,9 +338,9 @@ class _DetailScreenState extends State<DetailScreen> {
                 icon: const Icon(Icons.auto_awesome),
                 label: Text(context.tr('ai_insight')),
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: DesignSystem.spacing16),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
+                      borderRadius: DesignSystem.borderRadiusLarge),
                 ),
               ),
             ),
@@ -366,24 +368,25 @@ class _DetailScreenState extends State<DetailScreen> {
       children: [
         if (book.explanation != null) ...[
           Container(
-            padding: const EdgeInsets.all(16),
-            margin: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.all(DesignSystem.spacing16),
+            margin: const EdgeInsets.only(bottom: DesignSystem.spacing24),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.3)),
+              color: theme.colorScheme.primary.withOpacity(0.08),
+              borderRadius: DesignSystem.borderRadiusLarge,
+              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.auto_awesome, color: theme.colorScheme.primary),
-                const SizedBox(width: 12),
+                Icon(Icons.auto_awesome, color: theme.colorScheme.primary, size: 20),
+                const SizedBox(width: DesignSystem.spacing12),
                 Expanded(
                   child: Text(
                     book.explanation!,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
+                      height: 1.5,
                     ),
                   ),
                 ),

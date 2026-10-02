@@ -1,4 +1,5 @@
-﻿import 'dart:async';
+
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:book_ai_app/providers/auth_provider.dart';

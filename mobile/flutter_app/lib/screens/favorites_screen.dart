@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/language_provider.dart';
+import '../theme/design_system.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -36,31 +37,41 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         appBar: AppBar(title: Text(context.tr('saved'))),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(DesignSystem.spacing32),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.bookmark_outline,
-                    size: 80,
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
-                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(DesignSystem.spacing24),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.bookmark_outline,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.primary),
+                ),
+                const SizedBox(height: DesignSystem.spacing24),
                 Text(context.tr('favorites_title'),
-                    style: Theme.of(context).textTheme.headlineMedium),
-                const SizedBox(height: 10),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900)),
+                const SizedBox(height: DesignSystem.spacing12),
                 Text(
                   context.tr('sign_in_subtitle'),
                   textAlign: TextAlign.center,
                   style: Theme.of(context)
                       .textTheme
                       .bodyMedium
-                      ?.copyWith(color: Colors.grey),
+                      ?.copyWith(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
                 ),
-                const SizedBox(height: 32),
-                ElevatedButton(
-                  onPressed: () => context.push('/login'),
-                  child: Text(context.tr('sign_in_hint')),
+                const SizedBox(height: DesignSystem.spacing32),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => context.push('/login'),
+                    child: Text(context.tr('sign_in_hint')),
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: DesignSystem.spacing12),
                 TextButton(
                   onPressed: () => context.push('/register'),
                   child: Text(context.tr('create_one')),
@@ -112,29 +123,33 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     if (favs.favorites.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(DesignSystem.spacing32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.bookmark_outline,
-                  size: 80,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withOpacity(0.5)),
-              const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(DesignSystem.spacing24),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.bookmark_outline,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.primary),
+                ),
+              const SizedBox(height: DesignSystem.spacing24),
               Text(context.tr('favorites_empty_title'),
-                  style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 10),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+              const SizedBox(height: DesignSystem.spacing12),
               Text(
                 context.tr('favorites_empty_message'),
                 textAlign: TextAlign.center,
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
-                    ?.copyWith(color: Colors.grey),
+                    ?.copyWith(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: DesignSystem.spacing32),
               ElevatedButton.icon(
                 onPressed: () => context.go('/'),
                 icon: const Icon(Icons.explore_outlined),
@@ -194,25 +209,24 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             );
           },
           child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            contentPadding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing16, vertical: DesignSystem.spacing8),
             leading: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: DesignSystem.borderRadiusSmall,
               child: CachedNetworkImage(
                 imageUrl: fav.thumbnail.isNotEmpty
                     ? fav.thumbnail
                     : 'https://placehold.co/56x80.png?text=Book',
-                width: 56,
-                height: 80,
+                width: 60,
+                height: 85,
                 fit: BoxFit.cover,
                 placeholder: (_, __) => Container(
-                    width: 56,
-                    height: 80,
-                    color: Theme.of(context).colorScheme.surface),
+                    width: 60,
+                    height: 85,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest),
                 errorWidget: (_, __, ___) => Container(
-                    width: 56,
-                    height: 80,
-                    color: Theme.of(context).colorScheme.surface,
+                    width: 60,
+                    height: 85,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     child: const Icon(Icons.menu_book_rounded, size: 24)),
               ),
             ),
@@ -220,17 +234,18 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               fav.bookTitle,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             subtitle: Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 '${context.tr('saved')}: ${context.trRelativeDate(fav.addedAt)}',
-                style:
-                    Theme.of(context).textTheme.bodySmall,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                ),
               ),
             ),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3)),
             onTap: () => context.push('/book/${fav.isbn13}'),
           ),
         );

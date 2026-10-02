@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
+import '../theme/design_system.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -94,26 +95,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 16),
+                // Logo / branding
                 Center(
-                  child: Icon(Icons.menu_book_rounded,
-                      size: 80,
-                      color: Theme.of(context).colorScheme.primary),
+                  child: Container(
+                    padding: const EdgeInsets.all(DesignSystem.spacing16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.auto_awesome,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: DesignSystem.spacing24),
                 Center(
-                  child: Text(context.tr('app_name'),
-                      style: Theme.of(context).textTheme.headlineLarge),
+                  child: Text(
+                    context.tr('app_name'),
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900),
+                  ),
                 ),
+                const SizedBox(height: DesignSystem.spacing8),
                 Center(
                   child: Text(
                     context.tr('register_subtitle'),
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(color: Colors.grey),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: DesignSystem.spacing48),
 
                 // Error banner
                 if (auth.error != null) ...[
@@ -225,10 +239,10 @@ class _ErrorBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing16, vertical: DesignSystem.spacing12),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.error.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: DesignSystem.borderRadiusLarge,
         border: Border.all(
             color: Theme.of(context).colorScheme.error.withOpacity(0.3)),
       ),

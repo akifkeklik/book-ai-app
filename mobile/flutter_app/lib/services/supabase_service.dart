@@ -139,6 +139,14 @@ class SupabaseService implements AuthServiceBase {
 
   // ── Favorites ─────────────────────────────────────────────────────────────
 
+  Stream<List<Map<String, dynamic>>> streamFavorites(String userId) {
+    return client
+        .from('favorites')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
+        .order('added_at', ascending: false);
+  }
+
   Future<void> addFavorite({
     required String userId,
     required String bookId, // This is isbn13

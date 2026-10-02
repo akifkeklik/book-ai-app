@@ -1,59 +1,34 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'design_system.dart';
 
 class AppTheme {
   AppTheme._();
-
-  // ── Premium Dark Palette (Deep Slate 950/900) ──────────────────────────────
-  static const Color surfaceDark = Color(0xFF020617); // Slate 950
-  static const Color cardDark = Color(0xFF0F172A);    // Slate 900
-  static const Color borderDark = Color(0x3394A3B8);  // Slate 400 (20% Opacity)
-  
-  // ── Premium Light Palette (Pristine Slate 100/50) ────────────────────────
-  static const Color surfaceLight = Color(0xFFF1F5F9); // Slate 100
-  static const Color cardLight = Color(0xFFF8FAFC);    // Slate 50
-  static const Color borderLight = Color(0xFFE2E8F0);  // Slate 200
-
-  // ── Text Themes ────────────────────────────────────────────────────────────
-  static TextTheme _buildTextTheme(Color onSurface) {
-    return TextTheme(
-      displayLarge: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: onSurface, letterSpacing: -1),
-      displayMedium: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.bold, color: onSurface, letterSpacing: -1),
-      headlineLarge: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, color: onSurface, letterSpacing: -0.5),
-      headlineMedium: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600, color: onSurface, letterSpacing: -0.5),
-      titleLarge: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: onSurface),
-      bodyLarge: GoogleFonts.inter(fontSize: 16, color: onSurface.withOpacity(0.9), height: 1.5, letterSpacing: 0.2),
-      bodyMedium: GoogleFonts.inter(fontSize: 14, color: onSurface.withOpacity(0.8), height: 1.5),
-      bodySmall: GoogleFonts.inter(fontSize: 12, color: onSurface.withOpacity(0.6)),
-      labelLarge: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: onSurface, letterSpacing: 0.5),
-    );
-  }
 
   // ── Dark Theme (Deep Onyx & Blue) ──────────────────────────────────────────
   static ThemeData darkTheme(Color seedColor) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: Brightness.dark,
-      surface: surfaceDark,
+      surface: DesignSystem.backgroundDark,
     ).copyWith(
       primary: seedColor,
-      surfaceContainerHighest: cardDark,
+      surfaceContainerHighest: DesignSystem.surfaceDarkHighlight,
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: surfaceDark,
-      cardColor: cardDark,
-      textTheme: _buildTextTheme(Colors.white),
-      
+      scaffoldBackgroundColor: DesignSystem.backgroundDark,
+      cardColor: DesignSystem.surfaceDark,
+      textTheme: DesignSystem.textTheme(DesignSystem.textDarkPrimary),
+
       cardTheme: CardTheme(
         elevation: 0,
-        color: cardDark,
+        color: DesignSystem.surfaceDark,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: borderDark, width: 1),
+          borderRadius: DesignSystem.borderRadiusLarge,
+          side: const BorderSide(color: Colors.white12, width: 1),
         ),
       ),
 
@@ -61,14 +36,25 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -1),
+        titleTextStyle: DesignSystem.textTheme(DesignSystem.textDarkPrimary).displaySmall?.copyWith(letterSpacing: -1),
       ),
 
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: cardDark,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-        hintStyle: GoogleFonts.inter(color: Colors.white38),
+        fillColor: DesignSystem.surfaceDarkHighlight,
+        border: OutlineInputBorder(borderRadius: DesignSystem.borderRadiusLarge, borderSide: BorderSide.none),
+        hintStyle: DesignSystem.textTheme(DesignSystem.textDarkSecondary).bodyLarge,
+      ),
+
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: seedColor,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: DesignSystem.borderRadiusMedium),
+          padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing24, vertical: DesignSystem.spacing16),
+          textStyle: DesignSystem.textTheme(Colors.white).titleMedium,
+        ),
       ),
     );
   }
@@ -78,35 +64,53 @@ class AppTheme {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: Brightness.light,
-      surface: surfaceLight,
+      surface: DesignSystem.backgroundLight,
     ).copyWith(
       primary: seedColor,
-      surfaceContainerHighest: cardLight,
+      surfaceContainerHighest: DesignSystem.surfaceLightHighlight,
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: surfaceLight,
-      cardColor: cardLight,
-      textTheme: _buildTextTheme(const Color(0xFF0F172A)),
+      scaffoldBackgroundColor: DesignSystem.backgroundLight,
+      cardColor: DesignSystem.surfaceLight,
+      textTheme: DesignSystem.textTheme(DesignSystem.textLightPrimary),
 
       cardTheme: CardTheme(
-        elevation: 2,
-        shadowColor: Colors.black.withOpacity(0.05),
-        color: cardLight,
+        elevation: 0,
+        color: DesignSystem.surfaceLight,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: borderLight, width: 1),
+          borderRadius: DesignSystem.borderRadiusLarge,
+          side: BorderSide(color: Colors.black.withOpacity(0.05), width: 1),
         ),
       ),
 
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        titleTextStyle: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A), letterSpacing: -1),
-        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
+        centerTitle: false,
+        titleTextStyle: DesignSystem.textTheme(DesignSystem.textLightPrimary).displaySmall?.copyWith(letterSpacing: -1),
+        iconTheme: const IconThemeData(color: DesignSystem.textLightPrimary),
+      ),
+
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: DesignSystem.surfaceLightHighlight,
+        border: OutlineInputBorder(borderRadius: DesignSystem.borderRadiusLarge, borderSide: BorderSide.none),
+        hintStyle: DesignSystem.textTheme(DesignSystem.textLightSecondary).bodyLarge,
+      ),
+
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: seedColor,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: DesignSystem.borderRadiusMedium),
+          padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing24, vertical: DesignSystem.spacing16),
+          textStyle: DesignSystem.textTheme(Colors.white).titleMedium,
+        ),
       ),
     );
   }

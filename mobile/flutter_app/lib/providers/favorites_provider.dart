@@ -32,12 +32,7 @@ class FavoritesProvider extends ChangeNotifier {
     
     _favoritesSub?.cancel();
     try {
-      _favoritesSub = _svc.client
-          .from('favorites')
-          .stream(primaryKey: ['id'])
-          .eq('user_id', userId)
-          .order('added_at', ascending: false)
-          .listen((data) {
+      _favoritesSub = _svc.streamFavorites(userId).listen((data) {
         _favorites = data.map((j) => FavoriteBookDto.fromJson(j)).toList();
         _isLoading = false;
         notifyListeners();
