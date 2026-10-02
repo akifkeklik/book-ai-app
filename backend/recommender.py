@@ -136,9 +136,8 @@ class RecommenderEngine:
 
         logger.info(f"TF-IDF matrix created with shape: {self.tfidf_matrix.shape}")
 
-        logger.info("Calculating cosine similarity matrix...")
-        self.cosine_sim = cosine_similarity(self.tfidf_matrix)
-        logger.info(f"Cosine similarity matrix created with shape: {self.cosine_sim.shape}")
+        logger.info("Skipping full cosine similarity matrix calculation to save memory.")
+        self.cosine_sim = None
         self.is_fitted = True
 
     def find_index(self, book_identifier: str) -> Optional[int]:
@@ -182,7 +181,7 @@ class BookRecommender:
 
     @property
     def cosine_sim(self):
-        return self.engine.cosine_sim
+        return None
 
     def load_data(self, csv_path: str):
         """Load and preprocess data from a CSV file."""
@@ -378,9 +377,11 @@ class BookRecommender:
             best_candidate_idx = -1
 
             for cand_idx in candidate_indices:
-                sim_to_selected = (
-                    self.cosine_sim[cand_idx, selected_indices].max() if selected_indices else 0.0
-                )
+                if selected_indices:
+                    sim_scores = cosine_similarity(self.tfidf_matrix[cand_idx], self.tfidf_matrix[selected_indices])[0]
+                    sim_to_selected = sim_scores.max()
+                else:
+                    sim_to_selected = 0.0
                 mmr = (self.config.diversity_lambda * scores[cand_idx]) - (
                     (1 - self.config.diversity_lambda) * sim_to_selected
                 )
@@ -400,9 +401,11 @@ class BookRecommender:
         for rec in recs:
             idx = self.engine.find_index(rec["isbn13"])
             if idx is not None:
-                sim_to_selected = (
-                    self.cosine_sim[idx, selected_indices].max() if selected_indices else 0.0
-                )
+                if selected_indices:
+                    sim_scores = cosine_similarity(self.tfidf_matrix[idx], self.tfidf_matrix[selected_indices])[0]
+                    sim_to_selected = sim_scores.max()
+                else:
+                    sim_to_selected = 0.0
                 rec["final_score"] = scores[idx]
                 rec["diversity_penalty"] = (1 - self.config.diversity_lambda) * sim_to_selected
         return recs
@@ -430,7 +433,7 @@ class BookRecommender:
             return {"explanation": explanation, "explanation_source_book": ""}
 
         # Hybrid case: we have both likes (seed_indices) and possibly semantic matches
-        sim_scores = self.cosine_sim[rec_idx, seed_indices]
+        sim_scores = cosine_similarity(self.tfidf_matrix[rec_idx], self.tfidf_matrix[seed_indices])[0]
         if sim_scores.size == 0:
             return {}
 
