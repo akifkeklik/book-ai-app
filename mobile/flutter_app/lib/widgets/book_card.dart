@@ -1,5 +1,4 @@
 import 'dart:ui';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,9 +10,9 @@ import '../domain/entities/book.dart';
 import '../providers/auth_provider.dart';
 import '../providers/book_provider.dart';
 import '../providers/language_provider.dart';
+import '../theme/design_system.dart';
 import 'book_cover_fallback.dart';
 
-// ── Shared Multi-layer Fallback Cover ───────────────────────────────────────
 class NetworkCoverWithFallback extends StatelessWidget {
   final Book book;
   final double width;
@@ -28,7 +27,6 @@ class NetworkCoverWithFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Stage 3: The typographic fallback
     final Widget fallbackWidget = BookCoverFallback(
       title: book.title,
       author: book.authorsFormatted,
@@ -36,7 +34,6 @@ class NetworkCoverWithFallback extends StatelessWidget {
       height: height,
     );
 
-    // Stage 2: OpenLibrary Cover
     final Widget openLibraryWidget = book.openLibraryCoverUrl.isEmpty
         ? fallbackWidget
         : CachedNetworkImage(
@@ -52,7 +49,6 @@ class NetworkCoverWithFallback extends StatelessWidget {
             ),
           );
 
-    // Stage 1: Primary Kaggle/DB Cover URL
     if (book.coverUrl.isEmpty) return openLibraryWidget;
 
     return CachedNetworkImage(
@@ -70,37 +66,30 @@ class NetworkCoverWithFallback extends StatelessWidget {
   }
 }
 
-// ── Vertical book card (used in grids & lists) ────────────────────────────────
-
 class BookCard extends StatelessWidget {
   const BookCard({super.key, required this.book});
   final Book book;
 
-  String get _detailRouteIsbn =>
-      book.isbn13.trim().isEmpty ? '_' : book.isbn13.trim();
+  String get _detailRouteIsbn => book.isbn13.trim().isEmpty ? '_' : book.isbn13.trim();
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
         context.push('/book/$_detailRouteIsbn', extra: book);
       },
       child: Container(
-        width: 145,
-        margin: const EdgeInsets.only(bottom: 15, left: 4, right: 4, top: 4),
+        width: 150,
+        margin: const EdgeInsets.only(bottom: DesignSystem.spacing16, top: DesignSystem.spacing4),
         decoration: BoxDecoration(
-          color: Theme.of(context).cardTheme.color ?? colors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          color: Theme.of(context).cardTheme.color,
+          borderRadius: DesignSystem.borderRadiusLarge,
+          border: Border.all(color: isDark ? Colors.white12 : Colors.black.withOpacity(0.05)),
+          boxShadow: DesignSystem.shadowMd(isDark),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -110,59 +99,49 @@ class BookCard extends StatelessWidget {
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(20)),
-                    child: NetworkCoverWithFallback(
-                        book: book, width: double.infinity, height: 195),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(DesignSystem.radiusLarge)),
+                    child: NetworkCoverWithFallback(book: book, width: double.infinity, height: 210),
                   ),
                   if (book.explanation != null)
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: colors.primary.withOpacity(0.9),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 4),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.auto_awesome,
-                                size: 10, color: Colors.white),
-                            const SizedBox(width: 4),
-                            Text(
-                              context.tr('for_you').toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                              ),
+                      child: ClipRRect(
+                        borderRadius: DesignSystem.borderRadiusPill,
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withOpacity(0.8),
+                              borderRadius: DesignSystem.borderRadiusPill,
+                              boxShadow: DesignSystem.shadowSm(true),
                             ),
-                          ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.auto_awesome, size: 10, color: Colors.white),
+                                const SizedBox(width: 4),
+                                Text(
+                                  context.tr('for_you').toUpperCase(),
+                                  style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
                 ],
               ),
             ),
-
-            // Info (Expanded guards against overflow)
             Expanded(
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.all(DesignSystem.spacing12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Top content: Title and Author
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -170,61 +149,19 @@ class BookCard extends StatelessWidget {
                           book.title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.copyWith(
-                                  fontWeight: FontWeight.w700, height: 1.2),
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            height: 1.2,
+                            letterSpacing: -0.2,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           book.authorsFormatted,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: colors.onSurface.withOpacity(0.6),
-                                  ),
-                        ),
-                      ],
-                    ),
-
-                    // Bottom content: AI Note and Rating (Anchored)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (book.explanation != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Row(
-                              children: [
-                                Icon(Icons.auto_awesome,
-                                    size: 10, color: colors.primary),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    book.explanation!,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 8,
-                                      fontWeight: FontWeight.w600,
-                                      color: colors.primary.withOpacity(0.9),
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        _RatingRow(rating: book.averageRating),
-                        const SizedBox(height: 4),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerRight,
-                            child: _InteractionButtons(book: book),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colors.onSurface.withOpacity(0.6),
                           ),
                         ),
                       ],
@@ -240,53 +177,40 @@ class BookCard extends StatelessWidget {
   }
 }
 
-// ── Horizontal book card (used in featured / search results) ──────────────────
-
 class BookListTile extends StatelessWidget {
   const BookListTile({super.key, required this.book, this.trailing});
   final Book book;
   final Widget? trailing;
 
-  String get _detailRouteIsbn =>
-      book.isbn13.trim().isEmpty ? '_' : book.isbn13.trim();
+  String get _detailRouteIsbn => book.isbn13.trim().isEmpty ? '_' : book.isbn13.trim();
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: () => context.push('/book/$_detailRouteIsbn', extra: book),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: Theme.of(context).cardTheme.color ?? colors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: Theme.of(context).cardTheme.color,
+          borderRadius: DesignSystem.borderRadiusLarge,
+          border: Border.all(color: isDark ? Colors.white12 : Colors.black.withOpacity(0.05)),
+          boxShadow: DesignSystem.shadowSm(isDark),
         ),
         child: Row(
           children: [
-            // Thumbnail
             Hero(
               tag: 'cover_${book.isbn13}',
               child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.horizontal(left: Radius.circular(16)),
-                child: NetworkCoverWithFallback(
-                    book: book, width: 85, height: 120),
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(DesignSystem.radiusLarge)),
+                child: NetworkCoverWithFallback(book: book, width: 90, height: 130),
               ),
             ),
-
-            // Details
             Expanded(
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing16, vertical: DesignSystem.spacing12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -294,10 +218,10 @@ class BookListTile extends StatelessWidget {
                       book.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700, height: 1.2),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -305,23 +229,21 @@ class BookListTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colors.onSurface.withOpacity(0.6),
-                          ),
+                        color: colors.onSurface.withOpacity(0.6),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     if (book.explanation != null) ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: colors.primary.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: DesignSystem.borderRadiusSmall,
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.auto_awesome,
-                                size: 12, color: colors.primary),
+                            Icon(Icons.auto_awesome, size: 12, color: colors.primary),
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
@@ -330,9 +252,8 @@ class BookListTile extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 10,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
                                   color: colors.primary,
-                                  fontStyle: FontStyle.italic,
                                 ),
                               ),
                             ),
@@ -358,7 +279,6 @@ class BookListTile extends StatelessWidget {
                 ),
               ),
             ),
-
             if (trailing != null)
               Padding(
                 padding: const EdgeInsets.only(right: 12),
@@ -371,14 +291,11 @@ class BookListTile extends StatelessWidget {
   }
 }
 
-// ── Featured hero card (Glassmorphism & Rich Aesthetics) ────────────────────
-
 class FeaturedBookCard extends StatelessWidget {
   const FeaturedBookCard({super.key, required this.book});
   final Book book;
 
-  String get _detailRouteIsbn =>
-      book.isbn13.trim().isEmpty ? '_' : book.isbn13.trim();
+  String get _detailRouteIsbn => book.isbn13.trim().isEmpty ? '_' : book.isbn13.trim();
 
   @override
   Widget build(BuildContext context) {
@@ -386,23 +303,15 @@ class FeaturedBookCard extends StatelessWidget {
       onTap: () => context.push('/book/$_detailRouteIsbn', extra: book),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
-        // Removed fixed height: 220 to avoid overflows on small devices or with long titles
         constraints: const BoxConstraints(minHeight: 200, maxHeight: 260),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: DesignSystem.borderRadiusLarge,
           color: Theme.of(context).cardTheme.color,
           border: Border.all(color: Colors.white.withOpacity(0.08), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
+          boxShadow: DesignSystem.shadowLg(true),
         ),
         child: Stack(
           children: [
-            // Decorative background circles
             Positioned(
               right: -30,
               top: -30,
@@ -415,8 +324,6 @@ class FeaturedBookCard extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Content
             Row(
               children: [
                 Padding(
@@ -425,44 +332,33 @@ class FeaturedBookCard extends StatelessWidget {
                     tag: 'cover_${book.isbn13}',
                     child: Container(
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.4),
-                            blurRadius: 15,
-                            offset: const Offset(5, 5),
-                          )
-                        ],
+                        borderRadius: DesignSystem.borderRadiusMedium,
+                        boxShadow: DesignSystem.shadowMd(true),
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: NetworkCoverWithFallback(
-                            book: book, width: 125, height: 180),
+                        borderRadius: DesignSystem.borderRadiusMedium,
+                        child: NetworkCoverWithFallback(book: book, width: 125, height: 180),
                       ),
                     ),
                   ),
                 ),
                 Expanded(
                   child: Padding(
-                    padding:
-                        const EdgeInsets.only(top: 24, bottom: 24, right: 16),
+                    padding: const EdgeInsets.only(top: 24, bottom: 24, right: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Glassmorphism category pill
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: DesignSystem.borderRadiusSmall,
                           child: BackdropFilter(
                             filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.white.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                    color: Colors.white.withOpacity(0.2)),
+                                borderRadius: DesignSystem.borderRadiusSmall,
+                                border: Border.all(color: Colors.white.withOpacity(0.2)),
                               ),
                               child: Text(
                                 book.primaryCategory.toUpperCase(),
@@ -470,7 +366,7 @@ class FeaturedBookCard extends StatelessWidget {
                                 maxLines: 1,
                                 style: const TextStyle(
                                   fontSize: 10,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w900,
                                   letterSpacing: 0.5,
                                   color: Colors.white,
                                 ),
@@ -483,26 +379,17 @@ class FeaturedBookCard extends StatelessWidget {
                           book.title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              height: 1.2,
-                              color: Colors.white),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, height: 1.2, color: Colors.white),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           book.authorsFormatted,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white.withOpacity(0.7)),
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.7)),
                         ),
                         const Spacer(),
-                        _RatingRow(
-                            rating: book.averageRating,
-                            color: const Color(0xFFFFD166)),
+                        _RatingRow(rating: book.averageRating, color: DesignSystem.rating),
                       ],
                     ),
                   ),
@@ -516,8 +403,6 @@ class FeaturedBookCard extends StatelessWidget {
   }
 }
 
-// ── Shared sub-widgets ────────────────────────────────────────────────────────
-
 class _RatingRow extends StatelessWidget {
   const _RatingRow({required this.rating, this.color});
   final double rating;
@@ -530,19 +415,15 @@ class _RatingRow extends StatelessWidget {
       children: [
         RatingBarIndicator(
           rating: rating.clamp(0.0, 5.0),
-          itemBuilder: (_, __) =>
-              Icon(Icons.star_rounded, color: color ?? const Color(0xFFFFD166)),
+          itemBuilder: (_, __) => Icon(Icons.star_rounded, color: color ?? DesignSystem.rating),
           itemCount: 5,
           itemSize: 14,
-          unratedColor: (color ?? const Color(0xFFFFD166)).withOpacity(0.2),
+          unratedColor: (color ?? DesignSystem.rating).withOpacity(0.2),
         ),
         const SizedBox(width: 6),
         Text(
           rating.toStringAsFixed(1),
-          style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: color ?? const Color(0xFFFFD166)),
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color ?? DesignSystem.rating),
         ),
       ],
     );
@@ -559,16 +440,13 @@ class _CategoryChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: DesignSystem.borderRadiusSmall,
       ),
       child: Text(
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-            fontSize: 10,
-            color: Theme.of(context).colorScheme.primary,
-            fontWeight: FontWeight.w700),
+        style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w800),
       ),
     );
   }
@@ -591,18 +469,10 @@ class _InteractionButtons extends StatelessWidget {
           onPressed: () {
             HapticFeedback.mediumImpact();
             if (auth.currentUser != null) {
-              bp.submitFeedback(
-                userId: auth.currentUser!.id,
-                bookId: book.isbn13,
-                interaction: 'like',
-              );
+              bp.submitFeedback(userId: auth.currentUser!.id, bookId: book.isbn13, interaction: 'like');
             }
           },
           icon: const Icon(Icons.thumb_up_alt_outlined, size: 14),
-          padding: const EdgeInsets.all(2),
-          constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-          visualDensity: VisualDensity.compact,
-          splashRadius: 14,
           color: colors.primary,
         ),
         const SizedBox(width: 4),
@@ -610,22 +480,13 @@ class _InteractionButtons extends StatelessWidget {
           onPressed: () {
             HapticFeedback.heavyImpact();
             if (auth.currentUser != null) {
-              bp.submitFeedback(
-                userId: auth.currentUser!.id,
-                bookId: book.isbn13,
-                interaction: 'dislike',
-              );
+              bp.submitFeedback(userId: auth.currentUser!.id, bookId: book.isbn13, interaction: 'dislike');
             }
           },
           icon: const Icon(Icons.thumb_down_alt_outlined, size: 14),
-          padding: const EdgeInsets.all(2),
-          constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-          visualDensity: VisualDensity.compact,
-          splashRadius: 14,
           color: colors.error,
         ),
       ],
     );
   }
-
 }

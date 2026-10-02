@@ -31,12 +31,12 @@ class LanguageProvider extends ChangeNotifier {
       }
       await loadTranslations();
       _isInitialized = true;
-      _initCompleter.complete();
+      if (!_initCompleter.isCompleted) _initCompleter.complete();
       notifyListeners();
     } catch (_) {
       await loadTranslations();
       _isInitialized = true;
-      _initCompleter.complete();
+      if (!_initCompleter.isCompleted) _initCompleter.complete();
       notifyListeners();
     }
   }

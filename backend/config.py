@@ -4,10 +4,13 @@ Never commit secrets — use .env locally and platform env vars in production.
 """
 
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Always load .env from the backend directory, regardless of CWD
+_ENV_FILE = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=_ENV_FILE, override=True)
 
 
 class Config:

@@ -7,7 +7,7 @@ FROM python:3.12.10-slim-bookworm AS builder
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-WORKDIR /app
+WORKDIR /src/backend
 
 # System dependencies for ML libraries (numpy/pandas)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,18 +22,19 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ── 2. Runtime Stage ────────────────────────────────────────────────────────
 FROM python:3.12.10-slim-bookworm
 
-WORKDIR /app
+WORKDIR /src
 
 # Copy only the installed dependencies from the builder
 COPY --from=builder /install /usr/local
-COPY . .
+COPY . ./backend
 
 # Environment Defaults
 ENV FLASK_ENV=production
 ENV PORT=5000
+ENV PYTHONPATH=/src
 
 # Metadata
 EXPOSE 5000
 
 # High-performance server: Gunicorn with 1 worker to fit in Free Tier RAM (512MB)
-CMD sh -c "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --preload --timeout 120 app:app"
+CMD sh -c "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --preload --timeout 120 backend.app:app"

@@ -57,6 +57,9 @@ class ApiService {
           'Content-Type': 'application/json',
           'X-Api-Key': AppConfig.librisApiKey,
         },
+        // Accept all HTTP statuses so we can handle errors cleanly ourselves
+        // (prevents Dio from throwing before we can inspect the response)
+        validateStatus: (status) => status != null && status < 600,
       ),
     );
 
@@ -67,9 +70,41 @@ class ApiService {
           print('[API] ${options.method} ${options.uri}');
           handler.next(options);
         },
+        onResponse: (response, handler) {
+          // Guard against HTML error pages causing FormatException crashes.
+          // If we get a 4xx/5xx with HTML content-type, convert to a clean DioException.
+          final contentType = response.headers.value('content-type') ?? '';
+          if ((response.statusCode ?? 0) >= 400 &&
+              contentType.contains('text/html')) {
+            // ignore: avoid_print
+            print('[API] HTML error response (${response.statusCode}) — rejecting');
+            handler.reject(
+              DioException(
+                requestOptions: response.requestOptions,
+                response: response,
+                type: DioExceptionType.badResponse,
+                message:
+                    'Server returned HTTP ${response.statusCode}. Check backend configuration.',
+              ),
+            );
+            return;
+          }
+          handler.next(response);
+        },
         onError: (error, handler) {
+          final msg = switch (error.type) {
+            DioExceptionType.connectionTimeout ||
+            DioExceptionType.sendTimeout ||
+            DioExceptionType.receiveTimeout =>
+              '[API] Timeout: ${error.requestOptions.uri}',
+            DioExceptionType.connectionError =>
+              '[API] Connection error — is the backend running? ${error.message}',
+            DioExceptionType.badResponse =>
+              '[API] Bad response (${error.response?.statusCode}): ${error.message}',
+            _ => '[API] Error: ${error.message}',
+          };
           // ignore: avoid_print
-          print('[API] Error: ${error.message}');
+          print(msg);
           handler.next(error);
         },
       ),

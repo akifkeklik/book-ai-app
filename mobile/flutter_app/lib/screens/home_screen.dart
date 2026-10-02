@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +13,8 @@ import '../widgets/book_card.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/skeleton_loader.dart';
 import '../providers/language_provider.dart';
+import '../theme/design_system.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -49,21 +52,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
     books.fetchPopular();
     if (auth.isLoggedIn) {
-      // Senior Solution: Load favorites first, then trigger recommendations
-      // to ensure state is synced across the app layers.
       await favs.loadFavorites(auth.currentUser!.id);
-      
-      // Senior Solution: Auto-onboarding for users with zero favorites
-      // We check if the list is still empty after loading.
+
       if (favs.favorites.isEmpty && mounted) {
-        // Double check profile to avoid loop if they already onboarded but didn't favorite
         final profile = await context.read<BookRepository>().getUserProfile(auth.currentUser!.id);
         if (profile == null && mounted) {
           context.go('/onboarding');
           return;
         }
       }
-      
+
       books.fetchPersonalizedRecs(auth.currentUser!.id);
     }
   }
@@ -71,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       body: SafeArea(
@@ -86,198 +84,214 @@ class _HomeScreenState extends State<HomeScreen> {
                 controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  // ── App Bar ────────────────────────────────────────────────────
+                  // ── Premium App Bar ───────────────────────────────────────────
                   SliverAppBar(
                     floating: true,
                     snap: true,
+                    toolbarHeight: 70,
                     title: Row(
                       children: [
-                        Flexible(
-                          child: Text(
-                            'Libris',
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -1,
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [theme.colorScheme.primary, DesignSystem.primaryDark],
                             ),
-                            overflow: TextOverflow.ellipsis,
+                            borderRadius: DesignSystem.borderRadiusSmall,
+                          ),
+                          child: const Icon(Icons.auto_stories, color: Colors.white, size: 24),
+                        ),
+                        const SizedBox(width: DesignSystem.spacing12),
+                        Text(
+                          'Libris',
+                          style: theme.textTheme.headlineLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -1.5,
+                            color: isDark ? Colors.white : DesignSystem.textLightPrimary,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        if (books.totalBooksCount > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '${books.totalBooksCount}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                     actions: [
-                      IconButton(
-                        icon: const Icon(Icons.auto_awesome),
+                      _GlassIconButton(
+                        icon: Icons.search,
                         onPressed: () {
                           HapticFeedback.lightImpact();
-                          context.push('/ai');
+                          context.go('/search');
                         },
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.settings_outlined),
+                      const SizedBox(width: DesignSystem.spacing8),
+                      _GlassIconButton(
+                        icon: Icons.settings_outlined,
                         onPressed: () {
                           HapticFeedback.lightImpact();
                           context.push('/settings');
                         },
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: DesignSystem.spacing16),
                     ],
                   ),
 
-                  // ── Search & Recommendations ───────────────────────────────────
+                  // ── AI Discovery Banner ────────────────────────────────────────
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Search shortcut
-                          GestureDetector(
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              context.go('/search');
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 14),
-                              decoration: BoxDecoration(
-                                color: theme.cardColor.withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(30),
-                                border: Border.all(
-                                    color:
-                                        colorScheme.primary.withOpacity(0.1)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.search,
-                                      color:
-                                          colorScheme.primary.withOpacity(0.7)),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      context.tr('search_placeholder'),
-                                      style: TextStyle(
-                                          color: colorScheme.onSurface
-                                              .withOpacity(0.5)),
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
+                      padding: const EdgeInsets.all(DesignSystem.spacing16),
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticFeedback.mediumImpact();
+                          context.push('/ai');
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(DesignSystem.spacing24),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                theme.colorScheme.primary.withOpacity(0.9),
+                                DesignSystem.primaryDark,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: DesignSystem.borderRadiusLarge,
+                            boxShadow: DesignSystem.shadowLg(isDark),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: DesignSystem.borderRadiusPill,
+                                      ),
+                                      child: const Text(
+                                        'AI DISCOVERY',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(height: DesignSystem.spacing12),
+                                    Text(
+                                      'Find your next favorite book using AI',
+                                      style: theme.textTheme.titleLarge?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: DesignSystem.spacing8),
+                                    Text(
+                                      'Describe what you want to read, and we\'ll find it.',
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: Colors.white.withOpacity(0.8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: DesignSystem.spacing16),
+                              Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.auto_awesome, color: Colors.white, size: 28),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // ── Recommendations ───────────────────────────────────────────
+                  SliverToBoxAdapter(
+                    child: Consumer2<AuthProvider, FavoritesProvider>(
+                      builder: (context, auth, favProv, _) {
+                        if (!auth.isLoggedIn) return const SizedBox.shrink();
+
+                        if (favProv.favorites.isEmpty && !favProv.isLoading) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing16),
+                            child: _Section(
+                              title: context.tr('recommended_for_you'),
+                              child: Container(
+                                padding: const EdgeInsets.all(DesignSystem.spacing24),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary.withOpacity(0.05),
+                                  borderRadius: DesignSystem.borderRadiusLarge,
+                                  border: Border.all(color: theme.colorScheme.primary.withOpacity(0.1)),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.favorite_rounded,
+                                        color: theme.colorScheme.primary.withOpacity(0.5), size: 48),
+                                    const SizedBox(height: DesignSystem.spacing16),
+                                    Text(
+                                      context.tr('recommended_empty_title'),
+                                      textAlign: TextAlign.center,
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: DesignSystem.spacing8),
+                                    Text(
+                                      context.tr('recommended_empty_subtitle'),
+                                      textAlign: TextAlign.center,
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: isDark ? Colors.white70 : DesignSystem.textLightSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
+                          );
+                        }
+
+                        return Padding(
+                          padding: const EdgeInsets.only(left: DesignSystem.spacing16, right: DesignSystem.spacing16, top: DesignSystem.spacing8),
+                          child: _Section(
+                            title: context.tr('recommended_for_you'),
+                            child: books.personalizedStatus == BookStatus.loading
+                                ? const SkeletonList(height: 280)
+                                : _HorizontalRecs(books: books.personalizedRecs),
                           ),
-                          const SizedBox(height: 24),
+                        );
+                      },
+                    ),
+                  ),
 
-                          // Personalized Recs
-                          Consumer2<AuthProvider, FavoritesProvider>(
-                            builder: (context, auth, favProv, _) {
-                              if (!auth.isLoggedIn) {
-                                return const SizedBox.shrink();
-                              }
-
-                              if (favProv.favorites.isEmpty &&
-                                  !favProv.isLoading) {
-                                return _Section(
-                                  title: context.tr('recommended_for_you'),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(20),
-                                    width: double.infinity,
-                                    decoration: BoxDecoration(
-                                      color:
-                                          colorScheme.primary.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                          color: colorScheme.primary
-                                              .withOpacity(0.2)),
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        Icon(Icons.favorite_rounded,
-                                            color: colorScheme.primary
-                                                .withOpacity(0.7),
-                                            size: 48),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          context.tr('recommended_empty_title'),
-                                          textAlign: TextAlign.center,
-                                          style: theme.textTheme.titleMedium
-                                              ?.copyWith(
-                                            color: colorScheme.primary,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          context
-                                              .tr('recommended_empty_subtitle'),
-                                          textAlign: TextAlign.center,
-                                          style: theme.textTheme.bodyMedium
-                                              ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              return _Section(
-                                title: context.tr('recommended_for_you'),
-                                child: books.personalizedStatus ==
-                                        BookStatus.loading
-                                    ? const SkeletonList(height: 330)
-                                    : _HorizontalRecs(
-                                        books: books.personalizedRecs),
-                              );
-                            },
-                          ),
-
-                          const SizedBox(height: 12),
-                          _Section(
-                            title: context.tr('popular_books'),
-                            child: books.popularStatus == BookStatus.loading &&
-                                    books.popularBooks.isEmpty
-                                ? const SkeletonList(height: 330)
-                                : _HorizontalRecs(books: books.popularBooks),
-                          ),
-                        ],
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing16),
+                      child: _Section(
+                        title: context.tr('popular_books'),
+                        child: books.popularStatus == BookStatus.loading && books.popularBooks.isEmpty
+                            ? const SkeletonList(height: 280)
+                            : _HorizontalRecs(books: books.popularBooks),
                       ),
                     ),
                   ),
 
                   // ── All Books Grid (Infinite Scroll) ──────────────────────────
-                  if (books.popularStatus == BookStatus.loading &&
-                      books.popularBooks.isEmpty)
-                    const SliverToBoxAdapter(child: SkeletonList(height: 330))
-                  else if (books.popularStatus == BookStatus.error &&
-                      books.popularBooks.isEmpty)
+                  if (books.popularStatus == BookStatus.error && books.popularBooks.isEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.all(32),
                         child: Column(
                           children: [
-                            const Icon(Icons.cloud_off,
-                                size: 48, color: Colors.grey),
+                            const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
                             const SizedBox(height: 16),
                             Text(context.tr('error_loading_books')),
                             TextButton(
@@ -288,7 +302,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     )
-                  else if (books.popularBooks.isEmpty)
+                  else if (books.popularBooks.isEmpty && books.popularStatus != BookStatus.loading)
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 80),
@@ -305,8 +319,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
-                            return BookListTile(
-                                book: books.popularBooks[index]);
+                            return BookListTile(book: books.popularBooks[index]);
                           },
                           childCount: books.popularBooks.length,
                         ),
@@ -318,15 +331,42 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: books.isLoadingMore
                         ? const Padding(
                             padding: EdgeInsets.symmetric(vertical: 24),
-                            child: Center(
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2)),
+                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
                           )
                         : const SizedBox(height: 80),
                   ),
                 ],
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _GlassIconButton({required this.icon, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+      child: ClipRRect(
+        borderRadius: DesignSystem.borderRadiusPill,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Material(
+            color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+            shape: const CircleBorder(),
+            child: IconButton(
+              icon: Icon(icon, color: isDark ? Colors.white : DesignSystem.textLightPrimary),
+              onPressed: onPressed,
+            ),
           ),
         ),
       ),
@@ -344,16 +384,29 @@ class _Section extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: Theme.of(context)
-              .textTheme
-              .headlineSmall
-              ?.copyWith(fontWeight: FontWeight.bold),
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 20,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: DesignSystem.spacing8),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: DesignSystem.spacing16),
         child,
-        const SizedBox(height: 24),
+        const SizedBox(height: DesignSystem.spacing32),
       ],
     );
   }
@@ -367,11 +420,12 @@ class _HorizontalRecs extends StatelessWidget {
   Widget build(BuildContext context) {
     if (books.isEmpty) return const SizedBox.shrink();
     return SizedBox(
-      height: 358,
+      height: 310, // Adjusted for new design system book card
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: books.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        clipBehavior: Clip.none,
+        separatorBuilder: (_, __) => const SizedBox(width: DesignSystem.spacing16),
         itemBuilder: (_, index) => BookCard(book: books[index]),
       ),
     );

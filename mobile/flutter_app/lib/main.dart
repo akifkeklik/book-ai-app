@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -29,8 +31,24 @@ class MyCustomScrollBehavior extends MaterialScrollBehavior {
       };
 }
 
+/// Debug-only: Android emulator SSL sertifika sorununu çözer.
+/// CERTIFICATE_VERIFY_FAILED hatasını önler (sadece kDebugMode'da aktif).
+class _DevHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Android emulator debug: SSL sertifika doğrulamasını atla
+  if (kDebugMode) {
+    HttpOverrides.global = _DevHttpOverrides();
+  }
 
   try {
 

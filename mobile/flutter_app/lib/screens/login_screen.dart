@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/language_provider.dart';
+import '../theme/design_system.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -97,30 +98,37 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 // Logo / branding
                 Center(
-                  child: Icon(
-                    Icons.menu_book_rounded,
-                    size: 80,
-                    color: Theme.of(context).colorScheme.primary,
+                  child: Container(
+                    padding: const EdgeInsets.all(DesignSystem.spacing16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.auto_awesome,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: DesignSystem.spacing24),
                 Center(
                   child: Text(
                     context.tr('welcome_back'),
-                    style: Theme.of(context).textTheme.headlineLarge,
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900),
                   ),
                 ),
+                const SizedBox(height: DesignSystem.spacing8),
                 Center(
                   child: Text(
                     context.tr('sign_in_subtitle'),
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(color: Colors.grey),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        ),
                     textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: DesignSystem.spacing48),
 
                 // Error banner
                 if (auth.error != null) ...[
@@ -251,10 +259,10 @@ class _ErrorBanner extends StatelessWidget {
     final icon = _isNetworkError ? Icons.wifi_off_rounded : Icons.error_outline;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing16, vertical: DesignSystem.spacing12),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: DesignSystem.borderRadiusLarge,
         border: Border.all(color: borderColor),
       ),
       child: Row(

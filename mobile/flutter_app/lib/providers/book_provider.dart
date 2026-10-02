@@ -191,6 +191,13 @@ class BookProvider extends ChangeNotifier {
     }
   }
 
+  void clearUserData() {
+    _personalizedRecs = [];
+    _personalizedStatus = BookStatus.initial;
+    _lastPersonalizedUserId = null;
+    notifyListeners();
+  }
+
   Future<void> submitFeedback({
     required String userId,
     required String bookId,
