@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../providers/book_provider.dart';
+import '../providers/catalog_provider.dart';
 import '../providers/language_provider.dart';
 
 class CategoriesScreen extends StatelessWidget {
@@ -10,7 +10,7 @@ class CategoriesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final books = context.watch<BookProvider>();
+    final catalog = context.watch<CatalogProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -19,9 +19,9 @@ class CategoriesScreen extends StatelessWidget {
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: books.defaultGenres.length,
+        itemCount: catalog.defaultGenres.length,
         itemBuilder: (context, index) {
-          final cat = books.defaultGenres[index];
+          final cat = catalog.defaultGenres[index];
           return _buildCategoryCard(context, cat);
         },
       ),

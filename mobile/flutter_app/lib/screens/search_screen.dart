@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../providers/book_provider.dart';
+import '../providers/search_provider.dart';
+import '../providers/catalog_provider.dart';
 import '../providers/language_provider.dart';
 import '../widgets/book_card.dart';
 import '../widgets/empty_state.dart';
@@ -35,7 +36,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bookProv = context.watch<BookProvider>();
+    final searchProv = context.watch<SearchProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -54,18 +55,18 @@ class _SearchScreenState extends State<SearchScreen> {
                     icon: const Icon(Icons.clear),
                     onPressed: () {
                       _controller.clear();
-                      context.read<BookProvider>().clearSearch();
+                      context.read<SearchProvider>().clearSearch();
                     },
                   )
                 : null,
           ),
           onChanged: (q) {
             setState(() {});
-            context.read<BookProvider>().searchDebounced(q);
+            context.read<SearchProvider>().searchDebounced(q);
           },
           onSubmitted: (q) {
             if (q.trim().length >= 2) {
-              context.read<BookProvider>().search(q.trim());
+              context.read<SearchProvider>().search(q.trim());
             }
           },
         ),
@@ -77,14 +78,14 @@ class _SearchScreenState extends State<SearchScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: _buildBody(bookProv),
+      body: _buildBody(searchProv),
     );
   }
 
   void _showFilterSheet(BuildContext context) {
-    final bookProv = context.read<BookProvider>();
-    String tempAuthor = bookProv.filterAuthor;
-    int tempRange = bookProv.filterPageRange; // 0: All, 1: <300, 2: 300-500, 3: >500
+    final catalogProv = context.read<CatalogProvider>();
+    String tempAuthor = catalogProv.filterAuthor;
+    int tempRange = catalogProv.filterPageRange; // 0: All, 1: <300, 2: 300-500, 3: >500
 
     showModalBottomSheet(
       context: context,
@@ -171,7 +172,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     height: 50,
                     child: ElevatedButton(
                       onPressed: () {
-                        bookProv.setFilters(author: tempAuthor, pageRange: tempRange);
+                        catalogProv.setFilters(author: tempAuthor, pageRange: tempRange);
                         Navigator.pop(sheetCtx);
                       },
                       child: Text(context.tr('apply_filters')),
@@ -187,26 +188,26 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildBody(BookProvider bookProv) {
-    switch (bookProv.searchStatus) {
-      case BookStatus.initial:
+  Widget _buildBody(SearchProvider searchProv) {
+    switch (searchProv.status) {
+      case SearchStatus.initial:
         return LibrisEmptyState(
           icon: Icons.search_outlined,
           title: context.tr('search_empty_title'),
           message: context.tr('search_empty_message'),
         );
 
-      case BookStatus.loading:
+      case SearchStatus.loading:
         return const ShimmerList(count: 6);
 
-      case BookStatus.error:
+      case SearchStatus.error:
         return _ErrorState(
-          message: bookProv.searchError ?? 'Search failed.',
-          onRetry: () => bookProv.search(bookProv.lastQuery),
+          message: searchProv.error ?? 'Search failed.',
+          onRetry: () => searchProv.search(searchProv.lastQuery),
         );
 
-      case BookStatus.loaded:
-        if (bookProv.searchResults.isEmpty) {
+      case SearchStatus.loaded:
+        if (searchProv.searchResults.isEmpty) {
           return const LibrisEmptyState(
             icon: Icons.sentiment_dissatisfied_outlined,
             title: 'No results',
@@ -215,8 +216,8 @@ class _SearchScreenState extends State<SearchScreen> {
         }
         return ListView.builder(
           padding: const EdgeInsets.only(top: 8, bottom: 32),
-          itemCount: bookProv.searchResults.length,
-          itemBuilder: (_, i) => BookListTile(book: bookProv.searchResults[i]),
+          itemCount: searchProv.searchResults.length,
+          itemBuilder: (_, i) => BookListTile(book: searchProv.searchResults[i]),
         );
     }
   }
