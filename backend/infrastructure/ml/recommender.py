@@ -6,16 +6,12 @@ including the core engine, diversity, and explanation components. It is
 designed to be a self-contained, robust recommendation system.
 """
 
-import sys
-
-# Legacy pickle alias for backward compatibility
-sys.modules['backend.recommender'] = sys.modules[__name__]
-
 import logging
 import math
 import os
 import pickle
 import re
+import sys
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -23,6 +19,12 @@ import pandas as pd
 from backend.utils.preprocess import preprocess_dataframe
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
+# Legacy pickle alias: tfidf.pkl was serialised under the old module path
+# "backend.recommender". Setting this alias here (after all imports but before
+# any class definitions) ensures sys.modules contains the mapping by the time
+# the module is fully initialised, which is always before any pickle.load() call.
+sys.modules['backend.recommender'] = sys.modules[__name__]
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 MODEL_VERSION = "2.1.0"
