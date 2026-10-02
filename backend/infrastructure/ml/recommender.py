@@ -15,11 +15,9 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+from backend.utils.preprocess import preprocess_dataframe
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from supabase import Client
-
-from .utils.preprocess import preprocess_dataframe
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 MODEL_VERSION = "2.1.0"
@@ -194,22 +192,22 @@ class BookRecommender:
             logger.error(f"Data file not found at {csv_path}")
             self.engine.df = pd.DataFrame()
 
-    def load_from_supabase(self, supabase_client: Client):
-        """Load and preprocess data from Supabase."""
-        logger.info("Fetching data from Supabase...")
+    def load_from_dicts(self, books: List[Dict[str, Any]]):
+        """Load and preprocess data from a list of dictionaries."""
+        logger.info("Loading data from list of dictionaries...")
+        if not books:
+            logger.warning("No data provided to load.")
+            self.engine.df = pd.DataFrame()
+            return
+
         try:
-            response = supabase_client.table("books").select("*").execute()
-            if not response.data:
-                logger.warning("No data returned from Supabase.")
-                self.engine.df = pd.DataFrame()
-                return
-            df = pd.DataFrame(response.data)
+            df = pd.DataFrame(books)
             self.engine.df = preprocess_dataframe(df)
             logger.info(
-                f"Data loaded from Supabase and preprocessed. Shape: {self.engine.df.shape}"
+                f"Data loaded and preprocessed. Shape: {self.engine.df.shape}"
             )
         except Exception as e:
-            logger.error(f"Failed to load data from Supabase: {e}")
+            logger.error(f"Failed to process book data: {e}")
             self.engine.df = pd.DataFrame()
 
     def fit(self, save_path: Optional[str] = None):

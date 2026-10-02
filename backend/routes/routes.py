@@ -9,7 +9,7 @@ from functools import wraps
 from flask import Blueprint, g, jsonify, request
 
 from ..config import Config
-from ..recommender import BookRecommender
+from ..infrastructure.ml.recommender import BookRecommender
 from ..services.book_service import BookService
 from ..services.embedding_service import EmbeddingService
 
