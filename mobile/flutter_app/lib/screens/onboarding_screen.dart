@@ -3,7 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../domain/entities/book.dart';
-import '../providers/book_provider.dart';
+import '../providers/recommendation_provider.dart';
+import '../providers/search_provider.dart';
 import '../providers/language_provider.dart';
 import '../domain/repositories/book_repository.dart';
 
@@ -54,7 +55,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _finishOnboarding() async {
     final auth = context.read<AuthProvider>();
-    final bookProvider = context.read<BookProvider>();
+    final recommendationProvider = context.read<RecommendationProvider>();
     final userId = auth.currentUser?.id;
     if (userId == null) return;
 
@@ -69,7 +70,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       );
 
       // 2. New AI Onboarding submission
-      final success = await bookProvider.submitOnboarding(
+      final success = await recommendationProvider.submitOnboarding(
         userId: userId,
         bookIds: _selectedBooks,
         genres: _selectedCategories,
@@ -430,7 +431,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildBookSelectionStep(ThemeData theme, LanguageProvider lang) {
-    final bookProvider = context.watch<BookProvider>();
+    final searchProvider = context.watch<SearchProvider>();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -452,7 +453,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
             ),
             onChanged: (val) {
-              if (val.length > 2) bookProvider.search(val);
+              if (val.length > 2) searchProvider.search(val);
             },
           ),
           const SizedBox(height: 16),
@@ -475,12 +476,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           const SizedBox(height: 16),
           Expanded(
-            child: bookProvider.searchStatus == BookStatus.loading
+            child: searchProvider.status == SearchStatus.loading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView.builder(
-                    itemCount: bookProvider.searchResults.length,
+                    itemCount: searchProvider.searchResults.length,
                     itemBuilder: (context, i) {
-                      final book = bookProvider.searchResults[i];
+                      final book = searchProvider.searchResults[i];
                       final isSelected = _selectedBooks.contains(book.isbn13);
                       return ListTile(
                         leading: Image.network(book.coverUrl, height: 40, width: 30, fit: BoxFit.cover, 

@@ -6,7 +6,8 @@ import 'package:provider/provider.dart';
 
 import '../domain/entities/book.dart';
 import '../providers/auth_provider.dart';
-import '../providers/book_provider.dart';
+import '../providers/catalog_provider.dart';
+import '../providers/recommendation_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../domain/repositories/book_repository.dart';
 import '../widgets/book_card.dart';
@@ -35,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onScroll() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 400) {
-      context.read<BookProvider>().fetchMorePopular();
+      context.read<CatalogProvider>().fetchMorePopular();
     }
   }
 
@@ -46,11 +47,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _initData() async {
-    final books = context.read<BookProvider>();
+    final catalog = context.read<CatalogProvider>();
+    final recommendations = context.read<RecommendationProvider>();
     final auth = context.read<AuthProvider>();
     final favs = context.read<FavoritesProvider>();
 
-    books.fetchPopular();
+    catalog.fetchPopular();
     if (auth.isLoggedIn) {
       await favs.loadFavorites(auth.currentUser!.id);
 
@@ -62,7 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      books.fetchPersonalizedRecs(auth.currentUser!.id);
+      recommendations.fetchPersonalizedRecs(auth.currentUser!.id, catalog.popularBooks);
     }
   }
 
@@ -76,10 +78,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: RefreshIndicator(
           onRefresh: () async {
             HapticFeedback.mediumImpact();
-            await context.read<BookProvider>().fetchPopular(force: true);
+            await context.read<CatalogProvider>().fetchPopular(force: true);
           },
-          child: Consumer<BookProvider>(
-            builder: (context, books, _) {
+          child: Consumer2<CatalogProvider, RecommendationProvider>(
+            builder: (context, catalog, recommendations, _) {
               return CustomScrollView(
                 controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -263,9 +265,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.only(left: DesignSystem.spacing16, right: DesignSystem.spacing16, top: DesignSystem.spacing8),
                           child: _Section(
                             title: context.tr('recommended_for_you'),
-                            child: books.personalizedStatus == BookStatus.loading
+                            child: recommendations.status == RecommendationStatus.loading
                                 ? const SkeletonList(height: 280)
-                                : _HorizontalRecs(books: books.personalizedRecs),
+                                : _HorizontalRecs(books: recommendations.personalizedRecs),
                           ),
                         );
                       },
@@ -277,15 +279,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing16),
                       child: _Section(
                         title: context.tr('popular_books'),
-                        child: books.popularStatus == BookStatus.loading && books.popularBooks.isEmpty
+                        child: catalog.status == CatalogStatus.loading && catalog.popularBooks.isEmpty
                             ? const SkeletonList(height: 280)
-                            : _HorizontalRecs(books: books.popularBooks),
+                            : _HorizontalRecs(books: catalog.popularBooks),
                       ),
                     ),
                   ),
 
                   // ── All Books Grid (Infinite Scroll) ──────────────────────────
-                  if (books.popularStatus == BookStatus.error && books.popularBooks.isEmpty)
+                  if (catalog.status == CatalogStatus.error && catalog.popularBooks.isEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.all(32),
@@ -295,14 +297,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 16),
                             Text(context.tr('error_loading_books')),
                             TextButton(
-                              onPressed: () => books.fetchPopular(force: true),
+                              onPressed: () => catalog.fetchPopular(force: true),
                               child: Text(context.tr('retry')),
                             ),
                           ],
                         ),
                       ),
                     )
-                  else if (books.popularBooks.isEmpty && books.popularStatus != BookStatus.loading)
+                  else if (catalog.popularBooks.isEmpty && catalog.status != CatalogStatus.loading)
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 80),
@@ -319,16 +321,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
-                            return BookListTile(book: books.popularBooks[index]);
+                            return BookListTile(book: catalog.popularBooks[index]);
                           },
-                          childCount: books.popularBooks.length,
+                          childCount: catalog.popularBooks.length,
                         ),
                       ),
                     ),
 
                   // ── Loading More Indicator ────────────────────────────────────
                   SliverToBoxAdapter(
-                    child: books.isLoadingMore
+                    child: catalog.isLoadingMore
                         ? const Padding(
                             padding: EdgeInsets.symmetric(vertical: 24),
                             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),

@@ -3,17 +3,14 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'data/repositories/book_repository_impl.dart';
-import 'domain/repositories/book_repository.dart';
-import 'services/api_service.dart';
-import 'services/supabase_service.dart';
 import 'package:go_router/go_router.dart';
 
 import 'config.dart';
+import 'di/service_locator.dart';
 import 'providers/auth_provider.dart';
-import 'providers/book_provider.dart';
+import 'providers/catalog_provider.dart';
+import 'providers/recommendation_provider.dart';
+import 'providers/search_provider.dart';
 import 'providers/favorites_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/theme_provider.dart';
@@ -51,33 +48,35 @@ Future<void> main() async {
   }
 
   try {
-
-    await Supabase.initialize(
-      url: AppConfig.supabaseUrl,
-      publishableKey: AppConfig.supabaseAnonKey,
-    ).timeout(const Duration(seconds: 8));
-    
-    await Hive.initFlutter();
-    await Hive.openBox('books_cache');
+    await ServiceLocator.initialize();
   } catch (e) {
     debugPrint('Startup Initialization Error: $e');
   }
 
-  // Composition Root
-  final apiService = ApiService.instance;
-  apiService.init();
-  final supabaseService = SupabaseService.instance;
-  final bookRepository = BookRepositoryImpl(apiService, supabaseService);
-
   runApp(
     MultiProvider(
       providers: [
-        Provider<BookRepository>.value(value: bookRepository),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
-        ChangeNotifierProvider(create: (_) => AuthProvider(supabaseService)),
-        ChangeNotifierProvider(create: (_) => BookProvider(bookRepository)),
-        ChangeNotifierProvider(create: (_) => FavoritesProvider(supabaseService)),
+        ChangeNotifierProvider(create: (_) => AuthProvider(ServiceLocator.supabaseService)),
+        ChangeNotifierProvider(
+          create: (_) => CatalogProvider(
+            repository: ServiceLocator.bookRepository,
+            getPopularBooks: ServiceLocator.getPopularBooksUseCase,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => RecommendationProvider(
+            repository: ServiceLocator.bookRepository,
+            getPersonalizedRecs: ServiceLocator.getPersonalizedRecsUseCase,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SearchProvider(
+            repository: ServiceLocator.bookRepository,
+          ),
+        ),
+        ChangeNotifierProvider(create: (_) => FavoritesProvider(ServiceLocator.supabaseService)),
         ChangeNotifierProvider(create: (_) => ErrorProvider()),
       ],
       child: const LibrisApp(),

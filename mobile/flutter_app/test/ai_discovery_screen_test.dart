@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:book_ai_app/domain/repositories/book_repository.dart';
 import 'package:book_ai_app/screens/ai_discovery_screen.dart';
 import 'package:book_ai_app/providers/language_provider.dart';
-import 'package:book_ai_app/providers/book_provider.dart' as book_ai_app_book_provider;
 import 'package:book_ai_app/providers/auth_provider.dart' as book_ai_app_auth_provider;
 
 import 'book_provider_test.dart' show FakeBookRepository;
@@ -16,7 +15,6 @@ void main() {
       providers: [
         Provider<BookRepository>.value(value: repo),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
-        ChangeNotifierProvider(create: (_) => book_ai_app_book_provider.BookProvider(repo)),
         ChangeNotifierProvider(create: (_) => book_ai_app_auth_provider.AuthProvider(FakeAuthService())),
       ],
       child: const MaterialApp(
