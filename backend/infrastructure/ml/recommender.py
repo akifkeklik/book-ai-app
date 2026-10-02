@@ -6,6 +6,11 @@ including the core engine, diversity, and explanation components. It is
 designed to be a self-contained, robust recommendation system.
 """
 
+import sys
+
+# Legacy pickle alias for backward compatibility
+sys.modules['backend.recommender'] = sys.modules[__name__]
+
 import logging
 import math
 import os
