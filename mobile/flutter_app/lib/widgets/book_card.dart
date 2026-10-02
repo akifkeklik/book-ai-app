@@ -447,3 +447,4 @@ class _CategoryChip extends StatelessWidget {
       ),
     );
   }
+}
