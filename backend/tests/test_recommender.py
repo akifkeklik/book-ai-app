@@ -21,7 +21,7 @@ import tempfile
 
 import pandas as pd
 import pytest
-from backend.recommender import BookRecommender
+from backend.infrastructure.ml.recommender import BookRecommender
 from backend.utils.preprocess import (
     clean_text,
     extract_year,

@@ -13,7 +13,7 @@ from typing import List, Optional
 
 from ..config import Config
 from ..domain.ports import AuthPort, BookDataPort, UserInteractionRepository
-from ..recommender import BookRecommender
+from ..infrastructure.ml.recommender import BookRecommender
 
 logger = logging.getLogger(__name__)
 

@@ -29,7 +29,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from backend.config import Config  # noqa: E402
-from backend.recommender import BookRecommender  # noqa: E402
+from backend.infrastructure.ml.recommender import BookRecommender  # noqa: E402
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(

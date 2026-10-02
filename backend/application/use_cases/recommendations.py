@@ -4,7 +4,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from ...domain.ports import BookDataPort, UserInteractionRepository
-from ...recommender import BookRecommender
+from ...infrastructure.ml.recommender import BookRecommender
 from ..services.enrichment_service import BookEnrichmentService
 
 logger = logging.getLogger(__name__)
