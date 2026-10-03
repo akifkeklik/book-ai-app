@@ -16,9 +16,9 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+from backend.domain.taxonomy import CANONICAL_CATEGORIES_ORDERED, CANONICAL_CATEGORY_MAP
 from backend.utils.preprocess import preprocess_dataframe
 from sklearn.feature_extraction.text import TfidfVectorizer
-from backend.domain.taxonomy import CANONICAL_CATEGORY_MAP, CANONICAL_CATEGORIES_ORDERED
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Legacy pickle alias: tfidf.pkl was serialised under the old module path
