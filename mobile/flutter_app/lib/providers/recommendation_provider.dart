@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../domain/entities/book.dart';
-import '../domain/repositories/book_repository.dart';
-import '../application/use_cases/get_personalized_recs_use_case.dart';
+import '../application/use_cases/manage_recommendations_use_case.dart';
 
 enum RecommendationStatus { initial, loading, loaded, error }
 
 class RecommendationProvider extends ChangeNotifier {
-  final BookRepository _repository;
-  final GetPersonalizedRecsUseCase _getPersonalizedRecs;
+  final ManageRecommendationsUseCase _manageRecommendations;
 
   RecommendationProvider({
-    required BookRepository repository,
-    required GetPersonalizedRecsUseCase getPersonalizedRecs,
-  })  : _repository = repository,
-        _getPersonalizedRecs = getPersonalizedRecs;
+    required ManageRecommendationsUseCase manageRecommendations,
+  })  : _manageRecommendations = manageRecommendations;
 
   List<Book> _personalizedRecs = [];
   RecommendationStatus _status = RecommendationStatus.initial;
@@ -36,7 +32,7 @@ class RecommendationProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      final recs = await _getPersonalizedRecs.execute(userId, popularBooks);
+      final recs = await _manageRecommendations.getPersonalizedRecs(userId, popularBooks);
       if (_lastPersonalizedUserId == userId) {
         _personalizedRecs = recs;
         _status = RecommendationStatus.loaded;
@@ -70,7 +66,7 @@ class RecommendationProvider extends ChangeNotifier {
     }
 
     try {
-      final success = await _repository.submitFeedback(
+      final success = await _manageRecommendations.submitFeedback(
         userId: userId,
         bookId: bookId,
         interaction: interaction,
@@ -90,7 +86,7 @@ class RecommendationProvider extends ChangeNotifier {
     required List<String> genres,
   }) async {
     try {
-      final success = await _repository.submitOnboarding(
+      final success = await _manageRecommendations.submitOnboarding(
         userId: userId,
         bookIds: bookIds,
         genres: genres,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:book_ai_app/domain/repositories/book_repository.dart';
+import 'package:book_ai_app/application/use_cases/process_ai_chat_use_case.dart';
 import 'package:book_ai_app/screens/ai_discovery_screen.dart';
 import 'package:book_ai_app/providers/language_provider.dart';
 import 'package:book_ai_app/providers/auth_provider.dart' as book_ai_app_auth_provider;
@@ -10,10 +10,10 @@ import 'book_provider_test.dart' show FakeBookRepository;
 import 'auth_provider_test.dart' show FakeAuthService;
 
 void main() {
-  Widget createScreen(BookRepository repo) {
+  Widget createScreen(ProcessAiChatUseCase useCase) {
     return MultiProvider(
       providers: [
-        Provider<BookRepository>.value(value: repo),
+        Provider<ProcessAiChatUseCase>.value(value: useCase),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
         ChangeNotifierProvider(create: (_) => book_ai_app_auth_provider.AuthProvider(FakeAuthService())),
       ],
@@ -28,7 +28,7 @@ void main() {
       final repo = FakeBookRepository();
       repo.chatWithAIResult = {'answer': 'Success'};
 
-      await tester.pumpWidget(createScreen(repo));
+      await tester.pumpWidget(createScreen(ProcessAiChatUseCase(repo)));
 
       // Tap send button without typing
       await tester.tap(find.byType(IconButton));
@@ -49,7 +49,7 @@ void main() {
         'answer': 'This is an AI answer',
       };
 
-      await tester.pumpWidget(createScreen(repo));
+      await tester.pumpWidget(createScreen(ProcessAiChatUseCase(repo)));
 
       await tester.enterText(find.byType(TextField), 'Hello AI');
       await tester.tap(find.byType(IconButton));
@@ -71,7 +71,7 @@ void main() {
       final repo = FakeBookRepository();
       repo.chatError = Exception('Network Down');
 
-      await tester.pumpWidget(createScreen(repo));
+      await tester.pumpWidget(createScreen(ProcessAiChatUseCase(repo)));
 
       await tester.enterText(find.byType(TextField), 'Hello');
       await tester.tap(find.byType(IconButton));
@@ -87,7 +87,7 @@ void main() {
       repo.chatDelay = const Duration(seconds: 2);
       repo.chatWithAIResult = {'answer': 'Delayed'};
 
-      await tester.pumpWidget(createScreen(repo));
+      await tester.pumpWidget(createScreen(ProcessAiChatUseCase(repo)));
 
       await tester.enterText(find.byType(TextField), 'Multi tap');
 

@@ -2,14 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../domain/entities/book.dart';
-import '../domain/repositories/book_repository.dart';
-import '../application/use_cases/get_popular_books_use_case.dart';
+import '../application/use_cases/manage_catalog_use_case.dart';
 
 enum CatalogStatus { initial, loading, loaded, error }
 
 class CatalogProvider extends ChangeNotifier {
-  final BookRepository _repository;
-  final GetPopularBooksUseCase _getPopularBooks;
+  final ManageCatalogUseCase _manageCatalog;
 
   List<Book> _rawPopularBooks = [];
   List<Book> _filteredPopularBooks = [];
@@ -33,10 +31,8 @@ class CatalogProvider extends ChangeNotifier {
   int _filterPageRange = 0; // 0: All, 1: <300, 2: 300-500, 3: >500
 
   CatalogProvider({
-    required BookRepository repository,
-    required GetPopularBooksUseCase getPopularBooks,
-  })  : _repository = repository,
-        _getPopularBooks = getPopularBooks {
+    required ManageCatalogUseCase manageCatalog,
+  })  : _manageCatalog = manageCatalog {
     _loadFromCache();
     _fetchTotalCount();
     fetchGenres();
@@ -54,7 +50,7 @@ class CatalogProvider extends ChangeNotifier {
   int get filterPageRange => _filterPageRange;
 
   void _loadFromCache() {
-    final cached = _repository.getCachedPopularBooks();
+    final cached = _manageCatalog.getCachedPopularBooks();
     if (cached.isNotEmpty) {
       _rawPopularBooks = cached;
       _applyGlobalFilters();
@@ -65,14 +61,14 @@ class CatalogProvider extends ChangeNotifier {
 
   Future<void> _fetchTotalCount() async {
     try {
-      _totalBooksCount = await _repository.getTotalBookCount();
+      _totalBooksCount = await _manageCatalog.getTotalBookCount();
       notifyListeners();
     } catch (_) {}
   }
 
   Future<void> fetchGenres() async {
     try {
-      final categories = await _repository.getCategories();
+      final categories = await _manageCatalog.getCategories();
       if (categories.isNotEmpty) {
         _genres = categories;
       } else {
@@ -96,7 +92,7 @@ class CatalogProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _rawPopularBooks = await _getPopularBooks.execute(forceRefresh: force);
+      _rawPopularBooks = await _manageCatalog.getPopularBooks(forceRefresh: force);
       _applyGlobalFilters();
       _status = CatalogStatus.loaded;
       _lastFetchTime = DateTime.now();
@@ -114,7 +110,7 @@ class CatalogProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final newBooks = await _repository.getMorePopularBooks(offset: _rawPopularBooks.length, limit: 20);
+      final newBooks = await _manageCatalog.getMorePopularBooks(offset: _rawPopularBooks.length, limit: 20);
       _rawPopularBooks.addAll(newBooks);
       _applyGlobalFilters();
       _isLoadingMore = false;
