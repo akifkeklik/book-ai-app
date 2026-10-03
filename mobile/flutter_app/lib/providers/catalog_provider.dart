@@ -17,11 +17,35 @@ class CatalogProvider extends ChangeNotifier {
   DateTime? _lastFetchTime;
   bool _isLoadingMore = false;
 
+  // Canonical fallback genres — derived from real dataset analysis (6,396 books).
+  // These are the exact canonical names returned by the backend after normalization.
+  // Order: by book count descending.
   static const List<String> _fallbackGenres = [
-    'Fiction', 'Science', 'History', 'Mystery', 'Fantasy', 
-    'Biography', 'Self-Help', 'Business', 'Romance', 'Thriller', 
-    'Philosophy', 'Art', 'Cooking', 'Religion', 'Computers', 
-    'Psychology', 'Social Science', 'Poetry', 'Travel'
+    'Fiction',
+    'Young Adult & Children',
+    'History',
+    'Drama & Plays',
+    'Philosophy',
+    'Religion & Spirituality',
+    'Poetry',
+    'Science',
+    'Social Sciences',
+    'Art & Design',
+    'Food & Cooking',
+    'Psychology',
+    'Self-Development',
+    'Technology',
+    'Travel',
+    'Mystery & Thriller',
+    'Humor & Satire',
+    'Fantasy',
+    'Health & Wellness',
+    'Biography & Memoir',
+    'Science Fiction',
+    'Horror',
+    'Comics & Graphic Novels',
+    'Romance',
+    'Business',
   ];
 
   List<String> _genres = List<String>.from(_fallbackGenres);

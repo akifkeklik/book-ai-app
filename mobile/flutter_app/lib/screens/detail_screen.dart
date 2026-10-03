@@ -243,7 +243,7 @@ class _DetailScreenState extends State<DetailScreen> {
           child: IconButton(
             icon: Icon(
               isFavorite ? Icons.bookmark : Icons.bookmark_outline,
-              color: isFavorite ? const Color(0xFFFFD166) : Colors.white,
+              color: isFavorite ? DesignSystem.rating : Colors.white,
             ),
             onPressed: () {
               final uid = auth.currentUser?.id;
@@ -296,7 +296,7 @@ class _DetailScreenState extends State<DetailScreen> {
                 RatingBarIndicator(
                   rating: book.averageRating.clamp(0.0, 5.0),
                   itemBuilder: (_, __) =>
-                      const Icon(Icons.star, color: Color(0xFFFFD166)),
+                      const Icon(Icons.star, color: DesignSystem.rating),
                   itemCount: 5,
                   itemSize: 20,
                 ),
@@ -464,7 +464,7 @@ class _StatItem extends StatelessWidget {
     return Column(
       children: [
         Text(value,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
         Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
