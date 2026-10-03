@@ -60,6 +60,10 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider(ServiceLocator.supabaseService)),
         Provider(create: (_) => ServiceLocator.processAiChatUseCase),
+        Provider(create: (_) => ServiceLocator.manageUserProfileUseCase),
+        Provider(create: (_) => ServiceLocator.viewBookDetailsUseCase),
+        Provider(create: (_) => ServiceLocator.manageCatalogUseCase),
+        Provider(create: (_) => ServiceLocator.manageRecommendationsUseCase),
         ChangeNotifierProvider(
           create: (_) => CatalogProvider(
             manageCatalog: ServiceLocator.manageCatalogUseCase,

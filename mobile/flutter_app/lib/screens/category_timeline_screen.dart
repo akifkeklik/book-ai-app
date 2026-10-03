@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../domain/entities/book.dart';
 import '../providers/language_provider.dart';
-import '../domain/repositories/book_repository.dart';
+import '../application/use_cases/manage_catalog_use_case.dart';
 import '../widgets/book_card.dart';
 
 class CategoryTimelineScreen extends StatefulWidget {
@@ -40,7 +40,7 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
     if (!_hasMore || _isLoading) return;
     setState(() => _isLoading = true);
     try {
-      final result = await context.read<BookRepository>().getBooksByCategory(
+      final result = await context.read<ManageCatalogUseCase>().getBooksByCategory(
         category: widget.genre,
         page: _page,
         perPage: _perPage,

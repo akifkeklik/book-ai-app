@@ -6,7 +6,7 @@ import '../domain/entities/book.dart';
 import '../providers/recommendation_provider.dart';
 import '../providers/search_provider.dart';
 import '../providers/language_provider.dart';
-import '../domain/repositories/book_repository.dart';
+import '../application/use_cases/manage_user_profile_use_case.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -61,7 +61,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     try {
       // 1. Classic profile update (legacy support)
-      await context.read<BookRepository>().upsertUserProfile(
+      await context.read<ManageUserProfileUseCase>().upsertUserProfile(
         userId: userId,
         preferredGenres: _selectedCategories,
         readingFrequency: _readingFrequency,

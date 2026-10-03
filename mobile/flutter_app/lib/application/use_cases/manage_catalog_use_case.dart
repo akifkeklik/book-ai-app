@@ -24,6 +24,10 @@ class ManageCatalogUseCase {
     return _repository.getTotalBookCount();
   }
 
+  Future<Map<String, dynamic>> getBooksByCategory({required String category, int page = 1, int perPage = 40}) {
+    return _repository.getBooksByCategory(category: category, page: page, perPage: perPage);
+  }
+
   List<Book> getCachedPopularBooks() {
     return _repository.getCachedPopularBooks();
   }

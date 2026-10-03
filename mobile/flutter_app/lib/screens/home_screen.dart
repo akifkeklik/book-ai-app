@@ -9,7 +9,7 @@ import '../providers/auth_provider.dart';
 import '../providers/catalog_provider.dart';
 import '../providers/recommendation_provider.dart';
 import '../providers/favorites_provider.dart';
-import '../domain/repositories/book_repository.dart';
+import '../application/use_cases/manage_user_profile_use_case.dart';
 import '../widgets/book_card.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/skeleton_loader.dart';
@@ -57,7 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await favs.loadFavorites(auth.currentUser!.id);
 
       if (favs.favorites.isEmpty && mounted) {
-        final profile = await context.read<BookRepository>().getUserProfile(auth.currentUser!.id);
+        final profile = await context.read<ManageUserProfileUseCase>().getUserProfile(auth.currentUser!.id);
         if (profile == null && mounted) {
           context.go('/onboarding');
           return;
