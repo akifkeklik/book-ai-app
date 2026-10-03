@@ -9,7 +9,7 @@ from ...config import Config
 logger = logging.getLogger(__name__)
 
 
-class BookEnrichmentService:
+class GoogleBooksEnrichmentAdapter:
     """Service responsible for enriching book data with external sources (e.g., Google Books)."""
 
     def enrich(self, books: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

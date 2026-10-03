@@ -43,6 +43,9 @@ class BookDataPort(Protocol):
     ) -> None:
         ...
 
+    def check_health(self) -> bool:
+        ...
+
 
 class AuthPort(Protocol):
     def verify_token(self, token: str) -> Any:
@@ -60,4 +63,38 @@ class LlmPort(Protocol):
 
 class EmbeddingPort(Protocol):
     def generate_embedding(self, text: str, max_retries: int = 3) -> Optional[List[float]]:
+        ...
+
+
+class RecommenderPort(Protocol):
+    def recommend(
+        self,
+        seed_titles: Optional[List[str]] = None,
+        top_n: int = 10,
+        use_diversity: bool = False,
+        semantic_scores: Optional[Dict[str, float]] = None,
+        dislikes: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        ...
+
+    def search_books(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+        ...
+
+    def get_popular_books(self, limit: int = 10) -> List[Dict[str, Any]]:
+        ...
+
+    def get_all_books(
+        self, page: int = 1, per_page: int = 50, category: Optional[str] = None
+    ) -> Dict[str, Any]:
+        ...
+
+    def get_unique_categories(self) -> List[str]:
+        ...
+
+    def get_book_by_isbn(self, isbn: str) -> Optional[Dict[str, Any]]:
+        ...
+
+
+class EnrichmentPort(Protocol):
+    def enrich(self, books: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         ...

@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 books_bp = Blueprint("books", __name__)
 
 # Re-exporting aliases for convenience and to avoid changing the rest of this file
-_supabase = container.supabase
+_book_data_port = container.book_data_port
+_auth_port = container.auth_port
 _svc = container.book_service
 _get_books_uc = container.get_books_uc
 _search_books_uc = container.search_books_uc
@@ -38,7 +39,7 @@ def require_auth(f):
 
         token = auth_header.split(" ")[1]
         try:
-            user = _svc.verify_token(token)
+            user = _auth_port.verify_token(token) if _auth_port else None
             if not user or not user.id:
                 return jsonify({"error": "Unauthorized: Invalid token"}), 401
             g.user_id = user.id
@@ -63,9 +64,8 @@ def health_check():
 @books_bp.route("/health/ready", methods=["GET"])
 def readiness_check():
     try:
-        # Check DB dependency
-        if _supabase:
-            _supabase.table("books").select("isbn13").limit(1).execute()
+        if _book_data_port and not _book_data_port.check_health():
+            raise Exception("Database health check failed")
         return jsonify({"status": "ready", "service": "book-ai-api"}), 200
     except Exception as exc:
         import logging

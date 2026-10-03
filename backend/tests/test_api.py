@@ -22,6 +22,7 @@ import json
 import pytest
 from backend.app import create_app
 from backend.routes.routes import _svc
+from backend.container import container
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Fixtures
@@ -50,7 +51,11 @@ def auth_headers(monkeypatch):
             return DummyUser()
         raise Exception("Invalid token")
 
-    monkeypatch.setattr(_svc, "verify_token", mock_verify_token)
+    class FakeAuthPort:
+        def verify_token(self, token):
+            return mock_verify_token(token)
+
+    monkeypatch.setattr("backend.routes.routes._auth_port", FakeAuthPort())
     return {"Authorization": "Bearer valid-token"}
 
 

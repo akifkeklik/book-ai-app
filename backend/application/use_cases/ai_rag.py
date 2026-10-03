@@ -2,9 +2,14 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from ...domain.ports import BookDataPort, EmbeddingPort, LlmPort, UserInteractionRepository
-from ...infrastructure.ml.recommender import BookRecommender
-from ..services.enrichment_service import BookEnrichmentService
+from ...domain.ports import (
+    BookDataPort,
+    EmbeddingPort,
+    EnrichmentPort,
+    LlmPort,
+    RecommenderPort,
+    UserInteractionRepository,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +20,8 @@ class ProcessRagQueryUseCase:
         embedding_port: EmbeddingPort,
         book_data_port: Optional[BookDataPort],
         interaction_repo: Optional[UserInteractionRepository],
-        recommender: BookRecommender,
-        enrichment_service: BookEnrichmentService,
+        recommender: RecommenderPort,
+        enrichment_service: EnrichmentPort,
         llm_port: LlmPort,
     ):
         self._embedding_port = embedding_port
