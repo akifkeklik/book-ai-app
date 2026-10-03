@@ -39,6 +39,14 @@ class ManageRecommendationsUseCase {
     return _repository.submitOnboarding(userId: userId, bookIds: bookIds, genres: genres);
   }
 
+  Future<void> trackActivity({
+    required String userId,
+    required String activityType,
+    required String bookId,
+  }) {
+    return _repository.trackActivity(userId: userId, activityType: activityType, bookId: bookId);
+  }
+
   Future<List<Book>> _getFallbackRecs(String userId, List<Book> currentPopularBooks) async {
     try {
       final recs = await _repository.getFallbackRecommendations(userId);

@@ -10,6 +10,8 @@ import '../application/use_cases/manage_catalog_use_case.dart';
 import '../application/use_cases/manage_recommendations_use_case.dart';
 import '../application/use_cases/search_books_use_case.dart';
 import '../application/use_cases/process_ai_chat_use_case.dart';
+import '../application/use_cases/manage_user_profile_use_case.dart';
+import '../application/use_cases/view_book_details_use_case.dart';
 
 class ServiceLocator {
   static late final ApiService apiService;
@@ -20,6 +22,8 @@ class ServiceLocator {
   static late final ManageRecommendationsUseCase manageRecommendationsUseCase;
   static late final SearchBooksUseCase searchBooksUseCase;
   static late final ProcessAiChatUseCase processAiChatUseCase;
+  static late final ManageUserProfileUseCase manageUserProfileUseCase;
+  static late final ViewBookDetailsUseCase viewBookDetailsUseCase;
 
   static Future<void> initialize() async {
     await Supabase.initialize(
@@ -41,5 +45,7 @@ class ServiceLocator {
     manageRecommendationsUseCase = ManageRecommendationsUseCase(bookRepository);
     searchBooksUseCase = SearchBooksUseCase(bookRepository);
     processAiChatUseCase = ProcessAiChatUseCase(bookRepository);
+    manageUserProfileUseCase = ManageUserProfileUseCase(bookRepository);
+    viewBookDetailsUseCase = ViewBookDetailsUseCase(bookRepository);
   }
 }
