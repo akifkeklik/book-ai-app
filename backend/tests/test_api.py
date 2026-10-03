@@ -21,8 +21,6 @@ import json
 
 import pytest
 from backend.app import create_app
-from backend.routes.routes import _svc
-from backend.container import container
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Fixtures
