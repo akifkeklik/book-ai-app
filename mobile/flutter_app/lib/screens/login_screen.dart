@@ -88,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
       appBar: AppBar(title: Text(context.tr('sign_in_hint'))),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
           child: Form(
             key: _formKey,
             child: Column(
@@ -244,9 +244,10 @@ class _ErrorBanner extends StatelessWidget {
   final String message;
 
   bool get _isNetworkError =>
-      message.contains('uyku') ||
-      message.contains('bağlanamadı') ||
-      message.contains('Restore');
+      message.toLowerCase().contains('network') ||
+      message.toLowerCase().contains('socket') ||
+      message.toLowerCase().contains('connection') ||
+      message.toLowerCase().contains('timeout');
 
   @override
   Widget build(BuildContext context) {

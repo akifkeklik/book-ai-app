@@ -208,10 +208,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
       case SearchStatus.loaded:
         if (searchProv.searchResults.isEmpty) {
-          return const LibrisEmptyState(
+          return LibrisEmptyState(
             icon: Icons.sentiment_dissatisfied_outlined,
-            title: 'No results',
-            message: 'Try a different keyword',
+            title: context.tr('search_no_results_title'),
+            message: context.tr('search_no_results_message'),
           );
         }
         return ListView.builder(
@@ -246,7 +246,7 @@ class _ErrorState extends StatelessWidget {
             ElevatedButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+              label: Text(context.tr('retry')),
             ),
           ],
         ),

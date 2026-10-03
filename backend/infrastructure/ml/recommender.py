@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 from backend.utils.preprocess import preprocess_dataframe
 from sklearn.feature_extraction.text import TfidfVectorizer
+from backend.domain.taxonomy import CANONICAL_CATEGORY_MAP, CANONICAL_CATEGORIES_ORDERED
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Legacy pickle alias: tfidf.pkl was serialised under the old module path
@@ -491,13 +492,19 @@ class BookRecommender:
         if category:
             cat = category.strip()
             if cat and cat.lower() != "all":
-                # Senior Solution: Explicitly cast to string to handle list-like objects from Supabase/CSV
-                # and use a case-insensitive search.
-                mask = (
-                    df["categories"]
-                    .astype(str)
-                    .str.contains(cat, case=False, na=False, regex=False)
-                )
+                # Check if this is a canonical category name
+                if cat in self.CANONICAL_CATEGORIES_ORDERED:
+                    # Use canonical mapping: match all raw categories that map to this canonical
+                    mask = df["categories"].astype(str).apply(
+                        lambda raw: self._book_matches_canonical(raw, cat)
+                    )
+                else:
+                    # Fallback: substring match for backward compatibility
+                    mask = (
+                        df["categories"]
+                        .astype(str)
+                        .str.contains(cat, case=False, na=False, regex=False)
+                    )
                 df = df[mask]
 
         start = (page - 1) * per_page
@@ -514,16 +521,40 @@ class BookRecommender:
             "total_pages": total_pages,
         }
 
+    # ── Canonical Category Taxonomy ───────────────────────────────────────────
+
+    @classmethod
+    def _get_canonical_for_raw(cls, raw_category: str) -> Optional[str]:
+        """Return canonical category name for a raw category string, or None."""
+        key = raw_category.strip().lower()
+        return CANONICAL_CATEGORY_MAP.get(key)
+
+    @classmethod
+    def _book_matches_canonical(cls, raw_categories_str: str, canonical: str) -> bool:
+        """Check if a book's raw categories string contains the given canonical category."""
+        parts = re.split(r"[,|;/&]", str(raw_categories_str or ""))
+        for part in parts:
+            mapped = cls._get_canonical_for_raw(part.strip())
+            if mapped == canonical:
+                return True
+        return False
+
     def get_unique_categories(self) -> List[str]:
-        """Get a list of all unique categories."""
+        """Return canonical categories that have at least one book in the dataset."""
         if self.df.empty:
             return []
-        raw = self.df["categories"].dropna().astype(str)
-        exploded = raw.str.split(r"\s*[,|;/]\s*").explode().str.strip()
-        cleaned = exploded[
-            exploded.ne("") & ~exploded.str.lower().isin({"nan", "none", "null", "unknown"})
-        ]
-        return sorted(cleaned.str.title().unique().tolist())
+
+        # Find which canonical categories actually have books
+        present = set()
+        for raw in self.df["categories"].dropna().astype(str):
+            parts = re.split(r"[,|;/&]", raw)
+            for part in parts:
+                canonical = self._get_canonical_for_raw(part.strip())
+                if canonical:
+                    present.add(canonical)
+
+        # Return in canonical order, only those present
+        return [c for c in CANONICAL_CATEGORIES_ORDERED if c in present]
 
     def get_book_by_isbn(self, isbn: str) -> Optional[Dict[str, Any]]:
         """Retrieve a single book by its ISBN13."""

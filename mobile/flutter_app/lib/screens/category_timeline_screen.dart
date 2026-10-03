@@ -101,7 +101,7 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
                         child: Text(
                           context.tr('scroll_to_discover'),
                           style: theme.textTheme.bodySmall
-                              ?.copyWith(color: Colors.white38),
+                              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                         ),
                       ),
                     ),

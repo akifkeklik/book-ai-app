@@ -88,7 +88,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       appBar: AppBar(title: Text(context.tr('register_title'))),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
           child: Form(
             key: _formKey,
             child: Column(
@@ -147,7 +147,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   validator: (v) {
                     if (v == null || v.isEmpty) return context.tr('email_required');
                     if (!v.contains('@') || !v.contains('.')) {
-                      return context.tr('error');
+                      return context.tr('email_invalid');
                     }
                     return null;
                   },
@@ -185,7 +185,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _submit(),
                   decoration: InputDecoration(
-                    labelText: context.tr('password'),
+                    labelText: context.tr('confirm_password'),
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(_obscureConfirm
@@ -196,7 +196,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   validator: (v) {
-                    if (v != _passCtrl.text) return context.tr('error');
+                    if (v != _passCtrl.text) return context.tr('passwords_not_match');
                     return null;
                   },
                 ),

@@ -169,9 +169,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                         color: Colors.white.withOpacity(0.2),
                                         borderRadius: DesignSystem.borderRadiusPill,
                                       ),
-                                      child: const Text(
-                                        'AI DISCOVERY',
-                                        style: TextStyle(
+                                      child: Text(
+                                        context.tr('ai_discovery_badge'),
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 10,
                                           fontWeight: FontWeight.w800,
@@ -181,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                     const SizedBox(height: DesignSystem.spacing12),
                                     Text(
-                                      'Find your next favorite book using AI',
+                                      context.tr('ai_discovery_title'),
                                       style: theme.textTheme.titleLarge?.copyWith(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
@@ -190,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                     const SizedBox(height: DesignSystem.spacing8),
                                     Text(
-                                      'Describe what you want to read, and we\'ll find it.',
+                                      context.tr('ai_discovery_desc'),
                                       style: theme.textTheme.bodyMedium?.copyWith(
                                         color: Colors.white.withOpacity(0.8),
                                       ),
