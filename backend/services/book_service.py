@@ -8,9 +8,11 @@ Responsibilities:
 import logging
 from functools import lru_cache
 from typing import List, Optional
+
 from ..config import Config
 from ..domain.ports import BookDataPort, UserInteractionRepository
 from ..infrastructure.ml.recommender import BookRecommender
+
 logger = logging.getLogger(__name__)
 class BookService:
     """Singleton-style service initialised once when the blueprint is imported."""
@@ -44,6 +46,7 @@ class BookService:
                 raw_data = self.book_data_port.get_all_books_raw()
                 if raw_data:
                     import pandas as pd
+
                     from ..utils.preprocess import preprocess_dataframe
                     df = pd.DataFrame(raw_data)
                     self.recommender.engine.df = preprocess_dataframe(df)
