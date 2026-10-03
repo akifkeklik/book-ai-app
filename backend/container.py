@@ -1,6 +1,5 @@
 import logging
 
-from backend.application.services.enrichment_service import BookEnrichmentService
 from backend.application.use_cases.ai_rag import ProcessRagQueryUseCase
 from backend.application.use_cases.catalog import (
     GetBookDetailsUseCase,
@@ -18,6 +17,7 @@ from backend.application.use_cases.recommendations import (
     GetRecommendationsUseCase,
 )
 from backend.config import Config
+from backend.infrastructure.adapters.enrichment_adapter import GoogleBooksEnrichmentAdapter
 from backend.infrastructure.llm.adapters import GenericLlmAdapter
 from backend.infrastructure.ml.recommender import BookRecommender
 from backend.infrastructure.persistence.supabase_adapters import (
@@ -51,12 +51,11 @@ class Container:
         self.llm_port = GenericLlmAdapter(provider=Config.LLM_PROVIDER, api_key=Config.LLM_API_KEY)
 
         # 2. Application Services
-        self.enrichment_service = BookEnrichmentService()
+        self.enrichment_service = GoogleBooksEnrichmentAdapter()
         self.book_service = BookService(
             recommender=self.recommender,
             interaction_repo=self.interaction_repo,
             book_data_port=self.book_data_port,
-            auth_port=self.auth_port,
         )
         self.embedding_service = EmbeddingService(book_data_port=self.book_data_port)
 

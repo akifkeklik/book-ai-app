@@ -1,11 +1,10 @@
 from typing import Any, Dict, List, Optional
 
-from ...infrastructure.ml.recommender import BookRecommender
-from ..services.enrichment_service import BookEnrichmentService
+from ...domain.ports import EnrichmentPort, RecommenderPort
 
 
 class GetBooksUseCase:
-    def __init__(self, recommender: BookRecommender, enrichment_service: BookEnrichmentService):
+    def __init__(self, recommender: RecommenderPort, enrichment_service: EnrichmentPort):
         self._recommender = recommender
         self._enrichment_service = enrichment_service
 
@@ -16,7 +15,7 @@ class GetBooksUseCase:
 
 
 class SearchBooksUseCase:
-    def __init__(self, recommender: BookRecommender, enrichment_service: BookEnrichmentService):
+    def __init__(self, recommender: RecommenderPort, enrichment_service: EnrichmentPort):
         self._recommender = recommender
         self._enrichment_service = enrichment_service
 
@@ -26,7 +25,7 @@ class SearchBooksUseCase:
 
 
 class GetPopularBooksUseCase:
-    def __init__(self, recommender: BookRecommender, enrichment_service: BookEnrichmentService):
+    def __init__(self, recommender: RecommenderPort, enrichment_service: EnrichmentPort):
         self._recommender = recommender
         self._enrichment_service = enrichment_service
 
@@ -36,7 +35,7 @@ class GetPopularBooksUseCase:
 
 
 class GetBookDetailsUseCase:
-    def __init__(self, recommender: BookRecommender, enrichment_service: BookEnrichmentService):
+    def __init__(self, recommender: RecommenderPort, enrichment_service: EnrichmentPort):
         self._recommender = recommender
         self._enrichment_service = enrichment_service
 

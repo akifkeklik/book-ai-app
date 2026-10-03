@@ -183,6 +183,16 @@ class SupabaseBookDataPort:
             logger.error(f"Error upserting embedding: {e}")
             raise e
 
+    def check_health(self) -> bool:
+        if not self._supabase:
+            return False
+        try:
+            self._supabase.table("books").select("isbn13").limit(1).execute()
+            return True
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return False
+
 class SupabaseAuthPort:
     def __init__(self, supabase_client: Client):
         self._supabase = supabase_client

@@ -3,15 +3,13 @@ import random
 import time
 from typing import Any, Dict, List, Optional
 
-from ...domain.ports import BookDataPort, UserInteractionRepository
-from ...infrastructure.ml.recommender import BookRecommender
-from ..services.enrichment_service import BookEnrichmentService
+from ...domain.ports import BookDataPort, EnrichmentPort, RecommenderPort, UserInteractionRepository
 
 logger = logging.getLogger(__name__)
 
 
 class GetRecommendationsUseCase:
-    def __init__(self, recommender: BookRecommender, enrichment_service: BookEnrichmentService):
+    def __init__(self, recommender: RecommenderPort, enrichment_service: EnrichmentPort):
         self._recommender = recommender
         self._enrichment_service = enrichment_service
 
@@ -30,10 +28,10 @@ class GetRecommendationsUseCase:
 class GetPersonalizedRecommendationsUseCase:
     def __init__(
         self,
-        recommender: BookRecommender,
+        recommender: RecommenderPort,
         interaction_repo: Optional[UserInteractionRepository],
         book_data_port: Optional[BookDataPort],
-        enrichment_service: BookEnrichmentService,
+        enrichment_service: EnrichmentPort,
     ):
         self._recommender = recommender
         self._interaction_repo = interaction_repo
