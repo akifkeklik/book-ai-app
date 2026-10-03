@@ -2,12 +2,12 @@ import 'package:flutter/foundation.dart';
 import '../../domain/entities/book.dart';
 import '../../domain/repositories/book_repository.dart';
 
-class GetPersonalizedRecsUseCase {
+class ManageRecommendationsUseCase {
   final BookRepository _repository;
 
-  GetPersonalizedRecsUseCase(this._repository);
+  ManageRecommendationsUseCase(this._repository);
 
-  Future<List<Book>> execute(String userId, List<Book> currentPopularBooks) async {
+  Future<List<Book>> getPersonalizedRecs(String userId, List<Book> currentPopularBooks) async {
     try {
       final recs = await _repository.getPersonalizedRecommendations(userId);
       
@@ -21,6 +21,22 @@ class GetPersonalizedRecsUseCase {
       debugPrint('Personalized Recs error: $e. Using fallback...');
       return await _getFallbackRecs(userId, currentPopularBooks);
     }
+  }
+
+  Future<bool> submitFeedback({
+    required String userId,
+    required String bookId,
+    required String interaction,
+  }) {
+    return _repository.submitFeedback(userId: userId, bookId: bookId, interaction: interaction);
+  }
+
+  Future<bool> submitOnboarding({
+    required String userId,
+    required List<String> bookIds,
+    required List<String> genres,
+  }) {
+    return _repository.submitOnboarding(userId: userId, bookIds: bookIds, genres: genres);
   }
 
   Future<List<Book>> _getFallbackRecs(String userId, List<Book> currentPopularBooks) async {

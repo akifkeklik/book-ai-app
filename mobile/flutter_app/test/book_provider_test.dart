@@ -4,8 +4,8 @@ import 'package:book_ai_app/domain/entities/book.dart';
 import 'package:book_ai_app/domain/repositories/book_repository.dart';
 import 'package:book_ai_app/providers/catalog_provider.dart';
 import 'package:book_ai_app/providers/recommendation_provider.dart';
-import 'package:book_ai_app/application/use_cases/get_popular_books_use_case.dart';
-import 'package:book_ai_app/application/use_cases/get_personalized_recs_use_case.dart';
+import 'package:book_ai_app/application/use_cases/manage_catalog_use_case.dart';
+import 'package:book_ai_app/application/use_cases/manage_recommendations_use_case.dart';
 
 // ---------------------------------------------------------------------------
 // Fake BookRepository — no network, no Hive, no Supabase
@@ -129,8 +129,7 @@ void main() {
         FakeBookRepository.book('222', 'Book B'),
       ];
       final provider = CatalogProvider(
-        repository: repo,
-        getPopularBooks: GetPopularBooksUseCase(repo),
+        manageCatalog: ManageCatalogUseCase(repo),
       );
 
       await Future.delayed(Duration.zero);
@@ -147,8 +146,7 @@ void main() {
       final repo = FakeBookRepository();
       repo.popularBooksError = Exception('network timeout');
       final provider = CatalogProvider(
-        repository: repo,
-        getPopularBooks: GetPopularBooksUseCase(repo),
+        manageCatalog: ManageCatalogUseCase(repo),
       );
 
       await Future.delayed(Duration.zero);
@@ -165,8 +163,7 @@ void main() {
       repo.popularBooksResult = [];
 
       final provider = CatalogProvider(
-        repository: repo,
-        getPopularBooks: GetPopularBooksUseCase(repo),
+        manageCatalog: ManageCatalogUseCase(repo),
       );
       await Future.delayed(Duration.zero);
 
@@ -188,8 +185,7 @@ void main() {
       ];
       repo.popularBooksResult = expected;
       final provider = CatalogProvider(
-        repository: repo,
-        getPopularBooks: GetPopularBooksUseCase(repo),
+        manageCatalog: ManageCatalogUseCase(repo),
       );
 
       await Future.delayed(Duration.zero);
@@ -205,8 +201,7 @@ void main() {
       final repo = FakeBookRepository();
       repo.popularBooksError = Exception('server error');
       final provider = CatalogProvider(
-        repository: repo,
-        getPopularBooks: GetPopularBooksUseCase(repo),
+        manageCatalog: ManageCatalogUseCase(repo),
       );
 
       await Future.delayed(Duration.zero);
@@ -228,8 +223,7 @@ void main() {
       final repo = FakeBookRepository();
       repo.personalizedResult = [FakeBookRepository.book('P1', 'PersonalBook')];
       final provider = RecommendationProvider(
-        repository: repo,
-        getPersonalizedRecs: GetPersonalizedRecsUseCase(repo),
+        manageRecommendations: ManageRecommendationsUseCase(repo),
       );
 
       await Future.delayed(Duration.zero);
@@ -251,8 +245,7 @@ void main() {
       repo.personalizedError = Exception('AI service down');
       repo.fallbackError = Exception('Fallback down');
       final provider = RecommendationProvider(
-        repository: repo,
-        getPersonalizedRecs: GetPersonalizedRecsUseCase(repo),
+        manageRecommendations: ManageRecommendationsUseCase(repo),
       );
 
       await Future.delayed(Duration.zero);
@@ -269,8 +262,7 @@ void main() {
       ];
 
       final provider = RecommendationProvider(
-        repository: repo,
-        getPersonalizedRecs: GetPersonalizedRecsUseCase(repo),
+        manageRecommendations: ManageRecommendationsUseCase(repo),
       );
 
       await provider.fetchPersonalizedRecs('userA', []);

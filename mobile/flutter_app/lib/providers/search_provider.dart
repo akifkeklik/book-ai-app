@@ -2,14 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../domain/entities/book.dart';
-import '../domain/repositories/book_repository.dart';
+import '../application/use_cases/search_books_use_case.dart';
 
 enum SearchStatus { initial, loading, loaded, error }
 
 class SearchProvider extends ChangeNotifier {
-  final BookRepository _repository;
+  final SearchBooksUseCase _searchBooksUseCase;
 
-  SearchProvider({required BookRepository repository}) : _repository = repository;
+  SearchProvider({required SearchBooksUseCase searchBooksUseCase}) : _searchBooksUseCase = searchBooksUseCase;
 
   List<Book> _searchResults = [];
   SearchStatus _status = SearchStatus.initial;
@@ -51,7 +51,7 @@ class SearchProvider extends ChangeNotifier {
 
   Future<void> _performSearch(String query) async {
     try {
-      final results = await _repository.searchBooks(query);
+      final results = await _searchBooksUseCase.execute(query);
       _searchResults = results;
       _status = results.isEmpty ? SearchStatus.initial : SearchStatus.loaded;
     } catch (e) {

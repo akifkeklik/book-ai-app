@@ -59,21 +59,20 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider(ServiceLocator.supabaseService)),
+        Provider(create: (_) => ServiceLocator.processAiChatUseCase),
         ChangeNotifierProvider(
           create: (_) => CatalogProvider(
-            repository: ServiceLocator.bookRepository,
-            getPopularBooks: ServiceLocator.getPopularBooksUseCase,
+            manageCatalog: ServiceLocator.manageCatalogUseCase,
           ),
         ),
         ChangeNotifierProvider(
           create: (_) => RecommendationProvider(
-            repository: ServiceLocator.bookRepository,
-            getPersonalizedRecs: ServiceLocator.getPersonalizedRecsUseCase,
+            manageRecommendations: ServiceLocator.manageRecommendationsUseCase,
           ),
         ),
         ChangeNotifierProvider(
           create: (_) => SearchProvider(
-            repository: ServiceLocator.bookRepository,
+            searchBooksUseCase: ServiceLocator.searchBooksUseCase,
           ),
         ),
         ChangeNotifierProvider(create: (_) => FavoritesProvider(ServiceLocator.supabaseService)),
