@@ -1,25 +1,21 @@
 import sys
 from unittest.mock import MagicMock, patch
 
-try:
-    import psycopg2  # noqa: F401
-except ImportError:
-    psycopg2 = MagicMock()
-    sys.modules["psycopg2"] = psycopg2
+# Inject psycopg2 into sys.modules so the local import in the script gets the mock
+mock_psycopg2 = MagicMock()
+sys.modules["psycopg2"] = mock_psycopg2
 
 from backend.scripts.backfill_embeddings import backfill_embeddings
 
-
-@patch("psycopg2.connect")
 @patch("backend.scripts.backfill_embeddings.EmbeddingService")
-def test_backfill_loop(mock_embedding_service, mock_psycopg2_connect):
+def test_backfill_loop(mock_embedding_service):
     import os
     os.environ["SUPABASE_DB_URL"] = "postgres://test"
 
     # Mock psycopg2 connection
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
-    mock_psycopg2_connect.return_value = mock_conn
+    mock_psycopg2.connect.return_value = mock_conn
     mock_conn.cursor.return_value = mock_cursor
 
     # Setup the mock cursor to return columns and rows
