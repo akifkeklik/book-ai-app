@@ -15,9 +15,11 @@ class SupabaseInteractionRepository:
             return None
         try:
             from flask import g, has_request_context
+
             if has_request_context() and getattr(g, "jwt_token", None):
-                from supabase import create_client
                 from backend.config import Config
+                from supabase import create_client
+
                 client = create_client(Config.SUPABASE_URL, Config.SUPABASE_ANON_KEY)
                 client.postgrest.auth(g.jwt_token)
                 return client
@@ -101,9 +103,7 @@ class SupabaseBookDataPort:
     def __init__(self, supabase_client: Client):
         self._supabase = supabase_client
 
-    def get_semantic_candidates(
-        self, likes: List[str], limit: int = 100
-    ) -> Dict[str, float]:
+    def get_semantic_candidates(self, likes: List[str], limit: int = 100) -> Dict[str, float]:
         if not self._supabase or not likes:
             return {}
         try:
@@ -122,9 +122,7 @@ class SupabaseBookDataPort:
             logger.warning(f"Semantic candidate generation failed: {e}")
         return {}
 
-    def match_query_embeddings(
-        self, embedding: List[float], limit: int = 100
-    ) -> Dict[str, float]:
+    def match_query_embeddings(self, embedding: List[float], limit: int = 100) -> Dict[str, float]:
         if not self._supabase:
             return {}
         try:
@@ -148,10 +146,7 @@ class SupabaseBookDataPort:
             return []
         try:
             books_response = (
-                self._supabase.table("books")
-                .select("*")
-                .in_("isbn13", isbns)
-                .execute()
+                self._supabase.table("books").select("*").in_("isbn13", isbns).execute()
             )
             return getattr(books_response, "data", [])
         except Exception as e:
@@ -196,9 +191,7 @@ class SupabaseBookDataPort:
                 "content_hash": content_hash,
                 "model_version": model_version,
             }
-            self._supabase.table("book_embeddings").upsert(
-                payload, on_conflict="book_id"
-            ).execute()
+            self._supabase.table("book_embeddings").upsert(payload, on_conflict="book_id").execute()
         except Exception as e:
             logger.error(f"Error upserting embedding: {e}")
             raise e
@@ -212,6 +205,7 @@ class SupabaseBookDataPort:
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return False
+
 
 class SupabaseAuthPort:
     def __init__(self, supabase_client: Client):
