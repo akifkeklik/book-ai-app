@@ -43,6 +43,7 @@ def require_auth(f):
             if not user or not user.id:
                 return jsonify({"error": "Unauthorized: Invalid token"}), 401
             g.user_id = user.id
+            g.jwt_token = token
         except Exception as exc:
             logger.warning(f"JWT verification failed: {exc}")
             return jsonify({"error": "Unauthorized: Invalid or expired token"}), 401
@@ -62,6 +63,7 @@ def optional_auth(f):
                 user = _auth_port.verify_token(token) if _auth_port else None
                 if user and user.id:
                     g.user_id = user.id
+                    g.jwt_token = token
             except Exception:
                 pass
         return f(*args, **kwargs)
