@@ -2,7 +2,6 @@ import argparse
 import logging
 import os
 import sys
-import time
 
 from supabase import Client, create_client
 
@@ -35,7 +34,6 @@ def backfill_embeddings(batch_size: int = 100, max_books: int = None, force_reco
     processed = 0
     generated = 0
     skipped = 0
-    last_id = "0"
 
     consecutive_failures = 0
 

@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv('.env')
 
-from container import container
+from container import container  # noqa: E402
 
 
 def test_rag():

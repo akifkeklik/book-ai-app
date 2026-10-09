@@ -1,8 +1,14 @@
 from unittest.mock import MagicMock
-import pytest
 
+import pytest
 from backend.application.use_cases.ai_rag import ProcessRagQueryUseCase
-from backend.domain.ports import BookDataPort, EmbeddingPort, LlmPort, RecommenderPort, EnrichmentPort
+from backend.domain.ports import (
+    BookDataPort,
+    EmbeddingPort,
+    EnrichmentPort,
+    LlmPort,
+    RecommenderPort,
+)
 
 
 @pytest.mark.unit
