@@ -8,8 +8,12 @@ mock_psycopg2 = MagicMock()
 sys.modules["psycopg2"] = mock_psycopg2
 
 
+@patch("backend.scripts.backfill_embeddings.Config")
 @patch("backend.scripts.backfill_embeddings.EmbeddingService")
-def test_backfill_loop(mock_embedding_service):
+def test_backfill_loop(mock_embedding_service, mock_config):
+    mock_config.SUPABASE_URL = "https://test.supabase.co"
+    mock_config.SUPABASE_ANON_KEY = "dummy.header.payload"
+
     import os
     os.environ["SUPABASE_DB_URL"] = "postgres://test"
 
