@@ -2,6 +2,7 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
+from ...domain.models import RAGResponse, Recommendation
 from ...domain.ports import (
     BookDataPort,
     EmbeddingPort,
@@ -54,11 +55,11 @@ class ProcessRagQueryUseCase:
                     }
                 },
             )
-            return {
-                "answer": "I'm having trouble understanding your query right now. Please try again later.",
-                "referenced_books": [],
-                "status": "embedding_failed",
-            }
+            return RAGResponse(
+                answer="I'm having trouble understanding your query right now. Please try again later.",
+                referenced_books=[],
+                status="embedding_failed"
+            ).model_dump()
 
         # Step 2: Vector Retrieval & Recommendation Engine Integration
         t1 = time.time()
@@ -75,11 +76,11 @@ class ProcessRagQueryUseCase:
                     }
                 },
             )
-            return {
-                "answer": "I couldn't find any books in my library matching your description.",
-                "referenced_books": [],
-                "status": "empty_retrieval",
-            }
+            return RAGResponse(
+                answer="I couldn't find any books in my library matching your description.",
+                referenced_books=[],
+                status="empty_retrieval"
+            ).model_dump()
 
         # Step 3: Build Grounded Context
         context = self._build_context(retrieved_books)
@@ -117,11 +118,11 @@ class ProcessRagQueryUseCase:
                 "LLM generation failed, using fallback",
                 extra={"extra_data": {**metrics, "status": "llm_fallback"}},
             )
-            return {
-                "answer": "I couldn't generate a personalized response right now, but here are some books matching your query:",
-                "referenced_books": retrieved_books,
-                "status": "llm_fallback",
-            }
+            return RAGResponse(
+                answer="I couldn't generate a personalized response right now, but here are some books matching your query:",
+                referenced_books=[Recommendation(**book) for book in retrieved_books],
+                status="llm_fallback"
+            ).model_dump()
 
         import json
 
@@ -156,7 +157,11 @@ class ProcessRagQueryUseCase:
         logger.info(
             "RAG request successful", extra={"extra_data": {**metrics, "status": "success"}}
         )
-        return {"answer": answer_text, "referenced_books": retrieved_books, "status": "success"}
+        return RAGResponse(
+            answer=answer_text,
+            referenced_books=[Recommendation(**book) for book in retrieved_books],
+            status="success"
+        ).model_dump()
 
     def _retrieve_books_by_embedding(
         self, embedding: List[float], top_k: int = 5, user_id: Optional[str] = None

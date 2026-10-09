@@ -121,7 +121,7 @@ def test_rag_usecase_no_results():
 def test_rag_usecase_llm_failure():
     llm = FakeLlmPort(response=None) # LLM adapter returns None on failure
     book_data = FakeBookDataPort(candidates={"123": 0.9})
-    uc = ProcessRagQueryUseCase(FakeEmbeddingPort(), book_data, FakeInteractionRepo(), FakeRecommender(recs=[{"title": "Book 2"}]), FakeEnrichmentService(), llm)
+    uc = ProcessRagQueryUseCase(FakeEmbeddingPort(), book_data, FakeInteractionRepo(), FakeRecommender(recs=[{"isbn13": "124", "title": "Book 2", "authors": "Author"}]), FakeEnrichmentService(), llm)
 
     res = uc.execute("Hello")
     assert res["status"] == "llm_fallback"
@@ -134,7 +134,7 @@ def test_rag_usecase_personalization_seed():
     ]
     book_data = FakeBookDataPort(candidates={"123": 0.9}, books=[{"isbn13": "111", "title": "Liked Book"}])
     llm = FakeLlmPort()
-    uc = ProcessRagQueryUseCase(FakeEmbeddingPort(), book_data, FakeInteractionRepo(interactions), FakeRecommender(recs=[{"title": "Test"}]), FakeEnrichmentService(), llm)
+    uc = ProcessRagQueryUseCase(FakeEmbeddingPort(), book_data, FakeInteractionRepo(interactions), FakeRecommender(recs=[{"isbn13": "125", "title": "Test", "authors": "Author"}]), FakeEnrichmentService(), llm)
 
     uc.execute("Suggest me something", user_id="u1")
     sys_prompt, user_prompt = llm.calls[0]

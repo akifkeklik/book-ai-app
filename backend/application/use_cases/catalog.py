@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional
 
+from ...domain.models import Book
 from ...domain.ports import EnrichmentPort, RecommenderPort
 
 
@@ -30,7 +31,8 @@ class GetBooksUseCase:
             published_from=published_from, published_to=published_to,
             sort=sort, order=order
         )
-        result["books"] = self._enrichment_service.enrich(result["books"])
+        enriched_books = self._enrichment_service.enrich(result["books"])
+        result["books"] = [Book(**book).model_dump() for book in enriched_books]
         return result
 
 
@@ -41,7 +43,8 @@ class SearchBooksUseCase:
 
     def execute(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
         books = self._recommender.search_books(query=query, limit=limit)
-        return self._enrichment_service.enrich(books)
+        enriched_books = self._enrichment_service.enrich(books)
+        return [Book(**book).model_dump() for book in enriched_books]
 
 
 class GetPopularBooksUseCase:
@@ -51,7 +54,8 @@ class GetPopularBooksUseCase:
 
     def execute(self, limit: int = 20) -> List[Dict[str, Any]]:
         books = self._recommender.get_popular_books(limit=limit)
-        return self._enrichment_service.enrich(books)
+        enriched_books = self._enrichment_service.enrich(books)
+        return [Book(**book).model_dump() for book in enriched_books]
 
 
 class GetBookDetailsUseCase:
@@ -63,5 +67,6 @@ class GetBookDetailsUseCase:
         book = self._recommender.get_book_by_isbn(isbn)
         if book:
             enriched = self._enrichment_service.enrich([book])
-            return enriched[0] if enriched else None
+            if enriched:
+                return Book(**enriched[0]).model_dump()
         return None
