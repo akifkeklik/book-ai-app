@@ -3,15 +3,13 @@ from unittest.mock import MagicMock, patch
 
 from backend.scripts.backfill_embeddings import backfill_embeddings
 
-# Inject psycopg2 into sys.modules so the local import in the script gets the mock
-mock_psycopg2 = MagicMock()
-sys.modules["psycopg2"] = mock_psycopg2
 
-
+@patch.dict(sys.modules, {"psycopg2": MagicMock()})
 @patch("backend.scripts.backfill_embeddings.create_client")
 @patch("backend.scripts.backfill_embeddings.Config")
 @patch("backend.scripts.backfill_embeddings.EmbeddingService")
 def test_backfill_loop(mock_embedding_service, mock_config, mock_create_client):
+    mock_psycopg2 = sys.modules["psycopg2"]
     mock_config.SUPABASE_URL = "https://test.supabase.co"
     mock_config.SUPABASE_ANON_KEY = "dummy.header.payload"
 
