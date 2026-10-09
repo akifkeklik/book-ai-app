@@ -347,21 +347,13 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
             ),
           ),
           const SizedBox(height: DesignSystem.spacing16),
-          SingleChildScrollView(
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20),
-            scrollDirection: Axis.horizontal,
-            clipBehavior: Clip.none,
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < _referencedBooks.length; i++) ...[
-                    BookCard(book: _referencedBooks[i]),
-                    if (i < _referencedBooks.length - 1)
-                      const SizedBox(width: DesignSystem.spacing16),
-                  ]
-                ],
-              ),
+            child: Column(
+              children: [
+                for (var i = 0; i < _referencedBooks.length; i++)
+                  BookListTile(book: _referencedBooks[i]),
+              ],
             ),
           ),
         ]
