@@ -586,3 +586,14 @@ class TestMMR:
         recs = trained_engine._get_diverse_recommendations(scores, top_n=top_n)
         assert len(recs) == len(trained_engine.engine.df)
 
+    def test_mmr_tie_scores(self, trained_engine):
+        """Test MMR behavior when all scores are equal (ties)."""
+        scores = np.ones(len(trained_engine.engine.df)) * 0.5
+        recs = trained_engine._get_diverse_recommendations(scores, top_n=5)
+        assert len(recs) == 5
+
+    def test_mmr_zero_scores(self, trained_engine):
+        """Test MMR behavior when all scores are zero."""
+        scores = np.zeros(len(trained_engine.engine.df))
+        recs = trained_engine._get_diverse_recommendations(scores, top_n=5)
+        assert len(recs) == 5
