@@ -94,3 +94,79 @@ def test_process_rag_query_embedding_failure():
     assert response["status"] == "embedding_failed"
     assert response["answer"] == "I'm having trouble understanding your query right now. Please try again later."
     assert len(response.get("referenced_books", [])) == 0
+
+
+@pytest.mark.unit
+def test_process_rag_query_json_parsing_success():
+    import json
+    mock_embedding = MagicMock(spec=EmbeddingPort)
+    mock_data_port = MagicMock(spec=BookDataPort)
+    mock_recommender = MagicMock(spec=RecommenderPort)
+    mock_enrichment = MagicMock(spec=EnrichmentPort)
+    mock_llm = MagicMock(spec=LlmPort)
+
+    mock_embedding.generate_embedding.return_value = [0.1]
+    mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
+    mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book"}]
+    mock_enrichment.enrich.side_effect = lambda books: books
+
+    mock_llm.generate_response.return_value = json.dumps({
+        "answer": "This is a great fantasy book.",
+        "explanations": {"123": "You will love this."}
+    })
+
+    use_case = ProcessRagQueryUseCase(mock_embedding, mock_data_port, None, mock_recommender, mock_enrichment, mock_llm)
+    response = use_case.execute("fantasy")
+
+    assert response["answer"] == "This is a great fantasy book."
+    assert response["referenced_books"][0]["explanation"] == "You will love this."
+
+
+@pytest.mark.unit
+def test_process_rag_query_json_markdown_parsing():
+    import json
+    mock_embedding = MagicMock(spec=EmbeddingPort)
+    mock_data_port = MagicMock(spec=BookDataPort)
+    mock_recommender = MagicMock(spec=RecommenderPort)
+    mock_enrichment = MagicMock(spec=EnrichmentPort)
+    mock_llm = MagicMock(spec=LlmPort)
+
+    mock_embedding.generate_embedding.return_value = [0.1]
+    mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
+    mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book"}]
+    mock_enrichment.enrich.side_effect = lambda books: books
+
+    # Model returned markdown code fence
+    mock_llm.generate_response.return_value = "```json\n" + json.dumps({
+        "answer": "Markdown answer.",
+        "explanations": {"123": "Because of magic."}
+    }) + "\n```"
+
+    use_case = ProcessRagQueryUseCase(mock_embedding, mock_data_port, None, mock_recommender, mock_enrichment, mock_llm)
+    response = use_case.execute("fantasy")
+
+    assert response["answer"] == "Markdown answer."
+    assert response["referenced_books"][0]["explanation"] == "Because of magic."
+
+
+@pytest.mark.unit
+def test_process_rag_query_legacy_fallback():
+    mock_embedding = MagicMock(spec=EmbeddingPort)
+    mock_data_port = MagicMock(spec=BookDataPort)
+    mock_recommender = MagicMock(spec=RecommenderPort)
+    mock_enrichment = MagicMock(spec=EnrichmentPort)
+    mock_llm = MagicMock(spec=LlmPort)
+
+    mock_embedding.generate_embedding.return_value = [0.1]
+    mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
+    mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book"}]
+    mock_enrichment.enrich.side_effect = lambda books: books
+
+    # Model returned raw string instead of JSON
+    mock_llm.generate_response.return_value = "I am a plain text response."
+
+    use_case = ProcessRagQueryUseCase(mock_embedding, mock_data_port, None, mock_recommender, mock_enrichment, mock_llm)
+    response = use_case.execute("fantasy")
+
+    assert response["answer"] == "I am a plain text response."
+    assert "explanation" not in response["referenced_books"][0]

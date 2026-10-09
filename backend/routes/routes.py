@@ -4,6 +4,8 @@ The BookService is instantiated once at module import time (singleton pattern).
 """
 
 import logging
+import threading
+import time
 from functools import wraps
 
 from flask import Blueprint, g, jsonify, request
@@ -310,8 +312,53 @@ def feedback():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+_ai_rate_limits = {}
+_ai_rate_lock = threading.Lock()
+
+
+def rate_limit_ai(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # Prevent memory leak by periodically cleaning up old records
+        now = time.time()
+        limit = 5
+        window = 60
+
+        # Use X-Forwarded-For if available to prevent proxy spoofing (simplistic approach for now)
+        client_ip = (
+            request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+        )
+        user_id = getattr(g, "user_id", client_ip)
+
+        with _ai_rate_lock:
+            # Simple cleanup
+            if len(_ai_rate_limits) > 1000:
+                for k in list(_ai_rate_limits.keys()):
+                    _ai_rate_limits[k] = [t for t in _ai_rate_limits[k] if now - t < window]
+                    if not _ai_rate_limits[k]:
+                        del _ai_rate_limits[k]
+
+            if user_id in _ai_rate_limits:
+                reqs = _ai_rate_limits[user_id]
+                reqs = [t for t in reqs if now - t < window]
+                if len(reqs) >= limit:
+                    retry_after = int(window - (now - reqs[0]))
+                    response = jsonify({"error": "Rate limit exceeded. Please try again later."})
+                    response.headers["Retry-After"] = str(retry_after)
+                    return response, 429
+                reqs.append(now)
+                _ai_rate_limits[user_id] = reqs
+            else:
+                _ai_rate_limits[user_id] = [now]
+
+        return f(*args, **kwargs)
+
+    return decorated
+
+
 @books_bp.route("/ai/chat", methods=["POST"])
 @optional_auth
+@rate_limit_ai
 def ai_chat():
     data = request.get_json(silent=True)
     if not data or "query" not in data:
