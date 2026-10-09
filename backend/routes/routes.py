@@ -14,7 +14,10 @@ from ..container import container
 
 logger = logging.getLogger(__name__)
 
-books_bp = Blueprint("books", __name__)
+catalog_bp = Blueprint("catalog", __name__)
+discovery_bp = Blueprint("discovery", __name__)
+activity_bp = Blueprint("activity", __name__)
+health_bp = Blueprint("health", __name__)
 
 # Re-exporting aliases for convenience and to avoid changing the rest of this file
 _book_data_port = container.book_data_port
@@ -78,12 +81,12 @@ def optional_auth(f):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@books_bp.route("/health", methods=["GET"])
+@health_bp.route("/health", methods=["GET"])
 def health_check():
     return jsonify({"status": "healthy", "service": "book-ai-api"}), 200
 
 
-@books_bp.route("/docs", methods=["GET"])
+@health_bp.route("/docs", methods=["GET"])
 def swagger_ui():
     import os
 
@@ -94,7 +97,7 @@ def swagger_ui():
     return send_from_directory(static_dir, "index.html")
 
 
-@books_bp.route("/docs/<path:filename>", methods=["GET"])
+@health_bp.route("/docs/<path:filename>", methods=["GET"])
 def swagger_ui_files(filename):
     import os
 
@@ -104,7 +107,7 @@ def swagger_ui_files(filename):
     return send_from_directory(static_dir, filename)
 
 
-@books_bp.route("/health/ready", methods=["GET"])
+@health_bp.route("/health/ready", methods=["GET"])
 def readiness_check():
     try:
         if _book_data_port and not _book_data_port.check_health():
@@ -119,7 +122,7 @@ def readiness_check():
         return jsonify({"status": "not_ready", "error": "Database unavailable"}), 503
 
 
-@books_bp.route("/categories", methods=["GET"])
+@catalog_bp.route("/categories", methods=["GET"])
 def get_categories():
     try:
         return jsonify({"categories": _svc.get_categories()}), 200
@@ -132,7 +135,7 @@ def get_categories():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@books_bp.route("/books", methods=["GET"])
+@catalog_bp.route("/books", methods=["GET"])
 def get_books():
     try:
         page = max(1, int(request.args.get("page", 1)))
@@ -171,7 +174,7 @@ def get_books():
         raise exc
 
 
-@books_bp.route("/books/popular", methods=["GET"])
+@catalog_bp.route("/books/popular", methods=["GET"])
 def get_popular_books():
     try:
         # Senior Update: Increased limit for "All Books" section
@@ -182,7 +185,7 @@ def get_popular_books():
         raise exc
 
 
-@books_bp.route("/books/<isbn>", methods=["GET"])
+@catalog_bp.route("/books/<isbn>", methods=["GET"])
 def get_book_by_isbn(isbn: str):
     try:
         book = _get_book_details_uc.execute(isbn)
@@ -198,7 +201,7 @@ def get_book_by_isbn(isbn: str):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@books_bp.route("/search", methods=["GET"])
+@catalog_bp.route("/search", methods=["GET"])
 def search_books():
     query = request.args.get("q", "").strip()
     if not query:
@@ -218,7 +221,7 @@ def search_books():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@books_bp.route("/recommend", methods=["GET"])
+@discovery_bp.route("/recommend", methods=["GET"])
 def get_recommendations():
     book_title = request.args.get("book", "").strip()
     if not book_title:
@@ -249,7 +252,7 @@ def get_recommendations():
         raise exc
 
 
-@books_bp.route("/recommend/personalized", methods=["GET"])
+@discovery_bp.route("/recommend/personalized", methods=["GET"])
 @require_auth
 def get_personalized():
     user_id = g.user_id
@@ -265,7 +268,7 @@ def get_personalized():
         raise exc
 
 
-@books_bp.route("/onboarding", methods=["POST"])
+@activity_bp.route("/onboarding", methods=["POST"])
 @require_auth
 def onboarding():
     data = request.get_json(silent=True)
@@ -286,7 +289,7 @@ def onboarding():
         raise exc
 
 
-@books_bp.route("/feedback", methods=["POST"])
+@activity_bp.route("/feedback", methods=["POST"])
 @require_auth
 def feedback():
     data = request.get_json(silent=True)
@@ -356,7 +359,7 @@ def rate_limit_ai(f):
     return decorated
 
 
-@books_bp.route("/ai/chat", methods=["POST"])
+@discovery_bp.route("/ai/chat", methods=["POST"])
 @optional_auth
 @rate_limit_ai
 def ai_chat():
@@ -382,7 +385,7 @@ def ai_chat():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@books_bp.route("/track", methods=["POST"])
+@activity_bp.route("/track", methods=["POST"])
 @require_auth
 def track_activity():
     data = request.get_json(silent=True)

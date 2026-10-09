@@ -12,7 +12,7 @@ from flask_cors import CORS
 
 from .config import Config
 from .infrastructure.logging.structured_logger import log_event, setup_logger
-from .routes.routes import books_bp
+from .routes.routes import activity_bp, catalog_bp, discovery_bp, health_bp
 
 setup_logger()
 logger = logging.getLogger(__name__)
@@ -33,7 +33,10 @@ def create_app(config_class=Config) -> Flask:
     )
 
     # ── Blueprints ────────────────────────────────────────────────────────────
-    app.register_blueprint(books_bp, url_prefix="/api")
+    app.register_blueprint(catalog_bp, url_prefix="/api")
+    app.register_blueprint(discovery_bp, url_prefix="/api")
+    app.register_blueprint(activity_bp, url_prefix="/api")
+    app.register_blueprint(health_bp, url_prefix="/api")
 
     # ── Security Middleware ──────────────────────────────────────────────────
     @app.before_request
