@@ -189,7 +189,7 @@ class _ScaffoldWithNav extends StatelessWidget {
           NavigationDestination(
             icon: const Icon(Icons.bookmark_outline),
             selectedIcon: const Icon(Icons.bookmark),
-            label: context.tr('saved'),
+            label: context.tr('library'),
           ),
         ],
       ),

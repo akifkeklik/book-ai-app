@@ -37,12 +37,12 @@ class FavoritesProvider extends ChangeNotifier {
         _isLoading = false;
         notifyListeners();
       }, onError: (e) {
-        _error = 'Favoriler gerçek zamanlı güncellenemedi: $e';
+        _error = 'error_loading_books';
         _isLoading = false;
         notifyListeners();
       });
     } catch (e) {
-      _error = 'Failed to load favorites: $e';
+      _error = 'error_loading_books';
       _isLoading = false;
       notifyListeners();
     }
@@ -105,7 +105,7 @@ class FavoritesProvider extends ChangeNotifier {
     } catch (e) {
       // Rollback
       _favorites.removeWhere((f) => f.isbn13 == book.isbn13 && f.id.isEmpty);
-      _error = 'Failed to add favorite.';
+      _error = 'error';
       notifyListeners();
     }
   }
@@ -135,7 +135,7 @@ class FavoritesProvider extends ChangeNotifier {
     } catch (e) {
       // Rollback
       _favorites.insert(0, removed);
-      _error = 'Failed to remove favorite.';
+      _error = 'error';
       notifyListeners();
     }
   }

@@ -7,7 +7,7 @@ Responsibilities:
 """
 import logging
 from functools import lru_cache
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..config import Config
 from ..domain.ports import BookDataPort, UserInteractionRepository
@@ -64,8 +64,8 @@ class BookService:
         self.recommender.fit(save_path=Config.MODEL_PATH)
         logger.info("Training complete. Model saved to %s", Config.MODEL_PATH)
     @lru_cache(maxsize=1)
-    def get_categories(self) -> List[str]:
-        """Return all unique categories found in the dataset."""
+    def get_categories(self) -> List[Dict[str, Any]]:
+        """Return all unique categories found in the dataset with counts."""
         if not self.recommender.is_fitted:
             return []
         return self.recommender.get_unique_categories()

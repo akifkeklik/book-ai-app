@@ -3,16 +3,15 @@ import 'package:dio/dio.dart';
 import '../config.dart';
 import '../domain/entities/book.dart';
 import '../data/models/book_dto.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiService {
-  Future<List<String>> getCategories() async {
+  Future<List<Map<String, dynamic>>> getCategories() async {
     final resp = await _dio.get(AppConfig.apiCategories);
     final List<dynamic> list =
         resp.data['categories'] as List<dynamic>? ?? const [];
-    return list
-        .map((item) => item.toString().trim())
-        .where((item) => item.isNotEmpty)
-        .toList();
+    return list.map((item) => item as Map<String, dynamic>).toList();
   }
 
   Future<Map<String, dynamic>> chatWithAI(String query) async {
@@ -23,14 +22,33 @@ class ApiService {
     return resp.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> getBooksByCategory(
-      {required String category, int page = 1, int perPage = 40}) async {
+  Future<Map<String, dynamic>> getBooksByCategory({
+    required String category,
+    int page = 1,
+    int perPage = 40,
+    String? sort,
+    String? author,
+    String? publisher,
+    int? minPages,
+    int? maxPages,
+    double? minRating,
+    int? publishedFrom,
+    int? publishedTo,
+  }) async {
     final resp = await _dio.get(
       AppConfig.apiBooks,
       queryParameters: {
         'category': category,
         'page': page,
-        'per_page': perPage
+        'per_page': perPage,
+        if (sort != null) 'sort': sort,
+        if (author != null) 'author': author,
+        if (publisher != null) 'publisher': publisher,
+        if (minPages != null) 'min_pages': minPages,
+        if (maxPages != null) 'max_pages': maxPages,
+        if (minRating != null) 'min_rating': minRating,
+        if (publishedFrom != null) 'published_from': publishedFrom,
+        if (publishedTo != null) 'published_to': publishedTo,
       },
     );
     final List<dynamic> list = resp.data['books'] as List;
@@ -47,7 +65,10 @@ class ApiService {
 
   late final Dio _dio;
 
-  void init() {
+  @visibleForTesting
+  Dio get testDio => _dio;
+
+  void init({Session? Function()? sessionProvider}) {
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.backendUrl,
@@ -60,6 +81,20 @@ class ApiService {
         // Accept all HTTP statuses so we can handle errors cleanly ourselves
         // (prevents Dio from throwing before we can inspect the response)
         validateStatus: (status) => status != null && status < 600,
+      ),
+    );
+
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          final session = sessionProvider != null
+              ? sessionProvider()
+              : Supabase.instance.client.auth.currentSession;
+          if (session != null) {
+            options.headers['Authorization'] = 'Bearer ${session.accessToken}';
+          }
+          handler.next(options);
+        },
       ),
     );
 

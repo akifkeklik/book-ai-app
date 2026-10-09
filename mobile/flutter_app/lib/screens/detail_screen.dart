@@ -286,12 +286,16 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _buildStats(BuildContext context, Book book) {
-    return Row(
+    return Wrap(
+      spacing: 16,
+      runSpacing: 16,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 RatingBarIndicator(
                   rating: book.averageRating.clamp(0.0, 5.0),
@@ -314,15 +318,10 @@ class _DetailScreenState extends State<DetailScreen> {
             ),
           ],
         ),
-        const Spacer(),
-        if (book.pageCount > 0) ...[
-          _StatDivider(),
+        if (book.pageCount > 0)
           _StatItem(label: context.tr('page_count'), value: book.pageCount.toString()),
-        ],
-        if (book.publishedDate.isNotEmpty) ...[
-          _StatDivider(),
+        if (book.publishedDate.isNotEmpty)
           _StatItem(label: context.tr('year'), value: book.publishedDate.split('-').first),
-        ],
       ],
     );
   }
@@ -348,8 +347,10 @@ class _DetailScreenState extends State<DetailScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        Wrap(
+          spacing: 8,
+          runSpacing: 12,
+          alignment: WrapAlignment.spaceEvenly,
           children: [
             _InteractionButton(book: book, interaction: 'like', icon: Icons.thumb_up_outlined, label: context.tr('like')),
             _InteractionButton(book: book, interaction: 'want_to_read', icon: Icons.bookmark_add_outlined, label: context.tr('want_to_read')),
@@ -431,19 +432,26 @@ class _DetailScreenState extends State<DetailScreen> {
 
   Widget _buildSimilarList() {
     if (_loadingSimilar) {
-      return const SizedBox(
-        height: 280,
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    return SizedBox(
-      height: 330,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: _similar.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 16),
-        itemBuilder: (_, i) => BookCard(book: _similar[i]),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      clipBehavior: Clip.none,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < _similar.length; i++) ...[
+              BookCard(book: _similar[i]),
+              if (i < _similar.length - 1)
+                const SizedBox(width: 16),
+            ]
+          ],
+        ),
       ),
     );
   }
@@ -471,17 +479,7 @@ class _StatItem extends StatelessWidget {
   }
 }
 
-class _StatDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 30,
-      width: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      color: Theme.of(context).dividerColor.withOpacity(0.2),
-    );
-  }
-}
+
 
 class _LoadingScaffold extends StatelessWidget {
   const _LoadingScaffold();

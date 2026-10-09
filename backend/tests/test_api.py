@@ -115,6 +115,7 @@ class TestRootAndHealth:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.integration
 class TestBooksList:
     def test_get_books_default(self, client):
         resp = client.get("/api/books")
@@ -157,6 +158,7 @@ class TestBooksList:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.integration
 class TestPopularBooks:
     def test_get_popular(self, client):
         resp = client.get("/api/books/popular")
@@ -187,6 +189,7 @@ class TestPopularBooks:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.integration
 class TestISBNLookup:
     def test_get_book_by_isbn(self, client):
         # Use a known ISBN from our dataset
@@ -208,6 +211,7 @@ class TestISBNLookup:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.integration
 class TestSearch:
     def test_search_by_title(self, client):
         resp = client.get("/api/search?q=Dune")
@@ -246,6 +250,7 @@ class TestSearch:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.integration
 class TestRecommendations:
     def test_recommend(self, client):
         resp = client.get("/api/recommend?book=Dune")
@@ -289,6 +294,7 @@ class TestRecommendations:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.integration
 class TestActivityTracking:
     def test_track_activity(self, client, auth_headers, fake_interaction_repo):
         resp = client.post(
@@ -399,6 +405,7 @@ class TestErrorHandling:
 # ═════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.integration
 class TestMutationEndpoints:
     def test_onboarding_success(self, client, auth_headers, fake_interaction_repo):
         resp = client.post(

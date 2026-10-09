@@ -16,7 +16,7 @@ class ManageCatalogUseCase {
     return _repository.getMorePopularBooks(offset: offset, limit: limit);
   }
 
-  Future<List<String>> getCategories() {
+  Future<List<Map<String, dynamic>>> getCategories() {
     return _repository.getCategories();
   }
 
@@ -24,8 +24,32 @@ class ManageCatalogUseCase {
     return _repository.getTotalBookCount();
   }
 
-  Future<Map<String, dynamic>> getBooksByCategory({required String category, int page = 1, int perPage = 40}) {
-    return _repository.getBooksByCategory(category: category, page: page, perPage: perPage);
+  Future<Map<String, dynamic>> getBooksByCategory({
+    required String category,
+    int page = 1,
+    int perPage = 40,
+    String? sort,
+    String? author,
+    String? publisher,
+    int? minPages,
+    int? maxPages,
+    double? minRating,
+    int? publishedFrom,
+    int? publishedTo,
+  }) {
+    return _repository.getBooksByCategory(
+      category: category,
+      page: page,
+      perPage: perPage,
+      sort: sort,
+      author: author,
+      publisher: publisher,
+      minPages: minPages,
+      maxPages: maxPages,
+      minRating: minRating,
+      publishedFrom: publishedFrom,
+      publishedTo: publishedTo,
+    );
   }
 
   List<Book> getCachedPopularBooks() {

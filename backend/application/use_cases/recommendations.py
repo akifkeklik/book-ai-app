@@ -82,6 +82,8 @@ class GetPersonalizedRecommendationsUseCase:
                 genre_recs = []
                 for g in genres[:3]:
                     res = self._recommender.get_all_books(page=1, per_page=10, category=g)
+                    for book in res.get("books", []):
+                        book["recommendation_reason"] = f"Because you like {g}"
                     genre_recs.extend(res.get("books", []))
 
                 if genre_recs:
@@ -115,6 +117,12 @@ class GetPersonalizedRecommendationsUseCase:
             )
 
             final_recs = [r for r in recs if r.get("isbn13") not in dislikes]
+
+            # Attach a reason to the final recommendations
+            for r in final_recs:
+                if "recommendation_reason" not in r:
+                    r["recommendation_reason"] = "Based on your recent reading history"
+
             latency = round((time.time() - t0) * 1000, 2)
             logger.info("Personalized recommendation generated", extra={"extra_data": {
                 "personalized_latency_ms": latency,
@@ -129,4 +137,6 @@ class GetPersonalizedRecommendationsUseCase:
 
     def _fallback_popular(self, limit: int) -> List[Dict[str, Any]]:
         books = self._recommender.get_popular_books(limit=limit)
+        for b in books:
+            b["recommendation_reason"] = "Trending on Libris right now"
         return self._enrichment_service.enrich(books)

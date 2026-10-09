@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ThemeProvider extends ChangeNotifier {
   static const String _themeKey = 'preferred_theme_color';
   static const String _modeKey = 'preferred_theme_mode';
-  
+
   // ── Requested Accent Colors (Premium Shades) ──────────────────────────────
   static const Color red = Color(0xFFE57373);     // Soft Ruby
   static const Color blue = Color(0xFF64B5F6);    // Sky Azure
@@ -12,12 +12,16 @@ class ThemeProvider extends ChangeNotifier {
   static const Color yellow = Color(0xFFFFF176);  // Lemon Chiffon
   static const Color purple = Color(0xFFBA68C8);  // Lavender Mist
 
+  static const String _textScaleKey = 'preferred_text_scale';
+
   Color _seedColor = blue; // Default to Blue
   ThemeMode _themeMode = ThemeMode.dark; // Default to Dark
+  double _textScaleFactor = 1.0; // Default to 100%
 
   Color get seedColor => _seedColor;
   ThemeMode get themeMode => _themeMode;
   bool get isDarkMode => _themeMode == ThemeMode.dark;
+  double get textScaleFactor => _textScaleFactor;
 
   ThemeProvider() {
     _loadTheme();
@@ -26,7 +30,7 @@ class ThemeProvider extends ChangeNotifier {
   Future<void> _loadTheme() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       // Load Seed Color
       final savedColor = prefs.getInt(_themeKey);
       if (savedColor != null) {
@@ -37,6 +41,12 @@ class ThemeProvider extends ChangeNotifier {
       final savedMode = prefs.getString(_modeKey);
       if (savedMode != null) {
         _themeMode = savedMode == 'dark' ? ThemeMode.dark : ThemeMode.light;
+      }
+
+      // Load Text Scale Factor
+      final savedScale = prefs.getDouble(_textScaleKey);
+      if (savedScale != null) {
+        _textScaleFactor = savedScale;
       }
     } catch (_) {
       // Ignore errors for SharedPreferences
@@ -69,5 +79,16 @@ class ThemeProvider extends ChangeNotifier {
 
   void toggleTheme() {
     setThemeMode(_themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
+  }
+
+  Future<void> setTextScaleFactor(double scale) async {
+    if (_textScaleFactor == scale) return;
+    _textScaleFactor = scale;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_textScaleKey, scale);
+    } catch (_) { /* ignore */ }
   }
 }

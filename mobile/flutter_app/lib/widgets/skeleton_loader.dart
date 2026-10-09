@@ -19,11 +19,13 @@ class BookCardSkeleton extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 195,
-              decoration: const BoxDecoration(
-                color: Colors.white10,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            const AspectRatio(
+              aspectRatio: 2 / 3,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
               ),
             ),
             Padding(
@@ -52,13 +54,20 @@ class SkeletonList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: 5,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemBuilder: (_, __) => const BookCardSkeleton(),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      clipBehavior: Clip.none,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < 5; i++) ...[
+              const BookCardSkeleton(),
+              if (i < 4) const SizedBox(width: 12),
+            ]
+          ],
+        ),
       ),
     );
   }

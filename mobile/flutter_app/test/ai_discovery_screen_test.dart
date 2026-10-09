@@ -78,7 +78,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('error_loading_books'), findsOneWidget);
+      expect(find.textContaining('ai_discovery_error'), findsOneWidget);
     });
 
     testWidgets('duplicate submit prevented while loading', (tester) async {

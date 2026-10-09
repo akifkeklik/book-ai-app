@@ -78,7 +78,7 @@ void main() {
 
       expect(ok, false);
       expect(auth.isLoggedIn, false);
-      expect(auth.error, contains('E-posta veya şifre hatalı'));
+      expect(auth.error, contains('auth_error_invalid_credentials'));
       auth.dispose();
     });
   });

@@ -9,25 +9,26 @@ try:
 except ImportError:
     from domain.ports import BookDataPort
 
-import openai
-from openai import OpenAI
+import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
 class EmbeddingService:
     def __init__(self, book_data_port: Optional[BookDataPort] = None):
         self._book_data_port = book_data_port
-        self._model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
-        self._dimension = int(os.getenv("EMBEDDING_DIMENSION", "1536"))
-        self._client = None
+        self._model = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-2")
+        self._dimension = int(os.getenv("EMBEDDING_DIMENSION", "3072"))
 
-        # Sadece OPENAI_API_KEY varsa client'ı başlat.
-        api_key = os.getenv("OPENAI_API_KEY")
-        if api_key:
-            self._client = OpenAI(api_key=api_key)
+        # Sadece LLM_API_KEY varsa client'ı başlat.
+        self._api_key = os.getenv("LLM_API_KEY")
+        if self._api_key:
+            genai.configure(api_key=self._api_key)
+            self._is_configured = True
+        else:
+            self._is_configured = False
 
     def is_configured(self) -> bool:
-        return self._client is not None
+        return self._is_configured
 
     def generate_canonical_text(self, book: dict) -> str:
         """
@@ -64,23 +65,23 @@ class EmbeddingService:
 
     def generate_embedding(self, text: str, max_retries: int = 3) -> Optional[List[float]]:
         """
-        OpenAI API'sini çağırarak metnin embedding'ini oluşturur.
+        Gemini API'sini çağırarak metnin embedding'ini oluşturur.
         Sabit (bounded) retry mekanizması içerir.
         """
         if not self.is_configured():
-            logger.warning("OpenAI API key not configured. Cannot generate embedding.")
+            logger.warning("LLM_API_KEY not configured. Cannot generate embedding.")
             return None
 
         attempt = 0
         while attempt < max_retries:
             try:
-                response = self._client.embeddings.create(
-                    input=[text],
+                response = genai.embed_content(
                     model=self._model,
-                    dimensions=self._dimension
+                    content=text,
+                    task_type="retrieval_document"
                 )
 
-                embedding = response.data[0].embedding
+                embedding = response['embedding']
 
                 # Boyut (dimension) doğrulaması
                 if len(embedding) != self._dimension:
@@ -89,24 +90,33 @@ class EmbeddingService:
 
                 return embedding
 
-            except (openai.APIConnectionError, openai.RateLimitError, openai.InternalServerError) as e:
-                attempt += 1
-                if attempt == max_retries:
-                    logger.error(f"OpenAI API failed after {max_retries} attempts. Last error: {e}")
-                    return None
-
-                # Basit exponential backoff: 2, 4, 8 saniye...
-                sleep_time = 2 ** attempt
-                logger.warning(f"Transient error: {e}. Retrying in {sleep_time}s (Attempt {attempt}/{max_retries})")
-                time.sleep(sleep_time)
-
-            except openai.APIError as e:
-                # Permanent API error (örn. AuthenticationError, BadRequestError) - retry yapma
-                logger.error(f"Permanent OpenAI API Error: {e}")
-                return None
             except Exception as e:
-                logger.error(f"Unexpected error during embedding generation: {e}")
-                return None
+                attempt += 1
+                error_str = str(e)
+                sleep_time = 2 ** attempt
+
+                if "429" in error_str or "Quota exceeded" in error_str or "ResourceExhausted" in error_str:
+                    import re
+                    match = re.search(r'retry in ([\d\.]+)s', error_str, re.IGNORECASE)
+                    if match:
+                        sleep_time = float(match.group(1)) + 1.0
+                    else:
+                        match2 = re.search(r'seconds:\s*(\d+)', error_str, re.IGNORECASE)
+                        if match2:
+                            sleep_time = float(match2.group(1)) + 1.0
+                        else:
+                            sleep_time = 61.0
+
+                    # We give the quota errors more attempts since it's just a time limit
+                    max_retries = max(max_retries, attempt + 2)
+                    logger.warning(f"Quota exceeded. Waiting {sleep_time}s before retry (Attempt {attempt}/{max_retries})")
+                else:
+                    if attempt == max_retries:
+                        logger.error(f"Gemini API failed after {max_retries} attempts. Last error: {e}")
+                        return None
+                    logger.warning(f"Transient error: {e}. Retrying in {sleep_time}s (Attempt {attempt}/{max_retries})")
+
+                time.sleep(sleep_time)
 
     def get_existing_metadata(self, book_id: str) -> Optional[dict]:
         """

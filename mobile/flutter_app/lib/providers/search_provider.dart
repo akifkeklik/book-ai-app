@@ -56,7 +56,7 @@ class SearchProvider extends ChangeNotifier {
       _status = results.isEmpty ? SearchStatus.initial : SearchStatus.loaded;
     } catch (e) {
       _status = SearchStatus.error;
-      _error = e.toString();
+      _error = 'search_failed';
     }
     notifyListeners();
   }

@@ -11,7 +11,7 @@ import '../providers/recommendation_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../application/use_cases/manage_user_profile_use_case.dart';
 import '../widgets/book_card.dart';
-import '../widgets/empty_state.dart';
+
 import '../widgets/skeleton_loader.dart';
 import '../providers/language_provider.dart';
 import '../theme/design_system.dart';
@@ -34,10 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 400) {
-      context.read<CatalogProvider>().fetchMorePopular();
-    }
+    // Disabled infinite scroll for Dashboard structure
   }
 
   @override
@@ -91,24 +88,30 @@ class _HomeScreenState extends State<HomeScreen> {
                     floating: true,
                     snap: true,
                     toolbarHeight: 70,
-                    title: Row(
+                    title: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [theme.colorScheme.primary, DesignSystem.primaryDark],
-                            ),
-                            borderRadius: DesignSystem.borderRadiusSmall,
-                          ),
-                          child: const Icon(Icons.auto_stories, color: Colors.white, size: 24),
+                        Consumer<AuthProvider>(
+                          builder: (context, auth, _) {
+                            final email = auth.currentUser?.email;
+                            final name = email != null ? email.split('@').first : '';
+                            final displayName = name.isNotEmpty ? '${name[0].toUpperCase()}${name.substring(1)}' : '';
+                            return Text(
+                              displayName.isNotEmpty ? 'Hello, $displayName' : context.tr('app_name'),
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? Colors.white70 : DesignSystem.textLightSecondary,
+                                letterSpacing: -0.5,
+                              ),
+                            );
+                          },
                         ),
-                        const SizedBox(width: DesignSystem.spacing12),
                         Text(
-                          'Libris',
-                          style: theme.textTheme.headlineLarge?.copyWith(
+                          context.tr('explore'),
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            fontFamily: 'Outfit',
                             fontWeight: FontWeight.w900,
-                            letterSpacing: -1.5,
+                            letterSpacing: -1.0,
                             color: isDark ? Colors.white : DesignSystem.textLightPrimary,
                           ),
                         ),
@@ -117,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     actions: [
                       _GlassIconButton(
                         icon: Icons.search,
+                        tooltip: context.tr('search'),
                         onPressed: () {
                           HapticFeedback.lightImpact();
                           context.go('/search');
@@ -125,6 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: DesignSystem.spacing8),
                       _GlassIconButton(
                         icon: Icons.settings_outlined,
+                        tooltip: context.tr('settings'),
                         onPressed: () {
                           HapticFeedback.lightImpact();
                           context.push('/settings');
@@ -222,121 +227,85 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (!auth.isLoggedIn) return const SizedBox.shrink();
 
                         if (favProv.favorites.isEmpty && !favProv.isLoading) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing16),
-                            child: _Section(
-                              title: context.tr('recommended_for_you'),
-                              child: Container(
-                                padding: const EdgeInsets.all(DesignSystem.spacing24),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primary.withOpacity(0.05),
-                                  borderRadius: DesignSystem.borderRadiusLarge,
-                                  border: Border.all(color: theme.colorScheme.primary.withOpacity(0.1)),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Icon(Icons.favorite_rounded,
-                                        color: theme.colorScheme.primary.withOpacity(0.5), size: 48),
-                                    const SizedBox(height: DesignSystem.spacing16),
-                                    Text(
-                                      context.tr('recommended_empty_title'),
-                                      textAlign: TextAlign.center,
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        color: theme.colorScheme.primary,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: DesignSystem.spacing8),
-                                    Text(
-                                      context.tr('recommended_empty_subtitle'),
-                                      textAlign: TextAlign.center,
-                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                        color: isDark ? Colors.white70 : DesignSystem.textLightSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
+                          return const SizedBox.shrink(); // Don't show empty state here, just hide personalized section
+                        }
+
+                        if (recommendations.status == RecommendationStatus.loading) {
+                           return Padding(
+                             padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing16, vertical: DesignSystem.spacing8),
+                             child: _Section(
+                               title: context.tr('recommended_for_you'),
+                               child: const SkeletonList(height: 280),
+                             ),
+                           );
+                        }
+
+                        if (recommendations.personalizedRecs.isEmpty) {
+                           return const SizedBox.shrink(); // Hidden if no real personalized data
                         }
 
                         return Padding(
                           padding: const EdgeInsets.only(left: DesignSystem.spacing16, right: DesignSystem.spacing16, top: DesignSystem.spacing8),
                           child: _Section(
                             title: context.tr('recommended_for_you'),
-                            child: recommendations.status == RecommendationStatus.loading
-                                ? const SkeletonList(height: 280)
-                                : _HorizontalRecs(books: recommendations.personalizedRecs),
+                            child: _HorizontalRecs(books: recommendations.personalizedRecs),
                           ),
                         );
                       },
                     ),
                   ),
 
+
+
+                  // ── Trending / Popular (Horizontal) ─────────────────────────
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing16),
+                      padding: const EdgeInsets.only(left: DesignSystem.spacing16, right: DesignSystem.spacing16, top: DesignSystem.spacing8),
                       child: _Section(
                         title: context.tr('popular_books'),
-                        child: catalog.status == CatalogStatus.loading && catalog.popularBooks.isEmpty
+                        child: catalog.status == CatalogStatus.loading
                             ? const SkeletonList(height: 280)
-                            : _HorizontalRecs(books: catalog.popularBooks),
+                            : (catalog.status == CatalogStatus.error && catalog.popularBooks.isEmpty)
+                                ? Center(
+                                    child: TextButton(
+                                      onPressed: () => catalog.fetchPopular(force: true),
+                                      child: Text(context.tr('retry')),
+                                    ),
+                                  )
+                                : _HorizontalRecs(books: catalog.popularBooks.take(15).toList()),
                       ),
                     ),
                   ),
 
-                  // ── All Books Grid (Infinite Scroll) ──────────────────────────
-                  if (catalog.status == CatalogStatus.error && catalog.popularBooks.isEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
-                            const SizedBox(height: 16),
-                            Text(context.tr('error_loading_books')),
-                            TextButton(
-                              onPressed: () => catalog.fetchPopular(force: true),
-                              child: Text(context.tr('retry')),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else if (catalog.popularBooks.isEmpty && catalog.status != CatalogStatus.loading)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 80),
-                        child: LibrisEmptyState(
-                          icon: Icons.auto_stories_outlined,
-                          title: context.tr('no_books_found'),
-                          message: context.tr('no_books_message'),
-                        ),
-                      ),
-                    )
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            return BookListTile(book: catalog.popularBooks[index]);
-                          },
-                          childCount: catalog.popularBooks.length,
-                        ),
-                      ),
-                    ),
-
-                  // ── Loading More Indicator ────────────────────────────────────
+                  // ── Categories Discovery ──────────────────────────────────────
                   SliverToBoxAdapter(
-                    child: catalog.isLoadingMore
-                        ? const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24),
-                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                          )
-                        : const SizedBox(height: 80),
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: DesignSystem.spacing16, right: DesignSystem.spacing16, top: DesignSystem.spacing8),
+                      child: _Section(
+                        title: context.tr('categories'),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          clipBehavior: Clip.none,
+                          child: Row(
+                            children: [
+                              for (var i = 0; i < (catalog.defaultGenres.length < 8 ? catalog.defaultGenres.length : 8); i++) ...[
+                                _CategoryChip(
+                                  category: catalog.defaultGenres[i],
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    context.push('/category/${Uri.encodeComponent(catalog.defaultGenres[i])}');
+                                  },
+                                ),
+                                if (i < 7) const SizedBox(width: DesignSystem.spacing8),
+                              ]
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
+
+                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
                 ],
               );
             },
@@ -350,8 +319,9 @@ class _HomeScreenState extends State<HomeScreen> {
 class _GlassIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPressed;
+  final String? tooltip;
 
-  const _GlassIconButton({required this.icon, required this.onPressed});
+  const _GlassIconButton({required this.icon, required this.onPressed, this.tooltip});
 
   @override
   Widget build(BuildContext context) {
@@ -367,6 +337,7 @@ class _GlassIconButton extends StatelessWidget {
             shape: const CircleBorder(),
             child: IconButton(
               icon: Icon(icon, color: isDark ? Colors.white : DesignSystem.textLightPrimary),
+              tooltip: tooltip,
               onPressed: onPressed,
             ),
           ),
@@ -414,6 +385,32 @@ class _Section extends StatelessWidget {
   }
 }
 
+class _CategoryChip extends StatelessWidget {
+  final String category;
+  final VoidCallback onTap;
+
+  const _CategoryChip({required this.category, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ActionChip(
+      label: Text(
+        context.trGenre(category),
+        style: TextStyle(
+          color: theme.colorScheme.onSurface,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      onPressed: onTap,
+      backgroundColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
+      padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing12, vertical: DesignSystem.spacing8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+    );
+  }
+}
+
 class _HorizontalRecs extends StatelessWidget {
   const _HorizontalRecs({required this.books});
   final List<Book> books;
@@ -421,14 +418,21 @@ class _HorizontalRecs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (books.isEmpty) return const SizedBox.shrink();
-    return SizedBox(
-      height: 310, // Adjusted for new design system book card
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: books.length,
-        clipBehavior: Clip.none,
-        separatorBuilder: (_, __) => const SizedBox(width: DesignSystem.spacing16),
-        itemBuilder: (_, index) => BookCard(book: books[index]),
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      clipBehavior: Clip.none,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < books.length; i++) ...[
+              BookCard(book: books[i]),
+              if (i < books.length - 1)
+                const SizedBox(width: DesignSystem.spacing16),
+            ]
+          ],
+        ),
       ),
     );
   }

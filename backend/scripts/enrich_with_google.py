@@ -16,8 +16,7 @@ Usage:
     python scripts/enrich_with_google.py --overwrite            # overwrite existing data
 
 Requirements:
-    - GOOGLE_BOOKS_API_KEY in `.env` (project root) or in your environment
-    - OR pass as: python scripts/enrich_with_google.py --api-key AIzaSy...
+    - GOOGLE_BOOKS_API_KEY in backend/.env (env var, never CLI)
 """
 
 import argparse
@@ -325,7 +324,6 @@ Examples:
   python scripts/enrich_with_google.py --dry-run              # preview only
   python scripts/enrich_with_google.py --limit 50             # first 50 books
   python scripts/enrich_with_google.py --overwrite            # refresh all metadata
-  python scripts/enrich_with_google.py --api-key AIzaSy...    # pass key directly
         """,
     )
 
@@ -337,7 +335,12 @@ Examples:
     parser.add_argument(
         "--api-key",
         default="",
-        help="Google Books API key (overrides .env)",
+        dest="api_key",
+        # DEPRECATED: Passing secrets via CLI arguments exposes them in the
+        # process list (ps aux, /proc/<pid>/cmdline) and shell history.
+        # Set GOOGLE_BOOKS_API_KEY in backend/.env instead.
+        # This argument triggers a hard error if a non-empty value is supplied.
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--limit",
@@ -359,16 +362,23 @@ Examples:
     args = parser.parse_args()
 
     # ── Resolve API key ───────────────────────────────────────────────────────
-    api_key = args.api_key or Config.GOOGLE_BOOKS_API_KEY
+    if args.api_key:
+        logger.error(
+            f"{_RED}SECURITY: --api-key is deprecated and rejected.{_RESET}\n"
+            "  Passing secrets via CLI arguments exposes them in the process\n"
+            "  list (ps aux) and shell history.\n"
+            "  Set GOOGLE_BOOKS_API_KEY in backend/.env instead."
+        )
+        return 1
+
+    api_key = Config.GOOGLE_BOOKS_API_KEY
 
     if not api_key and not args.dry_run:
         logger.error(
             f"{_RED}No Google Books API key found!{_RESET}\n\n"
-            f"  Option 1: Add to .env (project root):\n"
-            f"    GOOGLE_BOOKS_API_KEY=AIzaSy...\n\n"
-            f"  Option 2: Pass directly:\n"
-            f"    python scripts/enrich_with_google.py --api-key AIzaSy...\n\n"
-            f"  Option 3: Preview without key:\n"
+            f"  Add to backend/.env:\n"
+            f"    GOOGLE_BOOKS_API_KEY=<your-key>\n\n"
+            f"  Or preview without key:\n"
             f"    python scripts/enrich_with_google.py --dry-run\n\n"
             f"  Get a key: https://console.cloud.google.com\n"
             f"  Guide: docs/google_api_setup.md"

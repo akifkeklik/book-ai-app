@@ -8,8 +8,28 @@ class GetBooksUseCase:
         self._recommender = recommender
         self._enrichment_service = enrichment_service
 
-    def execute(self, page: int = 1, per_page: int = 20, category: Optional[str] = None) -> Dict[str, Any]:
-        result = self._recommender.get_all_books(page=page, per_page=per_page, category=category)
+    def execute(
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        category: Optional[str] = None,
+        author: Optional[str] = None,
+        publisher: Optional[str] = None,
+        min_pages: Optional[int] = None,
+        max_pages: Optional[int] = None,
+        min_rating: Optional[float] = None,
+        published_from: Optional[int] = None,
+        published_to: Optional[int] = None,
+        sort: Optional[str] = None,
+        order: Optional[str] = "asc",
+    ) -> Dict[str, Any]:
+        result = self._recommender.get_all_books(
+            page=page, per_page=per_page, category=category,
+            author=author, publisher=publisher, min_pages=min_pages,
+            max_pages=max_pages, min_rating=min_rating,
+            published_from=published_from, published_to=published_to,
+            sort=sort, order=order
+        )
         result["books"] = self._enrichment_service.enrich(result["books"])
         return result
 

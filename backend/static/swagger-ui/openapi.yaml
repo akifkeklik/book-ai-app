@@ -1,0 +1,368 @@
+openapi: 3.0.3
+info:
+  title: Book AI Recommendation API
+  description: API for book recommendations, RAG chat, and user interactions.
+  version: 1.0.0
+servers:
+  - url: /api
+    description: Base API Path
+  - url: /
+    description: Root Path
+tags:
+  - name: Health
+  - name: Books
+  - name: Recommendations
+  - name: User
+  - name: AI
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: Global API Key required for protected endpoints.
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token required for user-specific endpoints.
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        request_id:
+          type: string
+    Book:
+      type: object
+      properties:
+        isbn13:
+          type: string
+        title:
+          type: string
+        authors:
+          type: string
+        categories:
+          type: string
+        thumbnail:
+          type: string
+        description:
+          type: string
+        published_year:
+          type: integer
+        average_rating:
+          type: number
+        num_pages:
+          type: integer
+    Recommendation:
+      type: object
+      properties:
+        book:
+          $ref: '#/components/schemas/Book'
+        score:
+          type: number
+        match_reason:
+          type: string
+    AIChatRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+    AIChatResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+        referenced_books:
+          type: array
+          items:
+            $ref: '#/components/schemas/Book'
+        status:
+          type: string
+security:
+  - ApiKeyAuth: []
+paths:
+  /:
+    get:
+      summary: Root Manifest
+      security: []
+      responses:
+        '200':
+          description: OK
+  /health:
+    get:
+      summary: Health Check
+      tags: [Health]
+      security: []
+      responses:
+        '200':
+          description: OK
+  /health/ready:
+    get:
+      summary: Readiness Check
+      tags: [Health]
+      responses:
+        '200':
+          description: OK
+        '503':
+          description: Database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /categories:
+    get:
+      summary: Get all categories
+      tags: [Books]
+      responses:
+        '200':
+          description: OK
+  /books:
+    get:
+      summary: Get books with pagination and filters
+      tags: [Books]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: author
+          in: query
+          schema:
+            type: string
+        - name: publisher
+          in: query
+          schema:
+            type: string
+        - name: min_pages
+          in: query
+          schema:
+            type: integer
+        - name: max_pages
+          in: query
+          schema:
+            type: integer
+        - name: min_rating
+          in: query
+          schema:
+            type: number
+        - name: published_from
+          in: query
+          schema:
+            type: integer
+        - name: published_to
+          in: query
+          schema:
+            type: integer
+        - name: sort
+          in: query
+          schema:
+            type: string
+        - name: order
+          in: query
+          schema:
+            type: string
+            default: asc
+      responses:
+        '200':
+          description: OK
+  /books/popular:
+    get:
+      summary: Get popular books
+      tags: [Books]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: OK
+  /books/{isbn}:
+    get:
+      summary: Get book by ISBN
+      tags: [Books]
+      parameters:
+        - name: isbn
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not Found
+  /search:
+    get:
+      summary: Search books
+      tags: [Books]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Bad Request
+  /recommend:
+    get:
+      summary: Get book recommendations based on a seed book
+      tags: [Recommendations]
+      parameters:
+        - name: book
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: top_n
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: hybrid
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not Found
+  /recommend/personalized:
+    get:
+      summary: Get personalized recommendations
+      tags: [Recommendations]
+      security:
+        - ApiKeyAuth: []
+          BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthorized
+  /onboarding:
+    post:
+      summary: Submit user onboarding data
+      tags: [User]
+      security:
+        - ApiKeyAuth: []
+          BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                book_ids:
+                  type: array
+                  items:
+                    type: string
+                genres:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+  /feedback:
+    post:
+      summary: Submit user feedback
+      tags: [User]
+      security:
+        - ApiKeyAuth: []
+          BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                book_id:
+                  type: string
+                interaction:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized
+  /ai/chat:
+    post:
+      summary: Ask the AI for recommendations
+      tags: [AI]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIChatRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIChatResponse'
+        '400':
+          description: Bad Request
+  /track:
+    post:
+      summary: Track user activity
+      tags: [User]
+      security:
+        - ApiKeyAuth: []
+          BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                book_id:
+                  type: string
+                book_name:
+                  type: string
+                action:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Bad Request
+        '401':
+          description: Unauthorized

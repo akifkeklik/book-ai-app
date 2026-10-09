@@ -33,12 +33,12 @@ class SettingsScreen extends StatelessWidget {
             children: [
               _buildLanguageToggle(context, lang),
               Divider(color: Theme.of(context).colorScheme.outline.withOpacity(0.05)),
-              
+
               // ── Dark/Light Mode Toggle (Senior Update) ──────────────────
               SwitchListTile(
                 title: Text(context.tr('settings_dark_mode')),
                 secondary: Icon(
-                  themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode, 
+                  themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
                   color: colorScheme.primary
                 ),
                 value: themeProvider.isDarkMode,
@@ -47,9 +47,9 @@ class SettingsScreen extends StatelessWidget {
                 },
                 activeColor: colorScheme.primary,
               ),
-              
+
               Divider(color: Theme.of(context).colorScheme.outline.withOpacity(0.05)),
-              
+
               // ── Color Theme Picker (Requested: Red, Blue, Green, Yellow, Purple)
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -70,6 +70,37 @@ class SettingsScreen extends StatelessWidget {
                         _buildColorDot(context, themeProvider, ThemeProvider.yellow),
                         _buildColorDot(context, themeProvider, ThemeProvider.purple),
                       ],
+                    ),
+                  ],
+                ),
+              ),
+
+              Divider(color: Theme.of(context).colorScheme.outline.withOpacity(0.05)),
+
+              // ── Text Size Picker ────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.tr('settings_text_size') != 'settings_text_size' ? context.tr('settings_text_size') : 'Text Size',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildScaleButton(context, themeProvider, 0.9, 'Small'),
+                          const SizedBox(width: 8),
+                          _buildScaleButton(context, themeProvider, 1.0, 'Default'),
+                          const SizedBox(width: 8),
+                          _buildScaleButton(context, themeProvider, 1.15, 'Large'),
+                          const SizedBox(width: 8),
+                          _buildScaleButton(context, themeProvider, 1.3, 'Extra Large'),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -149,9 +180,38 @@ class SettingsScreen extends StatelessWidget {
           color: color,
           shape: BoxShape.circle,
           border: isSelected ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 3) : null,
-          boxShadow: isSelected 
-              ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 8, spreadRadius: 2)] 
+          boxShadow: isSelected
+              ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 8, spreadRadius: 2)]
               : [],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScaleButton(BuildContext context, ThemeProvider provider, double scale, String label) {
+    final isSelected = provider.textScaleFactor == scale;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      onTap: () => provider.setTextScaleFactor(scale),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? colorScheme.primary : colorScheme.surfaceContainerHighest.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Colors.transparent : colorScheme.outline.withOpacity(0.1),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
         ),
       ),
     );
@@ -206,7 +266,7 @@ class _LangButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),

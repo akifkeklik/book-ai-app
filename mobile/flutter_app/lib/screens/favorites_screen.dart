@@ -34,7 +34,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     if (!auth.isLoggedIn) {
       return Scaffold(
-        appBar: AppBar(title: Text(context.tr('saved'))),
+        appBar: AppBar(title: Text(context.tr('library'))),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(DesignSystem.spacing32),
@@ -85,7 +85,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(context.tr('saved')),
+        title: Text(context.tr('library')),
         actions: [
           if (favs.favorites.isNotEmpty)
             Padding(

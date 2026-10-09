@@ -3,40 +3,24 @@ from unittest.mock import MagicMock, patch
 from backend.scripts.backfill_embeddings import backfill_embeddings
 
 
+@patch("psycopg2.connect")
 @patch("backend.scripts.backfill_embeddings.EmbeddingService")
-@patch("backend.scripts.backfill_embeddings.create_client")
-@patch("backend.scripts.backfill_embeddings.Config")
-def test_backfill_loop(mock_config, mock_create_client, mock_embedding_service):
-    # Setup Config
-    mock_config.SUPABASE_URL = "http://test"
-    mock_config.SUPABASE_ANON_KEY = "test_key"
+def test_backfill_loop(mock_embedding_service, mock_psycopg2_connect):
+    import os
+    os.environ["SUPABASE_DB_URL"] = "postgres://test"
 
-    # Setup Mock Supabase
-    mock_supabase = MagicMock()
-    mock_create_client.return_value = mock_supabase
+    # Mock psycopg2 connection
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_psycopg2_connect.return_value = mock_conn
+    mock_conn.cursor.return_value = mock_cursor
 
-    # First batch returns 2 books, second batch returns 0
-    mock_resp1 = MagicMock()
-    mock_resp1.data = [
-        {"isbn13": "book1", "title": "Title 1"},
-        {"isbn13": "book2", "title": "Title 2"}
+    # Setup the mock cursor to return columns and rows
+    mock_cursor.description = [("isbn13",), ("title",), ("current_hash",)]
+    mock_cursor.fetchall.return_value = [
+        ("book1", "Title 1", "hash1"),
+        ("book2", "Title 2", "old_hash2")
     ]
-    mock_resp2 = MagicMock()
-    mock_resp2.data = []
-
-    # We have to mock the chained calls: table("books").select("*").order("isbn13").gt("isbn13", last_id).limit(limit).execute()
-    mock_table = MagicMock()
-    mock_select = MagicMock()
-    mock_order = MagicMock()
-    mock_limit = MagicMock()
-
-    mock_supabase.table.return_value = mock_table
-    mock_table.select.return_value = mock_select
-    mock_select.order.return_value = mock_order
-    mock_order.gt.return_value = mock_limit
-    mock_limit.limit.return_value = MagicMock()
-    # The final execute() should return mock_resp1 then mock_resp2
-    mock_limit.limit.return_value.execute.side_effect = [mock_resp1, mock_resp2]
 
     # Setup Mock EmbeddingService
     mock_service_instance = MagicMock()
@@ -46,20 +30,17 @@ def test_backfill_loop(mock_config, mock_create_client, mock_embedding_service):
     mock_service_instance.generate_canonical_text.side_effect = ["text1", "text2"]
     mock_service_instance.generate_content_hash.side_effect = ["hash1", "hash2"]
 
-    # Book 1 is up-to-date, Book 2 needs update
-    mock_service_instance._model = "model-v1"
-    mock_service_instance.is_stale.side_effect = [
-        False, # Skip book1 (not stale)
-        True # Process book2 (stale)
-    ]
+    # Book 1 has current_hash == content_hash (hash1 == hash1), so it's skipped
+    # Book 2 has old_hash2 != hash2, so it's processed
 
+    mock_service_instance._model = "model-v1"
     mock_service_instance.generate_embedding.return_value = [0.1, 0.2]
-    mock_service_instance.upsert_embedding.return_value = True
 
     # Call backfill
-    backfill_embeddings(batch_size=2)
+    backfill_embeddings(max_books=2)
 
     # Verification
     # generate_embedding should be called only for book2
     mock_service_instance.generate_embedding.assert_called_once_with("text2")
-    mock_service_instance.upsert_embedding.assert_called_once_with("book2", [0.1, 0.2], "hash2")
+    # cursor.execute should be called for SELECT and then INSERT/UPDATE for book2
+    assert mock_cursor.execute.call_count == 2

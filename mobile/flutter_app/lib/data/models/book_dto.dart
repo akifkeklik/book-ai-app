@@ -19,6 +19,7 @@ class BookDto {
       rawSimilarityScore: (json['raw_similarity_score'] as num?)?.toDouble(),
       finalScore: (json['final_score'] as num?)?.toDouble(),
       diversityPenalty: (json['diversity_penalty'] as num?)?.toDouble(),
+      recommendationReason: json['recommendation_reason']?.toString(),
     );
   }
 
@@ -39,6 +40,7 @@ class BookDto {
         if (book.rawSimilarityScore != null) 'raw_similarity_score': book.rawSimilarityScore,
         if (book.finalScore != null) 'final_score': book.finalScore,
         if (book.diversityPenalty != null) 'diversity_penalty': book.diversityPenalty,
+        if (book.recommendationReason != null) 'recommendation_reason': book.recommendationReason,
       };
 }
 

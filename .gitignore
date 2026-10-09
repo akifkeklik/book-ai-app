@@ -10,6 +10,14 @@ venv/
 backend/saved_model/*.pkl
 backend/data/*backup*.csv
 
+# ── Enrichment Pipeline Artifacts ──────────────────────────────────────────────
+# Generated candidate/rejected files must NOT be committed to main branch.
+# Review them locally, then promote manually after human approval.
+backend/data/enrichment/candidate_books.csv
+backend/data/enrichment/rejected_books.csv
+backend/data/enrichment/api_responses/
+backend/data/enrichment/*.json
+
 # IDE
 .idea/
 .vscode/
