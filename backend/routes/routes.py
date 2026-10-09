@@ -43,6 +43,7 @@ def require_auth(f):
             if not user or not user.id:
                 return jsonify({"error": "Unauthorized: Invalid token"}), 401
             g.user_id = user.id
+            g.jwt_token = token
         except Exception as exc:
             logger.warning(f"JWT verification failed: {exc}")
             return jsonify({"error": "Unauthorized: Invalid or expired token"}), 401
@@ -62,6 +63,7 @@ def optional_auth(f):
                 user = _auth_port.verify_token(token) if _auth_port else None
                 if user and user.id:
                     g.user_id = user.id
+                    g.jwt_token = token
             except Exception:
                 pass
         return f(*args, **kwargs)
@@ -78,22 +80,27 @@ def optional_auth(f):
 def health_check():
     return jsonify({"status": "healthy", "service": "book-ai-api"}), 200
 
+
 @books_bp.route("/docs", methods=["GET"])
 def swagger_ui():
     import os
 
     from flask import send_from_directory
+
     # Serve index.html from static/swagger-ui
-    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'swagger-ui')
-    return send_from_directory(static_dir, 'index.html')
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "swagger-ui")
+    return send_from_directory(static_dir, "index.html")
+
 
 @books_bp.route("/docs/<path:filename>", methods=["GET"])
 def swagger_ui_files(filename):
     import os
 
     from flask import send_from_directory
-    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'swagger-ui')
+
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "swagger-ui")
     return send_from_directory(static_dir, filename)
+
 
 @books_bp.route("/health/ready", methods=["GET"])
 def readiness_check():
@@ -105,6 +112,7 @@ def readiness_check():
         import logging
 
         from .infrastructure.logging.structured_logger import log_event
+
         log_event(__name__, logging.ERROR, msg="Readiness check failed", error=str(exc))
         return jsonify({"status": "not_ready", "error": "Database unavailable"}), 503
 
@@ -153,7 +161,7 @@ def get_books():
             "published_from": safe_int(request.args.get("published_from")),
             "published_to": safe_int(request.args.get("published_to")),
             "sort": request.args.get("sort"),
-            "order": request.args.get("order", "asc")
+            "order": request.args.get("order", "asc"),
         }
 
         return jsonify(_get_books_uc.execute(**kwargs)), 200
@@ -313,7 +321,7 @@ def ai_chat():
     if not query:
         return jsonify({"error": "Query cannot be empty"}), 400
 
-    user_id = getattr(g, "user_id", None) # Optional if auth is not strictly enforced here
+    user_id = getattr(g, "user_id", None)  # Optional if auth is not strictly enforced here
     try:
         result = _process_rag_query_uc.execute(query, user_id=user_id)
         # result contains: answer, referenced_books, status

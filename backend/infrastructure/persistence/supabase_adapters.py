@@ -10,12 +10,30 @@ class SupabaseInteractionRepository:
     def __init__(self, supabase_client: Client):
         self._supabase = supabase_client
 
-    def get_user_interactions(self, user_id: str) -> List[Dict[str, Any]]:
+    def _get_client(self) -> Client:
         if not self._supabase:
+            return None
+        try:
+            from flask import g, has_request_context
+
+            if has_request_context() and getattr(g, "jwt_token", None):
+                from backend.config import Config
+                from supabase import create_client
+
+                client = create_client(Config.SUPABASE_URL, Config.SUPABASE_ANON_KEY)
+                client.postgrest.auth(g.jwt_token)
+                return client
+        except ImportError:
+            pass
+        return self._supabase
+
+    def get_user_interactions(self, user_id: str) -> List[Dict[str, Any]]:
+        client = self._get_client()
+        if not client:
             return []
         try:
             resp = (
-                self._supabase.table("user_interactions")
+                client.table("user_interactions")
                 .select("book_id, interaction_type")
                 .eq("user_id", user_id)
                 .execute()
@@ -26,11 +44,12 @@ class SupabaseInteractionRepository:
             return []
 
     def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
-        if not self._supabase:
+        client = self._get_client()
+        if not client:
             return None
         try:
             resp = (
-                self._supabase.table("user_profiles")
+                client.table("user_profiles")
                 .select("preferred_genres")
                 .eq("user_id", user_id)
                 .execute()
@@ -42,10 +61,11 @@ class SupabaseInteractionRepository:
             return None
 
     def upsert_interactions(self, entries: List[Dict[str, Any]]) -> None:
-        if not self._supabase or not entries:
+        client = self._get_client()
+        if not client or not entries:
             return
         try:
-            self._supabase.table("user_interactions").upsert(
+            client.table("user_interactions").upsert(
                 entries, on_conflict="user_id,book_id"
             ).execute()
         except Exception as e:
@@ -53,10 +73,11 @@ class SupabaseInteractionRepository:
             raise e
 
     def upsert_profile(self, user_id: str, genres: List[str], updated_at: str) -> None:
-        if not self._supabase:
+        client = self._get_client()
+        if not client:
             return
         try:
-            self._supabase.table("user_profiles").upsert(
+            client.table("user_profiles").upsert(
                 {
                     "user_id": user_id,
                     "preferred_genres": genres,
@@ -68,10 +89,11 @@ class SupabaseInteractionRepository:
             raise e
 
     def track_activity(self, payload: Dict[str, Any]) -> None:
-        if not self._supabase:
+        client = self._get_client()
+        if not client:
             return
         try:
-            self._supabase.table("user_activities").insert(payload).execute()
+            client.table("user_activities").insert(payload).execute()
         except Exception as e:
             logger.error(f"Failed to track activity: {e}")
             raise e
@@ -81,9 +103,7 @@ class SupabaseBookDataPort:
     def __init__(self, supabase_client: Client):
         self._supabase = supabase_client
 
-    def get_semantic_candidates(
-        self, likes: List[str], limit: int = 100
-    ) -> Dict[str, float]:
+    def get_semantic_candidates(self, likes: List[str], limit: int = 100) -> Dict[str, float]:
         if not self._supabase or not likes:
             return {}
         try:
@@ -102,9 +122,7 @@ class SupabaseBookDataPort:
             logger.warning(f"Semantic candidate generation failed: {e}")
         return {}
 
-    def match_query_embeddings(
-        self, embedding: List[float], limit: int = 100
-    ) -> Dict[str, float]:
+    def match_query_embeddings(self, embedding: List[float], limit: int = 100) -> Dict[str, float]:
         if not self._supabase:
             return {}
         try:
@@ -128,10 +146,7 @@ class SupabaseBookDataPort:
             return []
         try:
             books_response = (
-                self._supabase.table("books")
-                .select("*")
-                .in_("isbn13", isbns)
-                .execute()
+                self._supabase.table("books").select("*").in_("isbn13", isbns).execute()
             )
             return getattr(books_response, "data", [])
         except Exception as e:
@@ -176,9 +191,7 @@ class SupabaseBookDataPort:
                 "content_hash": content_hash,
                 "model_version": model_version,
             }
-            self._supabase.table("book_embeddings").upsert(
-                payload, on_conflict="book_id"
-            ).execute()
+            self._supabase.table("book_embeddings").upsert(payload, on_conflict="book_id").execute()
         except Exception as e:
             logger.error(f"Error upserting embedding: {e}")
             raise e
@@ -192,6 +205,7 @@ class SupabaseBookDataPort:
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return False
+
 
 class SupabaseAuthPort:
     def __init__(self, supabase_client: Client):

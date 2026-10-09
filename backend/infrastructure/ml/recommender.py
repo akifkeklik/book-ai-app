@@ -369,7 +369,8 @@ class BookRecommender:
     def _get_diverse_recommendations(self, scores: np.ndarray, top_n: int) -> List[Dict[str, Any]]:
         """Select diverse recommendations using Maximal Marginal Relevance (MMR)."""
         selected_indices = []
-        candidate_indices = np.argsort(scores)[::-1].tolist()
+        # Limit candidates to speed up MMR calculation
+        candidate_indices = np.argsort(scores)[::-1][:max(100, top_n * 10)].tolist()
 
         # Start with the highest-scoring item
         if not candidate_indices:

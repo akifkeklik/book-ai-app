@@ -19,6 +19,7 @@ import os
 import shutil
 import tempfile
 
+import numpy as np
 import pandas as pd
 import pytest
 from backend.infrastructure.ml.recommender import BookRecommender
@@ -569,3 +570,30 @@ def test_hybrid_recommendation_with_semantic_scores(trained_engine):
 
     assert len(recs) > 0
     assert all("final_score" in r for r in recs)
+
+class TestMMR:
+    def test_mmr_small_dataset(self, trained_engine):
+        """Test MMR on a dataset smaller than 100 to ensure limit doesn't crash."""
+        scores = np.random.rand(len(trained_engine.engine.df))
+        recs = trained_engine._get_diverse_recommendations(scores, top_n=3)
+        assert len(recs) == 3
+        # Should not throw any out-of-bounds index errors
+
+    def test_mmr_large_top_n(self, trained_engine):
+        """Test MMR when top_n is larger than the dataset size."""
+        scores = np.random.rand(len(trained_engine.engine.df))
+        top_n = len(trained_engine.engine.df) + 10
+        recs = trained_engine._get_diverse_recommendations(scores, top_n=top_n)
+        assert len(recs) == len(trained_engine.engine.df)
+
+    def test_mmr_tie_scores(self, trained_engine):
+        """Test MMR behavior when all scores are equal (ties)."""
+        scores = np.ones(len(trained_engine.engine.df)) * 0.5
+        recs = trained_engine._get_diverse_recommendations(scores, top_n=5)
+        assert len(recs) == 5
+
+    def test_mmr_zero_scores(self, trained_engine):
+        """Test MMR behavior when all scores are zero."""
+        scores = np.zeros(len(trained_engine.engine.df))
+        recs = trained_engine._get_diverse_recommendations(scores, top_n=5)
+        assert len(recs) == 5
