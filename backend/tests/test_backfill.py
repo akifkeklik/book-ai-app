@@ -1,4 +1,11 @@
+import sys
 from unittest.mock import MagicMock, patch
+
+try:
+    import psycopg2  # noqa: F401
+except ImportError:
+    psycopg2 = MagicMock()
+    sys.modules["psycopg2"] = psycopg2
 
 from backend.scripts.backfill_embeddings import backfill_embeddings
 
