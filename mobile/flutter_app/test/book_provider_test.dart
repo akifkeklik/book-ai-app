@@ -68,7 +68,7 @@ class FakeBookRepository implements BookRepository {
   Future<List<Book>> searchBooks(String query) async => [];
 
   @override
-  Future<List<String>> getCategories() async => categoriesResult;
+  Future<List<Map<String, dynamic>>> getCategories() async => [];
 
   @override
   Future<bool> submitFeedback({required String userId, required String bookId, required String interaction}) async => true;
@@ -77,7 +77,19 @@ class FakeBookRepository implements BookRepository {
   Future<bool> submitOnboarding({required String userId, required List<String> bookIds, required List<String> genres}) async => true;
 
   @override
-  Future<Map<String, dynamic>> getBooksByCategory({required String category, int page = 1, int perPage = 40}) async => {};
+  Future<Map<String, dynamic>> getBooksByCategory({
+    required String category,
+    int page = 1,
+    int perPage = 40,
+    String? sort,
+    String? author,
+    String? publisher,
+    int? minPages,
+    int? maxPages,
+    double? minRating,
+    int? publishedFrom,
+    int? publishedTo,
+  }) async => {};
 
   Map<String, dynamic> chatWithAIResult = {};
   Exception? chatError;
@@ -154,7 +166,7 @@ void main() {
 
       expect(provider.status, CatalogStatus.error);
       expect(provider.error, isNotNull);
-      expect(provider.error, contains('network timeout'));
+      expect(provider.error, contains('error_loading_books'));
       provider.dispose();
     });
 

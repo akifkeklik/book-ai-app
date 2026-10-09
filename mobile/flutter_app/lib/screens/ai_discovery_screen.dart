@@ -27,10 +27,10 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
   String? _error;
 
   final List<String> _examplePrompts = [
-    "I want a fast-paced sci-fi thriller about space exploration",
-    "Books similar to Harry Potter but darker",
-    "A self-help book about building habits",
-    "Historical fiction set in ancient Rome"
+    "I want a dark fantasy with political intrigue",
+    "Something like Harry Potter but darker",
+    "A short mystery for the weekend",
+    "Books that will make me think"
   ];
 
   @override
@@ -76,7 +76,7 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = context.read<LanguageProvider>().translate('error_loading_books');
+        _error = context.read<LanguageProvider>().translate('ai_discovery_error');
       });
     } finally {
       if (mounted) {
@@ -147,19 +147,26 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: theme.colorScheme.primary.withOpacity(0.1),
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primary.withOpacity(0.2),
+                  theme.colorScheme.primary.withOpacity(0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
             child: Icon(Icons.auto_awesome, size: 48, color: theme.colorScheme.primary),
           ),
           const SizedBox(height: DesignSystem.spacing24),
           Text(
-            'Libris AI Discovery',
+            "Your AI Librarian",
             style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: DesignSystem.spacing12),
           Text(
-            'Describe exactly what you\'re in the mood for, and our AI will curate the perfect recommendations for you.',
+            "Tell me what you feel like reading.",
             style: theme.textTheme.bodyLarge?.copyWith(
               color: isDark ? Colors.white70 : DesignSystem.textLightSecondary,
               height: 1.5,
@@ -170,7 +177,7 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Try asking:',
+              context.tr('ai_try_asking'),
               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
@@ -225,7 +232,7 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
             const CircularProgressIndicator(),
             const SizedBox(height: DesignSystem.spacing24),
             Text(
-              'Analyzing your request...',
+              context.tr('analyzing_request'),
               style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary),
             ),
           ],
@@ -340,17 +347,21 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
             ),
           ),
           const SizedBox(height: DesignSystem.spacing16),
-          SizedBox(
-            height: 310,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20),
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
-              itemCount: _referencedBooks.length,
-              separatorBuilder: (_, __) => const SizedBox(width: DesignSystem.spacing16),
-              itemBuilder: (context, index) {
-                return BookCard(book: _referencedBooks[index]);
-              },
+          SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20),
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < _referencedBooks.length; i++) ...[
+                    BookCard(book: _referencedBooks[i]),
+                    if (i < _referencedBooks.length - 1)
+                      const SizedBox(width: DesignSystem.spacing16),
+                  ]
+                ],
+              ),
             ),
           ),
         ]

@@ -41,7 +41,8 @@ class CategoriesScreen extends StatelessWidget {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final cat = catalog.defaultGenres[index];
-                  return _CategoryCard(category: cat);
+                  final count = catalog.categoryCounts[cat] ?? 0;
+                  return _CategoryCard(category: cat, bookCount: count);
                 },
                 childCount: catalog.defaultGenres.length,
               ),
@@ -55,8 +56,9 @@ class CategoriesScreen extends StatelessWidget {
 
 class _CategoryCard extends StatelessWidget {
   final String category;
+  final int bookCount;
 
-  const _CategoryCard({required this.category});
+  const _CategoryCard({required this.category, this.bookCount = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +106,9 @@ class _CategoryCard extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                context.tr('explore_category'),
+                bookCount > 0
+                    ? context.trPlural('book_count', bookCount)
+                    : context.tr('explore_category'),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: Colors.white.withOpacity(0.72),
                 ),

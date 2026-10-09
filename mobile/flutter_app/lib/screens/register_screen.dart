@@ -64,7 +64,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: Theme.of(context).textTheme.headlineLarge),
                   const SizedBox(height: 12),
                   Text(
-                    'We sent a confirmation link to\n${_emailCtrl.text}',
+                    context.tr('auth_confirm_sent').replaceAll('{email}', _emailCtrl.text),
                     textAlign: TextAlign.center,
                     style: Theme.of(context)
                         .textTheme
@@ -131,7 +131,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                 // Error banner
                 if (auth.error != null) ...[
-                  _ErrorBanner(message: auth.error!),
+                  _ErrorBanner(message: context.tr(auth.error!)),
                   const SizedBox(height: 16),
                 ],
 
@@ -213,8 +213,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
 
                 const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(context.tr('already_have_account')),
                     TextButton(

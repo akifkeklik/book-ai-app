@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class LanguageProvider extends ChangeNotifier {
   static const String _languageKey = 'preferred_language';
-  
+
   Locale _locale = const Locale('en');
   Map<String, String> _localizedStrings = {};
   bool _isInitialized = false;
@@ -43,7 +43,7 @@ class LanguageProvider extends ChangeNotifier {
 
   Future<void> setLanguage(String languageCode) async {
     if (_locale.languageCode == languageCode) return;
-    
+
     _locale = Locale(languageCode);
     await loadTranslations();
     notifyListeners();
@@ -76,20 +76,38 @@ class LanguageProvider extends ChangeNotifier {
     return value;
   }
 
+  /// Senior Solution: Pluralization support
+  String plural(String key, int count, {Map<String, String>? args}) {
+    String value;
+    if (count == 1) {
+      value = _localizedStrings['${key}_one'] ?? _localizedStrings[key] ?? key;
+    } else {
+      value = _localizedStrings['${key}_other'] ?? _localizedStrings[key] ?? key;
+    }
+
+    if (args != null) {
+      args.forEach((k, v) {
+        value = value.replaceAll('{$k}', v);
+      });
+    }
+    value = value.replaceAll('{count}', count.toString());
+    return value;
+  }
+
   /// Senior Solution: Localize dynamic genres from database
   String localizeGenre(String genre) {
     if (genre.isEmpty) return "";
-    
+
     // Convert "Biography & Autobiography" -> "genre_biography_autobiography"
     final key = "genre_${genre.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_').replaceAll(RegExp(r'_+'), '_')}";
-    
+
     // Remove trailing underscore if exists
     final cleanKey = key.endsWith('_') ? key.substring(0, key.length - 1) : key;
-    
+
     if (_localizedStrings.containsKey(cleanKey)) {
       return _localizedStrings[cleanKey]!;
     }
-    
+
     // Fallback: Title Case the raw string
     return genre.split(' ').map((word) {
       if (word.isEmpty) return "";
@@ -102,7 +120,7 @@ class LanguageProvider extends ChangeNotifier {
     final diff = DateTime.now().difference(dt);
 
     if (diff.inDays > 30) return '${dt.day}/${dt.month}/${dt.year}';
-    
+
     if (diff.inDays > 0) {
       return translate('time_day_ago', args: {'count': diff.inDays.toString()});
     }
@@ -112,7 +130,7 @@ class LanguageProvider extends ChangeNotifier {
     if (diff.inMinutes > 0) {
       return translate('time_min_ago', args: {'count': diff.inMinutes.toString()});
     }
-    
+
     return translate('time_just_now');
   }
 }
@@ -121,6 +139,10 @@ class LanguageProvider extends ChangeNotifier {
 extension AppLocalizations on BuildContext {
   String tr(String key, {Map<String, String>? args}) {
     return Provider.of<LanguageProvider>(this, listen: true).translate(key, args: args);
+  }
+
+  String trPlural(String key, int count, {Map<String, String>? args}) {
+    return Provider.of<LanguageProvider>(this, listen: true).plural(key, count, args: args);
   }
 
   String trGenre(String genre) {

@@ -23,6 +23,12 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
   int _page = 1;
   final int _perPage = 40; // Senior Update: Increased for smoother browsing
 
+  // Filters
+  String? _sort = 'popularity';
+  int? _minPages;
+  int? _maxPages;
+  double? _minRating;
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +42,23 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
     setState(() => _isLoading = false);
   }
 
+  Future<void> _applyFilters({String? sort, int? minPages, int? maxPages, double? minRating}) async {
+    setState(() {
+      _sort = sort ?? _sort;
+      if (minPages != -1) _minPages = minPages ?? _minPages;
+      if (minPages == -1) _minPages = null;
+      if (maxPages != -1) _maxPages = maxPages ?? _maxPages;
+      if (maxPages == -1) _maxPages = null;
+      if (minRating != -1) _minRating = minRating ?? _minRating;
+      if (minRating == -1) _minRating = null;
+
+      _books.clear();
+      _page = 1;
+      _hasMore = true;
+    });
+    await _fetchInitial();
+  }
+
   Future<void> _fetchMore() async {
     if (!_hasMore || _isLoading) return;
     setState(() => _isLoading = true);
@@ -44,6 +67,10 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
         category: widget.genre,
         page: _page,
         perPage: _perPage,
+        sort: _sort,
+        minPages: _minPages,
+        maxPages: _maxPages,
+        minRating: _minRating,
       );
       final newBooks = result['books'] as List<Book>;
       final totalPages = result['total_pages'] as int? ?? 1;
@@ -87,6 +114,12 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
       appBar: AppBar(
         title: Text(context.trGenre(widget.genre)),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_list_rounded),
+            onPressed: () => _showFilterSheet(context),
+          ),
+        ],
       ),
       body: _books.isEmpty && _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -179,6 +212,107 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showFilterSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return _FilterSheet(
+          initialSort: _sort ?? 'popularity',
+          onApply: (sort) {
+            _applyFilters(sort: sort);
+          },
+        );
+      },
+    );
+  }
+}
+
+class _FilterSheet extends StatefulWidget {
+  final String initialSort;
+  final Function(String) onApply;
+
+  const _FilterSheet({required this.initialSort, required this.onApply});
+
+  @override
+  State<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends State<_FilterSheet> {
+  late String _selectedSort;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedSort = widget.initialSort;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            context.tr('sort_and_filter'),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 24),
+          Text(context.tr('sort_by'), style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildSortChip('popularity', context.tr('popularity')),
+              _buildSortChip('rating', context.tr('rating')),
+              _buildSortChip('newest', context.tr('newest')),
+              _buildSortChip('oldest', context.tr('oldest')),
+              _buildSortChip('title', context.tr('title_a_z')),
+            ],
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: () {
+              widget.onApply(_selectedSort);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(context.tr('apply_options')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSortChip(String value, String label) {
+    final isSelected = _selectedSort == value;
+    final colorScheme = Theme.of(context).colorScheme;
+    return FilterChip(
+      selected: isSelected,
+      label: Text(label),
+      onSelected: (selected) {
+        if (selected) setState(() => _selectedSort = value);
+      },
+      selectedColor: colorScheme.primary.withOpacity(0.2),
+      checkmarkColor: colorScheme.primary,
     );
   }
 }

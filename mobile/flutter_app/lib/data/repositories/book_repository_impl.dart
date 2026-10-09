@@ -104,7 +104,7 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   @override
-  Future<List<String>> getCategories() async {
+  Future<List<Map<String, dynamic>>> getCategories() async {
     return await _api.getCategories();
   }
 
@@ -148,8 +148,32 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> getBooksByCategory({required String category, int page = 1, int perPage = 40}) async {
-    return await _api.getBooksByCategory(category: category, page: page, perPage: perPage);
+  Future<Map<String, dynamic>> getBooksByCategory({
+    required String category,
+    int page = 1,
+    int perPage = 40,
+    String? sort,
+    String? author,
+    String? publisher,
+    int? minPages,
+    int? maxPages,
+    double? minRating,
+    int? publishedFrom,
+    int? publishedTo,
+  }) async {
+    return await _api.getBooksByCategory(
+      category: category,
+      page: page,
+      perPage: perPage,
+      sort: sort,
+      author: author,
+      publisher: publisher,
+      minPages: minPages,
+      maxPages: maxPages,
+      minRating: minRating,
+      publishedFrom: publishedFrom,
+      publishedTo: publishedTo,
+    );
   }
 
   @override

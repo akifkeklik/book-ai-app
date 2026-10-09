@@ -6,13 +6,25 @@ abstract class BookRepository {
   Future<List<Book>> getPersonalizedRecommendations(String userId);
   Future<List<Book>> getFallbackRecommendations(String userId);
   Future<List<Book>> searchBooks(String query);
-  Future<List<String>> getCategories();
+  Future<List<Map<String, dynamic>>> getCategories();
   
   Future<bool> submitFeedback({required String userId, required String bookId, required String interaction});
   Future<bool> submitOnboarding({required String userId, required List<String> bookIds, required List<String> genres});
   
   // UI Specific Methods that were leaking Infrastructure
-  Future<Map<String, dynamic>> getBooksByCategory({required String category, int page = 1, int perPage = 40});
+  Future<Map<String, dynamic>> getBooksByCategory({
+    required String category,
+    int page = 1,
+    int perPage = 40,
+    String? sort,
+    String? author,
+    String? publisher,
+    int? minPages,
+    int? maxPages,
+    double? minRating,
+    int? publishedFrom,
+    int? publishedTo,
+  });
   Future<Map<String, dynamic>> chatWithAI(String query);
   Future<List<Book>> getRecommendations(String title);
   Future<void> trackActivity({required String userId, required String activityType, required String bookId});

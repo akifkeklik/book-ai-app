@@ -52,6 +52,23 @@ def require_auth(f):
     return decorated
 
 
+def optional_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            try:
+                user = _auth_port.verify_token(token) if _auth_port else None
+                if user and user.id:
+                    g.user_id = user.id
+            except Exception:
+                pass
+        return f(*args, **kwargs)
+
+    return decorated
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Health
 # ─────────────────────────────────────────────────────────────────────────────
@@ -60,6 +77,23 @@ def require_auth(f):
 @books_bp.route("/health", methods=["GET"])
 def health_check():
     return jsonify({"status": "healthy", "service": "book-ai-api"}), 200
+
+@books_bp.route("/docs", methods=["GET"])
+def swagger_ui():
+    import os
+
+    from flask import send_from_directory
+    # Serve index.html from static/swagger-ui
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'swagger-ui')
+    return send_from_directory(static_dir, 'index.html')
+
+@books_bp.route("/docs/<path:filename>", methods=["GET"])
+def swagger_ui_files(filename):
+    import os
+
+    from flask import send_from_directory
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'swagger-ui')
+    return send_from_directory(static_dir, filename)
 
 @books_bp.route("/health/ready", methods=["GET"])
 def readiness_check():
@@ -93,8 +127,36 @@ def get_books():
     try:
         page = max(1, int(request.args.get("page", 1)))
         per_page = min(max(1, int(request.args.get("per_page", 50))), 100)
-        category = request.args.get("category", None)
-        return jsonify(_get_books_uc.execute(page=page, per_page=per_page, category=category)), 200
+
+        def safe_int(val):
+            if val is not None and val.isdigit():
+                return int(val)
+            return None
+
+        def safe_float(val):
+            if val is not None:
+                try:
+                    return float(val)
+                except ValueError:
+                    return None
+            return None
+
+        kwargs = {
+            "page": page,
+            "per_page": per_page,
+            "category": request.args.get("category"),
+            "author": request.args.get("author"),
+            "publisher": request.args.get("publisher"),
+            "min_pages": safe_int(request.args.get("min_pages")),
+            "max_pages": safe_int(request.args.get("max_pages")),
+            "min_rating": safe_float(request.args.get("min_rating")),
+            "published_from": safe_int(request.args.get("published_from")),
+            "published_to": safe_int(request.args.get("published_to")),
+            "sort": request.args.get("sort"),
+            "order": request.args.get("order", "asc")
+        }
+
+        return jsonify(_get_books_uc.execute(**kwargs)), 200
     except Exception as exc:
         raise exc
 
@@ -241,7 +303,7 @@ def feedback():
 
 
 @books_bp.route("/ai/chat", methods=["POST"])
-# @require_auth  # Optionally require auth, uncomment if Flutter sends token for this
+@optional_auth
 def ai_chat():
     data = request.get_json(silent=True)
     if not data or "query" not in data:

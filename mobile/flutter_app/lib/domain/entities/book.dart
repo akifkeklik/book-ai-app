@@ -17,6 +17,7 @@ class Book {
   final double? rawSimilarityScore;
   final double? finalScore;
   final double? diversityPenalty;
+  final String? recommendationReason;
 
   const Book({
     required this.isbn13,
@@ -35,6 +36,7 @@ class Book {
     this.rawSimilarityScore,
     this.finalScore,
     this.diversityPenalty,
+    this.recommendationReason,
   });
 
   @override

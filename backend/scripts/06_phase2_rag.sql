@@ -2,7 +2,7 @@
 -- Description: Adds a new RPC for generic semantic search by query embedding
 
 CREATE OR REPLACE FUNCTION match_query_embeddings(
-  query_embedding vector(1536),
+  query_embedding vector(3072),
   match_threshold float,
   match_count int
 )
@@ -18,9 +18,9 @@ BEGIN
   FROM (
     SELECT
       be.book_id,
-      1 - (be.embedding <=> query_embedding) AS similarity
+      1 - ((be.embedding::halfvec(3072)) <=> (query_embedding::halfvec(3072))) AS similarity
     FROM public.book_embeddings be
-    ORDER BY be.embedding <=> query_embedding
+    ORDER BY (be.embedding::halfvec(3072)) <=> (query_embedding::halfvec(3072))
     LIMIT match_count
   ) sub
   WHERE sub.similarity > match_threshold;

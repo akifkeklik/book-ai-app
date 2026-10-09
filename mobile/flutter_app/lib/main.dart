@@ -121,12 +121,21 @@ class _LibrisAppState extends State<LibrisApp> {
       routerConfig: _router!,
       locale: langProvider.locale,
       builder: (context, child) {
-        // If language or auth is not initialized, show Splash.
-        // This keeps the Navigator tree alive even during loading.
+        // Apply global text scale factor
+        final mediaQuery = MediaQuery.of(context);
+        final scale = themeProvider.textScaleFactor;
+
+        Widget wrappedChild = MediaQuery(
+          data: mediaQuery.copyWith(
+            textScaler: TextScaler.linear(mediaQuery.textScaler.scale(scale)),
+          ),
+          child: _GlobalErrorListener(child: child!),
+        );
+
         if (!langProvider.isInitialized) {
           return const SplashScreen();
         }
-        return _GlobalErrorListener(child: child!);
+        return wrappedChild;
       },
     );
   }
@@ -153,7 +162,7 @@ class _GlobalErrorListenerState extends State<_GlobalErrorListener> {
 
   @override
   void dispose() {
-    // Note: Standard practice to remove listener, 
+    // Note: Standard practice to remove listener,
     // though global providers usually outlive this widget.
     try {
       context.read<ErrorProvider>().removeListener(_handleError);
@@ -166,7 +175,7 @@ class _GlobalErrorListenerState extends State<_GlobalErrorListener> {
     final errorProvider = context.read<ErrorProvider>();
     if (errorProvider.currentError != null) {
       final message = errorProvider.currentError!;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message, style: const TextStyle(color: Colors.white)),
@@ -180,7 +189,7 @@ class _GlobalErrorListenerState extends State<_GlobalErrorListener> {
           ),
         ),
       );
-      
+
       errorProvider.clearError();
     }
   }

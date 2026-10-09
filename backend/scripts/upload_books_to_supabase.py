@@ -45,8 +45,11 @@ def upload_to_supabase():
 
     for row in records:
         for k, v in row.items():
-            if isinstance(v, float) and math.isnan(v):
-                row[k] = None
+            if isinstance(v, float):
+                if math.isnan(v):
+                    row[k] = None
+                elif v.is_integer():
+                    row[k] = int(v)
 
     total = len(records)
     log(f"Toplam {total} kayıt bulundu. Supabase'e yükleniyor...")

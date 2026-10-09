@@ -132,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 // Error banner
                 if (auth.error != null) ...[
-                  _ErrorBanner(message: auth.error!),
+                  _ErrorBanner(message: context.tr(auth.error!)),
                   const SizedBox(height: 16),
                 ],
 
@@ -179,10 +179,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
 
                 // Remember Me & Forgot Password
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 16,
                   children: [
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         SizedBox(
                           height: 24,
@@ -193,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(context.tr('remember_me')),
+                        Flexible(child: Text(context.tr('remember_me'), overflow: TextOverflow.ellipsis)),
                       ],
                     ),
                     TextButton(
@@ -220,8 +223,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
 
                 const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(context.tr('no_account')),
                     TextButton(

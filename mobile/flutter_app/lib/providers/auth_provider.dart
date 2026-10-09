@@ -50,47 +50,24 @@ class AuthProvider extends ChangeNotifier {
   String _friendlyError(dynamic e) {
     final raw = e.toString();
 
-    // Format / parse hataları (HTML response vs.)
-    if (_isFormatError(raw)) {
-      return '⚠️ Sunucu geçici olarak yanıt veremiyor.\n'
-          'Lütfen birkaç saniye bekleyip tekrar deneyin.';
-    }
+    if (_isFormatError(raw)) return 'auth_error_format';
 
     // Ağ / bağlantı hataları
-    if (_isNetworkError(raw)) {
-      return '⚠️ Sunucuya bağlanılamadı.\n'
-          'İnternet bağlantınızı kontrol edin veya birkaç dakika bekleyip tekrar deneyin.';
-    }
+    if (_isNetworkError(raw)) return 'auth_error_network';
 
     // AuthException mesajından ham teknik bilgiyi sil
     if (e is AuthException) {
       final msg = e.message;
-      if (_isFormatError(msg)) {
-        return '⚠️ Sunucu geçici olarak yanıt veremiyor.\n'
-            'Lütfen birkaç saniye bekleyip tekrar deneyin.';
-      }
-      if (_isNetworkError(msg)) {
-        return '⚠️ Sunucuya bağlanılamadı.\n'
-            'İnternet bağlantınızı kontrol edin veya birkaç dakika bekleyip tekrar deneyin.';
-      }
-      if (msg.contains('Invalid login credentials')) {
-        return 'E-posta veya şifre hatalı. Lütfen tekrar deneyin.';
-      }
-      if (msg.contains('Email not confirmed')) {
-        return 'E-posta adresinizi doğrulayın, ardından giriş yapabilirsiniz.';
-      }
-      if (msg.contains('User already registered')) {
-        return 'Bu e-posta adresi zaten kayıtlı.';
-      }
-      if (msg.contains('email_address_invalid') || msg.contains('invalid_email')) {
-        return 'Geçersiz e-posta adresi. Lütfen kontrol edin.';
-      }
-      if (msg.contains('weak_password') || msg.contains('Password should be')) {
-        return 'Şifre çok zayıf. En az 6 karakter olmalı.';
-      }
-      return msg;
+      if (_isFormatError(msg)) return 'auth_error_format';
+      if (_isNetworkError(msg)) return 'auth_error_network';
+      if (msg.contains('Invalid login credentials')) return 'auth_error_invalid_credentials';
+      if (msg.contains('Email not confirmed')) return 'auth_error_unconfirmed';
+      if (msg.contains('User already registered')) return 'auth_error_already_registered';
+      if (msg.contains('email_address_invalid') || msg.contains('invalid_email')) return 'auth_error_invalid_email';
+      if (msg.contains('weak_password') || msg.contains('Password should be')) return 'auth_error_weak_password';
+      return msg; // Let it fallback to raw if unknown but shouldn't happen often
     }
-    return 'Beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
+    return 'auth_error_unexpected';
   }
 
   Future<void> _initAuth() async {

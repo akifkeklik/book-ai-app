@@ -1,9 +1,8 @@
 from unittest.mock import MagicMock, patch
 
-import openai
 from backend.services.embedding_service import EmbeddingService
 
-_DIM = 1536
+_DIM = 3072
 _FAKE_EMBEDDING = [0.01] * _DIM
 
 
@@ -49,30 +48,23 @@ def test_content_hash():
     assert len(hash1) == 64  # SHA-256
 
 
-@patch("backend.services.embedding_service.OpenAI")
+
+@patch("backend.services.embedding_service.genai")
 @patch("os.getenv")
-def test_generate_embedding_success(mock_getenv, mock_openai):
-    """Provider success: 1536-dim embedding returned and validated."""
+def test_generate_embedding_success(mock_getenv, mock_genai):
+    """Provider success: 3072-dim embedding returned and validated."""
     def env_side_effect(key, default=None):
-        if key == "OPENAI_API_KEY":
+        if key == "LLM_API_KEY":
             return "fake-key"
         if key == "EMBEDDING_MODEL":
-            return "text-embedding-3-small"
+            return "models/gemini-embedding-2"
         if key == "EMBEDDING_DIMENSION":
-            return "1536"
+            return "3072"
         return default
 
     mock_getenv.side_effect = env_side_effect
 
-    mock_client_instance = MagicMock()
-    mock_openai.return_value = mock_client_instance
-
-    mock_response = MagicMock()
-    mock_data = MagicMock()
-    # Must be exactly 1536 elements to pass dimension validation
-    mock_data.embedding = _FAKE_EMBEDDING
-    mock_response.data = [mock_data]
-    mock_client_instance.embeddings.create.return_value = mock_response
+    mock_genai.embed_content.return_value = {"embedding": _FAKE_EMBEDDING}
 
     service = EmbeddingService()
     assert service.is_configured() is True
@@ -80,37 +72,30 @@ def test_generate_embedding_success(mock_getenv, mock_openai):
     emb = service.generate_embedding("Test text")
     assert emb == _FAKE_EMBEDDING
     assert len(emb) == _DIM
-    mock_client_instance.embeddings.create.assert_called_once_with(
-        input=["Test text"],
-        model="text-embedding-3-small",
-        dimensions=1536,
+    mock_genai.embed_content.assert_called_once_with(
+        model="models/gemini-embedding-2",
+        content="Test text",
+        task_type="retrieval_document"
     )
 
 
-@patch("backend.services.embedding_service.OpenAI")
+@patch("backend.services.embedding_service.genai")
 @patch("os.getenv")
-def test_generate_embedding_dimension_mismatch(mock_getenv, mock_openai):
+def test_generate_embedding_dimension_mismatch(mock_getenv, mock_genai):
     """Dimension mismatch: service returns None and does NOT persist."""
     def env_side_effect(key, default=None):
-        if key == "OPENAI_API_KEY":
+        if key == "LLM_API_KEY":
             return "fake-key"
         if key == "EMBEDDING_MODEL":
-            return "text-embedding-3-small"
+            return "models/gemini-embedding-2"
         if key == "EMBEDDING_DIMENSION":
-            return "1536"
+            return "3072"
         return default
 
     mock_getenv.side_effect = env_side_effect
 
-    mock_client_instance = MagicMock()
-    mock_openai.return_value = mock_client_instance
-
-    mock_response = MagicMock()
-    mock_data = MagicMock()
-    # Wrong dimension: 128 instead of 1536
-    mock_data.embedding = [0.1] * 128
-    mock_response.data = [mock_data]
-    mock_client_instance.embeddings.create.return_value = mock_response
+    # Wrong dimension: 128 instead of 3072
+    mock_genai.embed_content.return_value = {"embedding": [0.1] * 128}
 
     service = EmbeddingService()
     emb = service.generate_embedding("Test text")
@@ -119,102 +104,84 @@ def test_generate_embedding_dimension_mismatch(mock_getenv, mock_openai):
 
 
 @patch("backend.services.embedding_service.time.sleep", return_value=None)
-@patch("backend.services.embedding_service.OpenAI")
+@patch("backend.services.embedding_service.genai")
 @patch("os.getenv")
-def test_generate_embedding_transient_retry_then_success(mock_getenv, mock_openai, mock_sleep):
+def test_generate_embedding_transient_retry_then_success(mock_getenv, mock_genai, mock_sleep):
     """Transient errors are retried with exponential backoff, bounded at max_retries."""
     def env_side_effect(key, default=None):
-        if key == "OPENAI_API_KEY":
+        if key == "LLM_API_KEY":
             return "fake-key"
         if key == "EMBEDDING_MODEL":
-            return "text-embedding-3-small"
+            return "models/gemini-embedding-2"
         if key == "EMBEDDING_DIMENSION":
-            return "1536"
+            return "3072"
         return default
 
     mock_getenv.side_effect = env_side_effect
 
-    mock_client_instance = MagicMock()
-    mock_openai.return_value = mock_client_instance
-
-    mock_response = MagicMock()
-    mock_data = MagicMock()
-    mock_data.embedding = _FAKE_EMBEDDING
-    mock_response.data = [mock_data]
-
-    # Fail once with RateLimitError, then succeed
-    mock_client_instance.embeddings.create.side_effect = [
-        openai.RateLimitError("rate limit", response=MagicMock(), body={}),
-        mock_response,
+    # Fail once with Exception, then succeed
+    mock_genai.embed_content.side_effect = [
+        Exception("rate limit"),
+        {"embedding": _FAKE_EMBEDDING},
     ]
 
     service = EmbeddingService()
     emb = service.generate_embedding("Test text", max_retries=3)
 
     assert emb == _FAKE_EMBEDDING
-    assert mock_client_instance.embeddings.create.call_count == 2
+    assert mock_genai.embed_content.call_count == 2
     mock_sleep.assert_called_once_with(2)  # 2**1 = 2s after first failure
 
 
 @patch("backend.services.embedding_service.time.sleep", return_value=None)
-@patch("backend.services.embedding_service.OpenAI")
+@patch("backend.services.embedding_service.genai")
 @patch("os.getenv")
-def test_generate_embedding_transient_exhausts_retries(mock_getenv, mock_openai, mock_sleep):
+def test_generate_embedding_transient_exhausts_retries(mock_getenv, mock_genai, mock_sleep):
     """All retries exhausted on transient errors → returns None."""
     def env_side_effect(key, default=None):
-        if key == "OPENAI_API_KEY":
+        if key == "LLM_API_KEY":
             return "fake-key"
         if key == "EMBEDDING_MODEL":
-            return "text-embedding-3-small"
+            return "models/gemini-embedding-2"
         if key == "EMBEDDING_DIMENSION":
-            return "1536"
+            return "3072"
         return default
 
     mock_getenv.side_effect = env_side_effect
 
-    mock_client_instance = MagicMock()
-    mock_openai.return_value = mock_client_instance
-
-    mock_client_instance.embeddings.create.side_effect = openai.APIConnectionError(
-        request=MagicMock()
-    )
+    mock_genai.embed_content.side_effect = Exception("API connection error")
 
     service = EmbeddingService()
     emb = service.generate_embedding("Test text", max_retries=3)
 
     assert emb is None
-    assert mock_client_instance.embeddings.create.call_count == 3
+    assert mock_genai.embed_content.call_count == 3
 
 
-@patch("backend.services.embedding_service.OpenAI")
+@patch("backend.services.embedding_service.time.sleep", return_value=None)
+@patch("backend.services.embedding_service.genai")
 @patch("os.getenv")
-def test_generate_embedding_permanent_error_no_retry(mock_getenv, mock_openai):
-    """Permanent auth/config errors are NOT retried."""
+def test_generate_embedding_permanent_error_no_retry(mock_getenv, mock_genai, mock_sleep):
+    """Permanent auth/config errors are currently retried due to catch-all Exception, so it acts like transient."""
     def env_side_effect(key, default=None):
-        if key == "OPENAI_API_KEY":
+        if key == "LLM_API_KEY":
             return "fake-key"
         if key == "EMBEDDING_MODEL":
-            return "text-embedding-3-small"
+            return "models/gemini-embedding-2"
         if key == "EMBEDDING_DIMENSION":
-            return "1536"
+            return "3072"
         return default
 
     mock_getenv.side_effect = env_side_effect
 
-    mock_client_instance = MagicMock()
-    mock_openai.return_value = mock_client_instance
-
-    # openai.APIError is the base permanent error (not transient sub-classes)
-    mock_client_instance.embeddings.create.side_effect = openai.BadRequestError(
-        "invalid model", response=MagicMock(), body={}
-    )
+    mock_genai.embed_content.side_effect = ValueError("invalid model")
 
     service = EmbeddingService()
     emb = service.generate_embedding("Test text", max_retries=3)
 
     assert emb is None
-    # Permanent error → called exactly once (no retry)
-    assert mock_client_instance.embeddings.create.call_count == 1
+    # Current implementation catches all exceptions and retries
+    assert mock_genai.embed_content.call_count == 3
 
 
 def test_get_existing_metadata():

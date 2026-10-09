@@ -90,16 +90,25 @@ class CatalogProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Map<String, int> _categoryCounts = {};
+
+  Map<String, int> get categoryCounts => _categoryCounts;
+
   Future<void> fetchGenres() async {
     try {
       final categories = await _manageCatalog.getCategories();
       if (categories.isNotEmpty) {
-        _genres = categories;
+        _genres = categories.map((e) => e['name'] as String).toList();
+        _categoryCounts = {
+          for (var e in categories) e['name'] as String: e['count'] as int
+        };
       } else {
         _genres = List<String>.from(_fallbackGenres);
+        _categoryCounts = {};
       }
     } catch (_) {
       _genres = List<String>.from(_fallbackGenres);
+      _categoryCounts = {};
     }
     notifyListeners();
   }
@@ -123,7 +132,7 @@ class CatalogProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _status = CatalogStatus.error;
-      _error = e.toString();
+      _error = 'error_loading_books';
       notifyListeners();
     }
   }

@@ -19,7 +19,7 @@ class GenericLlmAdapter(LlmPort):
             if self._provider == "gemini":
                 import google.generativeai as genai
                 genai.configure(api_key=self._api_key)
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                model = genai.GenerativeModel("models/gemini-2.5-flash")
                 response = model.generate_content(
                     system_prompt + "\n\n" + user_prompt,
                     generation_config={"temperature": 0.3},

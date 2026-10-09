@@ -482,30 +482,81 @@ class BookRecommender:
         return sorted_df.head(limit).to_dict(orient="records")
 
     def get_all_books(
-        self, page: int = 1, per_page: int = 20, category: Optional[str] = None
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        category: Optional[str] = None,
+        author: Optional[str] = None,
+        publisher: Optional[str] = None,
+        min_pages: Optional[int] = None,
+        max_pages: Optional[int] = None,
+        min_rating: Optional[float] = None,
+        published_from: Optional[int] = None,
+        published_to: Optional[int] = None,
+        sort: Optional[str] = None,
+        order: Optional[str] = "asc"
     ) -> Dict[str, Any]:
-        """Get a paginated list of all books, optionally filtered by category."""
+        """Get a paginated list of all books, optionally filtered and sorted."""
         if self.df.empty:
             return {"books": [], "total": 0, "page": page, "per_page": per_page, "total_pages": 0}
 
-        df = self.df
+        df = self.df.copy()
+
         if category:
             cat = category.strip()
             if cat and cat.lower() != "all":
-                # Check if this is a canonical category name
                 if cat in self.CANONICAL_CATEGORIES_ORDERED:
-                    # Use canonical mapping: match all raw categories that map to this canonical
                     mask = df["categories"].astype(str).apply(
                         lambda raw: self._book_matches_canonical(raw, cat)
                     )
                 else:
-                    # Fallback: substring match for backward compatibility
-                    mask = (
-                        df["categories"]
-                        .astype(str)
-                        .str.contains(cat, case=False, na=False, regex=False)
-                    )
+                    mask = df["categories"].astype(str).str.contains(cat, case=False, na=False, regex=False)
                 df = df[mask]
+
+        if author:
+            df = df[df["authors"].astype(str).str.contains(author.strip(), case=False, na=False, regex=False)]
+
+        if publisher:
+            # Check if dataset has publisher, if not ignore or handle gracefully
+            if "publisher" in df.columns:
+                df = df[df["publisher"].astype(str).str.contains(publisher.strip(), case=False, na=False, regex=False)]
+
+        if min_pages is not None:
+            if "page_count" in df.columns:
+                df = df[df["page_count"] >= min_pages]
+
+        if max_pages is not None:
+            if "page_count" in df.columns:
+                df = df[df["page_count"] <= max_pages]
+
+        if min_rating is not None:
+            if "average_rating" in df.columns:
+                df = df[df["average_rating"] >= min_rating]
+
+        if published_from is not None or published_to is not None:
+            if "published_date" in df.columns:
+                # published_date is often a string like '2005-09-01' or just '2005'
+                # We can do a string comparison if we assume YYYY format, or convert to numeric year.
+                # Let's extract the year robustly.
+                years = df["published_date"].astype(str).str.extract(r'(\d{4})')[0].astype(float)
+                if published_from is not None:
+                    df = df[years >= published_from]
+                if published_to is not None:
+                    df = df[years <= published_to]
+
+        if sort:
+            ascending = order.lower() == "asc"
+            if sort == "rating" and "average_rating" in df.columns:
+                df = df.sort_values(by="average_rating", ascending=ascending)
+            elif sort == "popularity" and "popularity_score" in df.columns:
+                df = df.sort_values(by="popularity_score", ascending=ascending)
+            elif sort == "newest" or sort == "oldest":
+                if "published_date" in df.columns:
+                    # ascending=False for newest, ascending=True for oldest
+                    asc = sort == "oldest"
+                    df = df.sort_values(by="published_date", ascending=asc)
+            elif sort == "title" and "title" in df.columns:
+                df = df.sort_values(by="title", ascending=ascending)
 
         start = (page - 1) * per_page
         end = start + per_page
@@ -539,22 +590,22 @@ class BookRecommender:
                 return True
         return False
 
-    def get_unique_categories(self) -> List[str]:
-        """Return canonical categories that have at least one book in the dataset."""
+    def get_unique_categories(self) -> List[Dict[str, Any]]:
+        """Return canonical categories that have at least one book in the dataset, with their counts."""
         if self.df.empty:
             return []
 
-        # Find which canonical categories actually have books
-        present = set()
+        # Find which canonical categories actually have books and count them
+        counts = {}
         for raw in self.df["categories"].dropna().astype(str):
             parts = re.split(r"[,|;/&]", raw)
             for part in parts:
                 canonical = self._get_canonical_for_raw(part.strip())
                 if canonical:
-                    present.add(canonical)
+                    counts[canonical] = counts.get(canonical, 0) + 1
 
         # Return in canonical order, only those present
-        return [c for c in CANONICAL_CATEGORIES_ORDERED if c in present]
+        return [{"name": c, "count": counts[c]} for c in CANONICAL_CATEGORIES_ORDERED if c in counts]
 
     def get_book_by_isbn(self, isbn: str) -> Optional[Dict[str, Any]]:
         """Retrieve a single book by its ISBN13."""

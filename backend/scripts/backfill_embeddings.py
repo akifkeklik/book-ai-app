@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 
 from supabase import Client, create_client
 
@@ -36,50 +37,81 @@ def backfill_embeddings(batch_size: int = 100, max_books: int = None, force_reco
     skipped = 0
     last_id = "0"
 
-    while True:
+    consecutive_failures = 0
+
+    import psycopg2
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
+    db_url = os.environ.get("SUPABASE_DB_URL")
+    if not db_url:
+        logger.error("SUPABASE_DB_URL not set.")
+        sys.exit(1)
+
+    conn = psycopg2.connect(db_url)
+    conn.autocommit = True
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT b.*, be.content_hash as current_hash
+        FROM books b
+        LEFT JOIN book_embeddings be ON b.isbn13 = be.book_id
+        ORDER BY b.isbn13
+    """)
+    columns = [desc[0] for desc in cursor.description]
+    books = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    for book in books:
         if max_books and processed >= max_books:
             break
 
-        limit = min(batch_size, max_books - processed) if max_books else batch_size
+        book_id = book["isbn13"]
+        current_hash = book.pop("current_hash", None)
+        processed += 1
 
-        # Cursor based pagination to avoid OFFSET issues
-        resp = supabase.table("books").select("*").order("isbn13").gt("isbn13", last_id).limit(limit).execute()
-        books = getattr(resp, "data", [])
+        canonical_text = embedding_service.generate_canonical_text(book)
+        if not canonical_text:
+            logger.warning(f"Book {book_id} has empty canonical text. Skipping.")
+            skipped += 1
+            continue
 
-        if not books:
-            break
+        content_hash = embedding_service.generate_content_hash(canonical_text)
 
-        for book in books:
-            book_id = book["isbn13"]
-            last_id = book_id
-            processed += 1
-
-            canonical_text = embedding_service.generate_canonical_text(book)
-            if not canonical_text:
-                logger.warning(f"Book {book_id} has empty canonical text. Skipping.")
+        # Check staleness
+        if not force_recompute:
+            if current_hash == content_hash:
                 skipped += 1
                 continue
 
-            content_hash = embedding_service.generate_content_hash(canonical_text)
+        logger.info(f"Generating embedding for book {book_id}...")
+        embedding = embedding_service.generate_embedding(canonical_text)
 
-            # Check staleness
-            if not force_recompute:
-                if not embedding_service.is_stale(book_id, content_hash):
-                    logger.debug(f"Book {book_id} is up-to-date. Skipping.")
-                    skipped += 1
-                    continue
+        if embedding:
+            try:
+                embedding_str = "[" + ",".join(map(str, embedding)) + "]"
+                cursor.execute("""
+                    INSERT INTO book_embeddings (book_id, embedding, content_hash, model_version)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (book_id) DO UPDATE SET
+                        embedding = EXCLUDED.embedding,
+                        content_hash = EXCLUDED.content_hash,
+                        model_version = EXCLUDED.model_version
+                """, (book_id, embedding_str, content_hash, embedding_service._model))
+                success = True
+            except Exception as e:
+                logger.error(f"Error upserting embedding directly: {e}")
+                success = False
 
-            logger.info(f"Generating embedding for book {book_id}...")
-            embedding = embedding_service.generate_embedding(canonical_text)
-
-            if embedding:
-                success = embedding_service.upsert_embedding(book_id, embedding, content_hash)
-                if success:
-                    generated += 1
-                else:
-                    logger.error(f"Failed to save embedding for {book_id}")
+            if success:
+                generated += 1
+                consecutive_failures = 0
             else:
-                logger.error(f"Failed to generate embedding for {book_id}")
+                logger.error(f"Failed to save embedding for {book_id}")
+        else:
+            consecutive_failures += 1
+            logger.error(f"Failed to generate embedding for {book_id}")
+            if consecutive_failures >= 3:
+                logger.error("Too many consecutive failures. Aborting backfill due to possible quota limits.")
+                sys.exit(1)
 
     logger.info(f"Backfill complete! Processed: {processed}, Generated: {generated}, Skipped: {skipped}")
 

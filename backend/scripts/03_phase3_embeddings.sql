@@ -5,7 +5,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE IF NOT EXISTS public.book_embeddings (
     book_id TEXT PRIMARY KEY REFERENCES public.books(isbn13) ON DELETE CASCADE,
-    embedding vector(1536), -- Dimension for text-embedding-3-small
+    embedding vector(3072), -- Dimension for gemini-embedding-2
     content_hash TEXT NOT NULL,
     model_version TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS public.book_embeddings (
 
 -- Index for HNSW fast search. Using vector_cosine_ops for Cosine Similarity.
 -- Note: In production with millions of rows, consider tweaking m and ef_construction.
-CREATE INDEX IF NOT EXISTS book_embeddings_embedding_idx ON public.book_embeddings USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS book_embeddings_embedding_idx ON public.book_embeddings USING hnsw ((embedding::halfvec(3072)) halfvec_cosine_ops);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.book_embeddings ENABLE ROW LEVEL SECURITY;

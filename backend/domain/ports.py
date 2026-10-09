@@ -84,11 +84,23 @@ class RecommenderPort(Protocol):
         ...
 
     def get_all_books(
-        self, page: int = 1, per_page: int = 50, category: Optional[str] = None
+        self,
+        page: int = 1,
+        per_page: int = 50,
+        category: Optional[str] = None,
+        author: Optional[str] = None,
+        publisher: Optional[str] = None,
+        min_pages: Optional[int] = None,
+        max_pages: Optional[int] = None,
+        min_rating: Optional[float] = None,
+        published_from: Optional[int] = None,
+        published_to: Optional[int] = None,
+        sort: Optional[str] = None,
+        order: Optional[str] = "asc"
     ) -> Dict[str, Any]:
         ...
 
-    def get_unique_categories(self) -> List[str]:
+    def get_unique_categories(self) -> List[Dict[str, Any]]:
         ...
 
     def get_book_by_isbn(self, isbn: str) -> Optional[Dict[str, Any]]:

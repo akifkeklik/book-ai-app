@@ -46,11 +46,13 @@ class _ShimmerCoverBox extends StatelessWidget {
   const _ShimmerCoverBox();
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 190,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    return const AspectRatio(
+      aspectRatio: 2 / 3,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
       ),
     );
   }
@@ -120,14 +122,20 @@ class ShimmerGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 280,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: count,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (_, __) => const ShimmerBookCard(),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      clipBehavior: Clip.none,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < count; i++) ...[
+              const ShimmerBookCard(),
+              if (i < count - 1) const SizedBox(width: 12),
+            ]
+          ],
+        ),
       ),
     );
   }

@@ -46,8 +46,8 @@ def create_app(config_class=Config) -> Flask:
         if app.config.get("TESTING", False):
             return None
 
-        # Allow root manifest and health checks without key potentially
-        if request.path == "/" or request.path == "/api/health":
+        # Allow root manifest, health checks, and docs without key potentially
+        if request.path == "/" or request.path == "/api/health" or request.path.startswith("/api/docs"):
             return None
 
         if request.path.startswith("/api/"):
