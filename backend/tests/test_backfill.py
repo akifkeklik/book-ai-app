@@ -1,11 +1,12 @@
 import sys
 from unittest.mock import MagicMock, patch
 
+from backend.scripts.backfill_embeddings import backfill_embeddings
+
 # Inject psycopg2 into sys.modules so the local import in the script gets the mock
 mock_psycopg2 = MagicMock()
 sys.modules["psycopg2"] = mock_psycopg2
 
-from backend.scripts.backfill_embeddings import backfill_embeddings
 
 @patch("backend.scripts.backfill_embeddings.EmbeddingService")
 def test_backfill_loop(mock_embedding_service):
