@@ -1,4 +1,4 @@
-﻿# ğŸ¤– Libris CI/CD Automation Pipeline
+#  Libris CI/CD Automation Pipeline
 # Purpose: High-speed automated verification for every push or PR.
 
 name: Libris Engineering Excellence
@@ -19,7 +19,7 @@ on:
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:
-  # â”€â”€ ğŸ›¡ï¸ Database / Migration CI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  #   Database / Migration CI 
   database-ci:
     name: Migration Validation
     runs-on: ubuntu-latest
@@ -51,7 +51,7 @@ jobs:
             psql -h localhost -U postgres -d postgres -f "$sql"
           done
 
-  # â”€â”€ ğŸ›¡ï¸ Backend CI (Python/Flask) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  #   Backend CI (Python/Flask) 
   backend-ci:
     name: Backend Lint & Test
     runs-on: ubuntu-latest
@@ -80,7 +80,7 @@ jobs:
         run: |
           PYTHONPATH=backend python -m pytest backend/tests/ -v --tb=short
 
-  # â”€â”€ ğŸ›¡ï¸ Docker Build CI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  #   Docker Build CI 
   docker-ci:
     name: Docker Build Check
     runs-on: ubuntu-latest
@@ -91,7 +91,7 @@ jobs:
         run: |
           docker build --no-cache -t libris-backend backend/
 
-  # â”€â”€ ğŸ›¡ï¸ Frontend CI (Flutter/Dart) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  #   Frontend CI (Flutter/Dart) 
   frontend-ci:
     name: Mobile App Analysis & Test
     runs-on: ubuntu-latest
