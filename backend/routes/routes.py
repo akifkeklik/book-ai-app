@@ -317,29 +317,33 @@ def feedback():
 
 _ai_rate_limits = {}
 _ai_rate_lock = threading.Lock()
+_ai_rate_cleanup_time = time.time()
 
 
 def rate_limit_ai(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        # Prevent memory leak by periodically cleaning up old records
+        global _ai_rate_cleanup_time
         now = time.time()
         limit = 5
         window = 60
 
-        # Use X-Forwarded-For if available to prevent proxy spoofing (simplistic approach for now)
-        client_ip = (
-            request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
-        )
+        # Do not blindly trust X-Forwarded-For without proper proxy configuration (e.g. ProxyFix).
+        client_ip = request.remote_addr or "unknown"
         user_id = getattr(g, "user_id", client_ip)
 
         with _ai_rate_lock:
-            # Simple cleanup
-            if len(_ai_rate_limits) > 1000:
+            # Cleanup at most once every minute to prevent O(N) sweeps on every request
+            if now - _ai_rate_cleanup_time > 60:
                 for k in list(_ai_rate_limits.keys()):
                     _ai_rate_limits[k] = [t for t in _ai_rate_limits[k] if now - t < window]
                     if not _ai_rate_limits[k]:
                         del _ai_rate_limits[k]
+                _ai_rate_cleanup_time = now
+
+            # Hard cap to prevent memory exhaustion under heavy unique IP spoofing/attacks
+            if len(_ai_rate_limits) > 10000:
+                return jsonify({"error": "Service overloaded. Rate limiter capacity reached."}), 503
 
             if user_id in _ai_rate_limits:
                 reqs = _ai_rate_limits[user_id]
