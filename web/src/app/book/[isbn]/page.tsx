@@ -3,6 +3,7 @@ import { BookCard } from '@/components/BookCard';
 import type { Book } from '@/types';
 import { Star, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import BookFeedback from '@/components/BookFeedback';
 
 export const instant = false;
 
@@ -87,6 +88,8 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
               {book.description || 'No description available for this book.'}
             </p>
           </div>
+          
+          <BookFeedback bookId={book.isbn13} />
         </div>
       </div>
       

@@ -1,7 +1,25 @@
 import Link from 'next/link';
 import { BookOpen, Sparkles, Compass } from 'lucide-react';
+import { createClient } from '@/lib/supabase/server';
+import { ApiService } from '@/lib/api';
+import { BookCard } from '@/components/BookCard';
+import type { Book } from '@/types';
 
-export default function Home() {
+export const instant = false;
+
+export default async function Home() {
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  let personalizedRecs: Book[] = [];
+  if (session) {
+    try {
+      personalizedRecs = await ApiService.getPersonalizedRecommendations(4);
+    } catch (e) {
+      console.error('Failed to get personalized recs:', e);
+    }
+  }
+
   return (
     <div className="container" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
       <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto' }}>
@@ -21,6 +39,19 @@ export default function Home() {
             <Sparkles size={20} className="text-gradient" /> Try AI Discovery
           </Link>
         </div>
+        
+        {session && personalizedRecs.length > 0 && (
+          <div style={{ textAlign: 'left', marginBottom: '4rem' }}>
+            <h2 style={{ fontSize: '2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Sparkles className="text-gradient" /> For You
+            </h2>
+            <div className="grid-books">
+              {personalizedRecs.map(rec => (
+                <BookCard key={rec.isbn13} book={rec} />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2rem', textAlign: 'left' }}>
           <div className="glass-panel">

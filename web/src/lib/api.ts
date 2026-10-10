@@ -102,4 +102,36 @@ export class ApiService {
     
     return res.json();
   }
+
+  static async getPersonalizedRecommendations(limit: number = 10): Promise<Book[]> {
+    const headers = await this.getHeaders();
+    const url = new URL(`${API_URL}/api/recommend/personalized`);
+    url.searchParams.append('limit', limit.toString());
+    
+    const res = await fetch(url.toString(), { headers });
+    if (!res.ok) throw new Error('Failed to fetch personalized recommendations');
+    
+    const data = await res.json();
+    return data.recommendations || [];
+  }
+
+  static async submitFeedback(bookId: string, interaction: 'like' | 'dislike'): Promise<boolean> {
+    const headers = await this.getHeaders();
+    const res = await fetch(`${API_URL}/api/feedback`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ book_id: bookId, interaction })
+    });
+    return res.ok;
+  }
+
+  static async trackActivity(bookId: string, action: string = 'view'): Promise<boolean> {
+    const headers = await this.getHeaders();
+    const res = await fetch(`${API_URL}/api/track`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ book_id: bookId, action })
+    });
+    return res.ok;
+  }
 }
