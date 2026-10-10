@@ -65,7 +65,7 @@
    cd book-ai-app
    ```
 
-2. **Frontend Setup:**
+2. **Mobile Setup (Flutter):**
 
    ```bash
    cd mobile/flutter_app
@@ -73,7 +73,16 @@
    flutter run
    ```
 
-3. **Backend Setup:**
+3. **Web Setup (Next.js):**
+
+   ```bash
+   cd web
+   # Create .env.local with LIBRIS_API_KEY and NEXT_PUBLIC_SUPABASE_URL
+   npm install
+   npm run dev
+   ```
+
+4. **Backend Setup:**
    ```bash
    pip install -r backend/requirements.txt
    python -m backend.app
