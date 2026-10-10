@@ -183,5 +183,10 @@
   "auth_error_weak_password": "Şifre çok zayıf. En az 6 karakter olmalı.",
   "auth_error_unexpected": "Beklenmeyen bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
   "auth_confirm_sent": "Onay bağlantısı şuraya gönderildi:\n{email}",
-  "search_failed": "Arama başarısız oldu."
+  "search_failed": "Arama başarısız oldu.",
+  "like": "Beğen",
+  "dislike": "Beğenme",
+  "want_to_read": "Okumak İstiyorum",
+  "finished": "Okudum",
+  "marked_as": "{label} olarak işaretlendi"
 }

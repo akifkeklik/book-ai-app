@@ -183,5 +183,10 @@
   "auth_error_weak_password": "Password is too weak. Must be at least 6 characters.",
   "auth_error_unexpected": "An unexpected error occurred. Please try again later.",
   "auth_confirm_sent": "We sent a confirmation link to\n{email}",
-  "search_failed": "Search failed."
+  "search_failed": "Search failed.",
+  "like": "Like",
+  "dislike": "Dislike",
+  "want_to_read": "Want to Read",
+  "finished": "Finished",
+  "marked_as": "Marked as {label}"
 }

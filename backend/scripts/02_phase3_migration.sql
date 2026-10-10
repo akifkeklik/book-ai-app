@@ -20,7 +20,7 @@ END $$;
 -- 2. Backfill existing favorites into user_interactions as 'like'
 -- Use DO NOTHING to prevent overwriting existing dislikes or newer interactions
 INSERT INTO public.user_interactions (user_id, book_id, interaction_type, created_at)
-SELECT user_id, isbn13, 'like', added_at
+SELECT user_id, book_id, 'like', added_at
 FROM public.favorites
 ON CONFLICT (user_id, book_id) DO NOTHING;
 
@@ -30,12 +30,12 @@ RETURNS TRIGGER AS $$
 BEGIN
     IF (TG_OP = 'INSERT') THEN
         INSERT INTO public.user_interactions (user_id, book_id, interaction_type, created_at)
-        VALUES (NEW.user_id, NEW.isbn13, 'like', NEW.added_at)
+        VALUES (NEW.user_id, NEW.book_id, 'like', NEW.added_at)
         ON CONFLICT (user_id, book_id) DO UPDATE SET interaction_type = 'like';
         RETURN NEW;
     ELSIF (TG_OP = 'DELETE') THEN
         DELETE FROM public.user_interactions 
-        WHERE user_id = OLD.user_id AND book_id = OLD.isbn13 AND interaction_type = 'like';
+        WHERE user_id = OLD.user_id AND book_id = OLD.book_id AND interaction_type = 'like';
         RETURN OLD;
     END IF;
     RETURN NULL;

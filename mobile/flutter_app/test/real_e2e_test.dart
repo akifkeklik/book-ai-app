@@ -38,7 +38,7 @@ void main() {
     try {
       final response = await supabase.auth.signInWithPassword(email: email, password: password);
       expect(response.session, isNotNull);
-      print('Login successful. Session token: ${response.session?.accessToken?.substring(0, 10)}...');
+      print('Login successful. Session token: ${response.session!.accessToken.substring(0, 10)}...');
     } catch (e) {
       print('Login failed: $e. Proceeding with anonymous access.');
     }
