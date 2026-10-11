@@ -50,7 +50,9 @@ class SupabaseInteractionRepository:
         try:
             resp = (
                 client.table("user_profiles")
-                .select("preferred_genres")
+                .select(
+                    "preferred_genres,preferred_authors,preferred_vibe,reading_frequency,updated_at"
+                )
                 .eq("user_id", user_id)
                 .execute()
             )
