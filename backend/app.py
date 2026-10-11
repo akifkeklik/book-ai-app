@@ -3,6 +3,7 @@ Book AI Recommendation API
 Flask factory application with CORS, error handlers, and blueprint registration.
 """
 
+import hmac
 import logging
 import time
 import uuid
@@ -65,8 +66,14 @@ def create_app(config_class=Config) -> Flask:
 
             # 1. Server-to-Server Authentication via X-Api-Key
             api_key = request.headers.get("X-Api-Key")
-            if api_key:
-                if api_key == app.config["LIBRIS_API_KEY"]:
+            if api_key is not None:
+                api_key_clean = api_key.strip()
+                server_key = str(app.config.get("LIBRIS_API_KEY", "")).strip()
+                if not api_key_clean or not server_key:
+                    log_event(__name__, logging.WARNING, msg="Unauthorized access attempt: Empty X-Api-Key", ip=request.remote_addr)
+                    return jsonify({"error": "Unauthorized: Invalid API Key"}), 401
+
+                if hmac.compare_digest(api_key_clean, server_key):
                     g.is_server = True
                     return None
                 log_event(__name__, logging.WARNING, msg="Unauthorized access attempt: Invalid X-Api-Key", ip=request.remote_addr)

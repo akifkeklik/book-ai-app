@@ -342,6 +342,18 @@ _ai_rate_cleanup_time = time.time()
 
 
 def rate_limit_ai(f):
+    """
+    Tiered AI Rate Limiter.
+    - Anonymous (IP-based): 5 requests / 60 seconds
+    - Authenticated User (user_id-based): 10 requests / 60 seconds
+    - Server (X-Api-Key): 30 requests / 60 seconds
+
+    ARCHITECTURAL NOTE (PRE-PRODUCTION):
+    This limiter is currently in-memory (per Python process). In multi-worker
+    WSGI/Gunicorn deployments, each worker process maintains an isolated bucket.
+    For multi-instance horizontal scaling, a distributed store (e.g. Redis) is required.
+    IP resolution uses request.remote_addr to prevent unverified X-Forwarded-For spoofing.
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
         global _ai_rate_cleanup_time
@@ -406,6 +418,19 @@ def ai_chat():
     query = data["query"].strip()
     if not query:
         return jsonify({"error": "Query cannot be empty"}), 400
+
+    MAX_QUERY_LENGTH = 1000
+    if len(query) > MAX_QUERY_LENGTH:
+        return (
+            jsonify(
+                {
+                    "error": f"Query exceeds maximum allowed length of {MAX_QUERY_LENGTH} characters",
+                    "max_length": MAX_QUERY_LENGTH,
+                    "actual_length": len(query),
+                }
+            ),
+            400,
+        )
 
     user_id = getattr(g, "user_id", None)  # Optional if auth is not strictly enforced here
     try:

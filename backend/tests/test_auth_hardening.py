@@ -69,6 +69,17 @@ def test_server_invalid_api_key_rejected_with_401(auth_client):
     data = resp.get_json()
     assert "Invalid API Key" in data["error"]
 
+def test_server_empty_api_key_rejected_with_401(auth_client):
+    # Empty string API key
+    resp_empty = auth_client.get("/api/categories", headers={"X-Api-Key": ""})
+    assert resp_empty.status_code == 401
+    assert "Invalid API Key" in resp_empty.get_json()["error"]
+
+    # Whitespace-only API key
+    resp_space = auth_client.get("/api/categories", headers={"X-Api-Key": "   "})
+    assert resp_space.status_code == 401
+    assert "Invalid API Key" in resp_space.get_json()["error"]
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. Anonymous Access with Supabase Anon Key
 # ─────────────────────────────────────────────────────────────────────────────
@@ -151,6 +162,26 @@ def test_ai_chat_rate_limiting_isolated_per_user(auth_client):
     # User 2 on the same IP is still allowed because User 2 has separate authenticated quota
     resp_u2 = auth_client.post("/api/ai/chat", headers=headers_u2, json=payload, environ_base={"REMOTE_ADDR": "192.168.1.10"})
     assert resp_u2.status_code == 200
+
+def test_ai_chat_query_length_boundary_accepted(auth_client):
+    _ai_rate_limits.clear()
+    headers = {"Authorization": f"Bearer {TEST_SUPABASE_ANON_KEY}"}
+    # Exactly 1000 characters
+    valid_query = "A" * 1000
+    resp = auth_client.post("/api/ai/chat", headers=headers, json={"query": valid_query})
+    assert resp.status_code == 200
+
+def test_ai_chat_query_length_exceeded_rejected_with_400(auth_client):
+    _ai_rate_limits.clear()
+    headers = {"Authorization": f"Bearer {TEST_SUPABASE_ANON_KEY}"}
+    # 1001 characters
+    long_query = "A" * 1001
+    resp = auth_client.post("/api/ai/chat", headers=headers, json={"query": long_query})
+    assert resp.status_code == 400
+    data = resp.get_json()
+    assert "Query exceeds maximum allowed length of 1000 characters" in data["error"]
+    assert data["max_length"] == 1000
+    assert data["actual_length"] == 1001
 
 def test_misconfiguration_guard_when_libris_key_missing(auth_app):
     auth_app.config["LIBRIS_API_KEY"] = ""
