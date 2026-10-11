@@ -75,7 +75,15 @@ class _HomeScreenState extends State<HomeScreen> {
         child: RefreshIndicator(
           onRefresh: () async {
             HapticFeedback.mediumImpact();
-            await context.read<CatalogProvider>().fetchPopular(force: true);
+            final catalog = context.read<CatalogProvider>();
+            final auth = context.read<AuthProvider>();
+            final favs = context.read<FavoritesProvider>();
+            final recs = context.read<RecommendationProvider>();
+            await catalog.fetchPopular(force: true);
+            if (auth.isLoggedIn && auth.currentUser != null) {
+              await favs.loadFavorites(auth.currentUser!.id);
+              await recs.fetchPersonalizedRecs(auth.currentUser!.id, catalog.popularBooks, force: true);
+            }
           },
           child: Consumer2<CatalogProvider, RecommendationProvider>(
             builder: (context, catalog, recommendations, _) {
@@ -225,10 +233,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Consumer2<AuthProvider, FavoritesProvider>(
                       builder: (context, auth, favProv, _) {
                         if (!auth.isLoggedIn) return const SizedBox.shrink();
-
-                        if (favProv.favorites.isEmpty && !favProv.isLoading) {
-                          return const SizedBox.shrink(); // Don't show empty state here, just hide personalized section
-                        }
 
                         if (recommendations.status == RecommendationStatus.loading) {
                            return Padding(
