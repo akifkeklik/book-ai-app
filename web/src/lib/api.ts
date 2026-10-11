@@ -35,30 +35,30 @@ export class ApiService {
   }
 
   static async getBooks(
-    params: { page?: number; per_page?: number; category?: string; query?: string } = {}
+    params: {
+      page?: number;
+      per_page?: number;
+      category?: string;
+      query?: string;
+      sort?: string;
+      order?: string;
+      min_rating?: number;
+      min_pages?: number;
+      max_pages?: number;
+    } = {}
   ): Promise<PaginatedResponse<Book>> {
     const headers = await this.getHeaders();
     const url = new URL(`${API_URL}/api/books`);
     
     if (params.page) url.searchParams.append('page', params.page.toString());
     if (params.per_page) url.searchParams.append('per_page', params.per_page.toString());
-    if (params.category) url.searchParams.append('category', params.category);
-    
-    // Use search endpoint if query is provided
-    if (params.query) {
-      const searchUrl = new URL(`${API_URL}/api/search`);
-      searchUrl.searchParams.append('q', params.query);
-      searchUrl.searchParams.append('limit', (params.per_page || 40).toString());
-      
-      const res = await fetch(searchUrl.toString(), { headers });
-      if (!res.ok) throw new Error('Failed to search books');
-      const data = await res.json();
-      return {
-        books: data.books || [],
-        total: data.books?.length || 0,
-        total_pages: 1
-      };
-    }
+    if (params.category && params.category !== 'all') url.searchParams.append('category', params.category);
+    if (params.query) url.searchParams.append('q', params.query);
+    if (params.sort) url.searchParams.append('sort', params.sort);
+    if (params.order) url.searchParams.append('order', params.order);
+    if (params.min_rating) url.searchParams.append('min_rating', params.min_rating.toString());
+    if (params.min_pages) url.searchParams.append('min_pages', params.min_pages.toString());
+    if (params.max_pages) url.searchParams.append('max_pages', params.max_pages.toString());
 
     const res = await fetch(url.toString(), { headers });
     if (!res.ok) throw new Error('Failed to fetch books');
@@ -115,7 +115,10 @@ export class ApiService {
     return data.recommendations || [];
   }
 
-  static async submitFeedback(bookId: string, interaction: 'like' | 'dislike'): Promise<boolean> {
+  static async submitFeedback(
+    bookId: string,
+    interaction: 'like' | 'dislike' | 'favorite' | 'want_to_read' | 'finished'
+  ): Promise<boolean> {
     const headers = await this.getHeaders();
     const res = await fetch(`${API_URL}/api/feedback`, {
       method: 'POST',

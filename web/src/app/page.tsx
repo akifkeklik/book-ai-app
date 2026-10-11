@@ -5,6 +5,7 @@ import { ApiService } from '@/lib/api';
 import { BookCard } from '@/components/BookCard';
 import type { Book } from '@/types';
 
+
 export const instant = false;
 
 export default async function Home() {
