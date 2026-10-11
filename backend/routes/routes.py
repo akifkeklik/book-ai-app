@@ -38,14 +38,26 @@ _process_rag_query_uc = container.process_rag_query_uc
 def require_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        # 1. If caller is explicitly anonymous (e.g. Supabase anon key), reject personal data access
+        if getattr(g, "is_anon", False):
+            return jsonify({"error": "Unauthorized: Real user authentication required, anonymous access provided"}), 401
+
+        # 2. If user already verified by middleware
+        if getattr(g, "user_id", None):
+            return f(*args, **kwargs)
+
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             return jsonify({"error": "Unauthorized: Missing or invalid Authorization header"}), 401
 
-        token = auth_header.split(" ")[1]
+        token = auth_header.split(" ", 1)[1].strip()
+        from backend.config import Config
+        if Config.SUPABASE_ANON_KEY and token == Config.SUPABASE_ANON_KEY:
+            return jsonify({"error": "Unauthorized: Real user authentication required, anonymous key provided"}), 401
+
         try:
             user = _auth_port.verify_token(token) if _auth_port else None
-            if not user or not user.id:
+            if not user or not getattr(user, "id", None):
                 return jsonify({"error": "Unauthorized: Invalid token"}), 401
             g.user_id = user.id
             g.jwt_token = token
@@ -61,12 +73,21 @@ def require_auth(f):
 def optional_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        # If user_id already resolved by middleware, proceed
+        if getattr(g, "user_id", None):
+            return f(*args, **kwargs)
+
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
+            token = auth_header.split(" ", 1)[1].strip()
+            from backend.config import Config
+            if Config.SUPABASE_ANON_KEY and token == Config.SUPABASE_ANON_KEY:
+                g.is_anon = True
+                return f(*args, **kwargs)
+
             try:
                 user = _auth_port.verify_token(token) if _auth_port else None
-                if user and user.id:
+                if user and getattr(user, "id", None):
                     g.user_id = user.id
                     g.jwt_token = token
             except Exception:
@@ -325,12 +346,23 @@ def rate_limit_ai(f):
     def decorated(*args, **kwargs):
         global _ai_rate_cleanup_time
         now = time.time()
-        limit = 5
         window = 60
 
-        # Do not blindly trust X-Forwarded-For without proper proxy configuration (e.g. ProxyFix).
+        # Do not blindly trust X-Forwarded-For without proper proxy configuration
         client_ip = request.remote_addr or "unknown"
-        user_id = getattr(g, "user_id", client_ip)
+        user_id = getattr(g, "user_id", None)
+        is_server = getattr(g, "is_server", False)
+
+        if user_id:
+            bucket_key = f"user:{user_id}"
+            limit = 10
+        elif is_server:
+            bucket_key = f"server:{client_ip}"
+            limit = 30
+        else:
+            # Anonymous access (with valid SUPABASE_ANON_KEY or test fixture)
+            bucket_key = f"anon:{client_ip}"
+            limit = 5
 
         with _ai_rate_lock:
             # Cleanup at most once every minute to prevent O(N) sweeps on every request
@@ -345,8 +377,8 @@ def rate_limit_ai(f):
             if len(_ai_rate_limits) > 10000:
                 return jsonify({"error": "Service overloaded. Rate limiter capacity reached."}), 503
 
-            if user_id in _ai_rate_limits:
-                reqs = _ai_rate_limits[user_id]
+            if bucket_key in _ai_rate_limits:
+                reqs = _ai_rate_limits[bucket_key]
                 reqs = [t for t in reqs if now - t < window]
                 if len(reqs) >= limit:
                     retry_after = int(window - (now - reqs[0]))
@@ -354,9 +386,9 @@ def rate_limit_ai(f):
                     response.headers["Retry-After"] = str(retry_after)
                     return response, 429
                 reqs.append(now)
-                _ai_rate_limits[user_id] = reqs
+                _ai_rate_limits[bucket_key] = reqs
             else:
-                _ai_rate_limits[user_id] = [now]
+                _ai_rate_limits[bucket_key] = [now]
 
         return f(*args, **kwargs)
 
