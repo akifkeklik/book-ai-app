@@ -40,7 +40,11 @@ def require_auth(f):
     def decorated(*args, **kwargs):
         # 1. If caller is explicitly anonymous (e.g. Supabase anon key), reject personal data access
         if getattr(g, "is_anon", False):
-            return jsonify({"error": "Unauthorized: Real user authentication required, anonymous access provided"}), 401
+            return jsonify(
+                {
+                    "error": "Unauthorized: Real user authentication required, anonymous access provided"
+                }
+            ), 401
 
         # 2. If user already verified by middleware
         if getattr(g, "user_id", None):
@@ -52,8 +56,11 @@ def require_auth(f):
 
         token = auth_header.split(" ", 1)[1].strip()
         from backend.config import Config
+
         if Config.SUPABASE_ANON_KEY and token == Config.SUPABASE_ANON_KEY:
-            return jsonify({"error": "Unauthorized: Real user authentication required, anonymous key provided"}), 401
+            return jsonify(
+                {"error": "Unauthorized: Real user authentication required, anonymous key provided"}
+            ), 401
 
         try:
             user = _auth_port.verify_token(token) if _auth_port else None
@@ -81,6 +88,7 @@ def optional_auth(f):
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ", 1)[1].strip()
             from backend.config import Config
+
             if Config.SUPABASE_ANON_KEY and token == Config.SUPABASE_ANON_KEY:
                 g.is_anon = True
                 return f(*args, **kwargs)
@@ -318,15 +326,26 @@ def feedback():
         return jsonify({"error": "JSON body required"}), 400
 
     user_id = g.user_id
-    book_id = data.get("book_id")
-    interaction = data.get("interaction")  # 'like' or 'dislike'
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
 
-    if not all([user_id, book_id, interaction]):
-        return jsonify({"error": "user_id, book_id, and interaction are required"}), 400
+    book_id = data.get("book_id")
+    if not book_id or not isinstance(book_id, str) or not book_id.strip():
+        return jsonify({"error": "book_id is required"}), 400
+    book_id = book_id.strip()
+
+    interaction = data.get("interaction")
+    if not interaction or not isinstance(interaction, str):
+        return jsonify({"error": "interaction is required"}), 400
+    interaction = interaction.strip().lower()
+
+    valid_interactions = ["like", "dislike", "favorite"]
+    if interaction not in valid_interactions:
+        return jsonify({"error": f"Invalid interaction. Supported: {valid_interactions}"}), 400
 
     try:
         result = _submit_feedback_uc.execute(user_id, book_id, interaction)
-        return jsonify(result), 200 if result["status"] == "success" else 500
+        return jsonify(result), 200 if result.get("status") == "success" else 500
     except Exception as exc:
         raise exc
 
@@ -354,6 +373,7 @@ def rate_limit_ai(f):
     For multi-instance horizontal scaling, a distributed store (e.g. Redis) is required.
     IP resolution uses request.remote_addr to prevent unverified X-Forwarded-For spoofing.
     """
+
     @wraps(f)
     def decorated(*args, **kwargs):
         global _ai_rate_cleanup_time
@@ -454,18 +474,30 @@ def track_activity():
         return jsonify({"error": "JSON body required"}), 400
 
     user_id = g.user_id
-    book_name = data.get("book_name", "").strip()
-    book_id = data.get("book_id", "").strip()
-    action = data.get("action", "view").strip()
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    book_name = data.get("book_name", "").strip() if isinstance(data.get("book_name"), str) else ""
+    book_id = data.get("book_id", "").strip() if isinstance(data.get("book_id"), str) else ""
+    if not book_id and book_name:
+        book_id = book_name
 
     if not book_id:
         return jsonify({"error": "book_id is required"}), 400
 
+    action = data.get("action", "view")
+    if not isinstance(action, str):
+        return jsonify({"error": "action must be a string"}), 400
+    action = action.strip().lower()
+
     valid_actions = [
         "view",
         "book_view",
+        "like",
         "book_like",
+        "dislike",
         "book_dislike",
+        "favorite",
         "book_favorite",
         "recommendation_click",
         "search",
@@ -479,4 +511,6 @@ def track_activity():
         )
         return jsonify(result), 200
     except Exception as exc:
-        raise exc
+        logger.error(f"Tracking error: {exc}")
+        return jsonify({"error": "Failed to track activity"}), 500
+

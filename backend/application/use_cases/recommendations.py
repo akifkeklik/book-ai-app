@@ -14,7 +14,9 @@ class GetRecommendationsUseCase:
         self._recommender = recommender
         self._enrichment_service = enrichment_service
 
-    def execute(self, book_title: str, top_n: int = 10, use_hybrid: bool = True) -> List[Dict[str, Any]]:
+    def execute(
+        self, book_title: str, top_n: int = 10, use_hybrid: bool = True
+    ) -> List[Dict[str, Any]]:
         t0 = time.time()
         books = self._recommender.recommend(
             seed_titles=[book_title],
@@ -22,7 +24,16 @@ class GetRecommendationsUseCase:
             use_diversity=True,
         )
         latency = round((time.time() - t0) * 1000, 2)
-        logger.info("Recommendation generated", extra={"extra_data": {"recommendation_latency_ms": latency, "seed": book_title, "count": len(books)}})
+        logger.info(
+            "Recommendation generated",
+            extra={
+                "extra_data": {
+                    "recommendation_latency_ms": latency,
+                    "seed": book_title,
+                    "count": len(books),
+                }
+            },
+        )
         enriched_books = self._enrichment_service.enrich(books)
         return [Recommendation(**book).model_dump() for book in enriched_books]
 
@@ -50,25 +61,46 @@ class GetPersonalizedRecommendationsUseCase:
             return self._fallback_popular(limit)
 
         try:
-            # 1. Get user interactions (Likes and Dislikes)
+            # 1. Get user interactions (Likes, Favorites, and Dislikes)
             interactions_data = self._interaction_repo.get_user_interactions(user_id)
-            likes = [f["book_id"] for f in interactions_data if f.get("interaction_type") == "like"]
-            dislikes = [f["book_id"] for f in interactions_data if f.get("interaction_type") == "dislike"]
+            if not isinstance(interactions_data, list):
+                interactions_data = []
 
-            likes_tuple = tuple(sorted(set(likes)))
-            dislikes_tuple = tuple(sorted(set(dislikes)))
+            likes = []
+            dislikes = []
+            for item in interactions_data:
+                if not isinstance(item, dict):
+                    continue
+                bid = item.get("book_id")
+                itype = item.get("interaction_type")
+                if not bid:
+                    continue
+                clean_bid = str(bid).strip()
+                if not clean_bid:
+                    continue
+                if itype in ("like", "favorite"):
+                    likes.append(clean_bid)
+                elif itype == "dislike":
+                    dislikes.append(clean_bid)
+
+            dislikes_set = set(dislikes)
+            # Active dislikes take strict precedence over older likes
+            likes_set = set(likes) - dislikes_set
+
+            likes_tuple = tuple(sorted(likes_set))
+            dislikes_tuple = tuple(sorted(dislikes_set))
 
             genres_tuple = ()
             if not likes_tuple:
                 profile_data = self._interaction_repo.get_user_profile(user_id)
-                if profile_data:
+                if isinstance(profile_data, dict):
                     genres = profile_data.get("preferred_genres", [])
-                    if genres:
-                        genres_tuple = tuple(sorted(set(genres)))
+                    if isinstance(genres, list) and genres:
+                        genres_tuple = tuple(
+                            sorted(set(str(g).strip() for g in genres if str(g).strip()))
+                        )
 
-            return self._compute_recs(
-                user_id, likes_tuple, dislikes_tuple, genres_tuple, limit
-            )
+            return self._compute_recs(user_id, likes_tuple, dislikes_tuple, genres_tuple, limit)
         except Exception as e:
             logger.error(f"Failed fetching interactions for personalized recs: {e}")
             return self._fallback_popular(limit)
@@ -99,16 +131,22 @@ class GetPersonalizedRecommendationsUseCase:
                 logger.info(f"User {user_id} has no profile info. Returning trending books.")
                 return self._fallback_popular(limit)
 
-            logger.info(f"Generating personalized recs for {user_id} with {len(seed_titles)} seeds.")
+            logger.info(
+                f"Generating personalized recs for {user_id} with {len(seed_titles)} seeds."
+            )
 
             semantic_scores = None
             if likes and self._book_data_port:
                 try:
-                    semantic_scores = self._book_data_port.get_semantic_candidates(list(likes), limit=100)
+                    semantic_scores = self._book_data_port.get_semantic_candidates(
+                        list(likes), limit=100
+                    )
                     if semantic_scores:
                         logger.info(f"Retrieved {len(semantic_scores)} semantic candidates.")
                 except Exception as e:
-                    logger.warning(f"Semantic candidate generation failed: {e}. Degrading to TF-IDF only.")
+                    logger.warning(
+                        f"Semantic candidate generation failed: {e}. Degrading to TF-IDF only."
+                    )
 
             t0 = time.time()
             recs = self._recommender.recommend(
@@ -116,10 +154,11 @@ class GetPersonalizedRecommendationsUseCase:
                 top_n=limit,
                 use_diversity=True,
                 semantic_scores=semantic_scores,
-                dislikes=list(dislikes)
+                dislikes=list(dislikes),
             )
 
-            final_recs = [r for r in recs if r.get("isbn13") not in dislikes]
+            dislikes_set = set(str(d).strip() for d in dislikes)
+            final_recs = [r for r in recs if str(r.get("isbn13", "")).strip() not in dislikes_set]
 
             # Attach a reason to the final recommendations
             for r in final_recs:
@@ -127,12 +166,17 @@ class GetPersonalizedRecommendationsUseCase:
                     r["recommendation_reason"] = "Based on your recent reading history"
 
             latency = round((time.time() - t0) * 1000, 2)
-            logger.info("Personalized recommendation generated", extra={"extra_data": {
-                "personalized_latency_ms": latency,
-                "seed_count": len(seed_titles),
-                "semantic_candidates": len(semantic_scores) if semantic_scores else 0,
-                "count": len(final_recs)
-            }})
+            logger.info(
+                "Personalized recommendation generated",
+                extra={
+                    "extra_data": {
+                        "personalized_latency_ms": latency,
+                        "seed_count": len(seed_titles),
+                        "semantic_candidates": len(semantic_scores) if semantic_scores else 0,
+                        "count": len(final_recs),
+                    }
+                },
+            )
             enriched_books = self._enrichment_service.enrich(final_recs)
             return [Recommendation(**book).model_dump() for book in enriched_books]
         except Exception as e:

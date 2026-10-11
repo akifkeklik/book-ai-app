@@ -25,7 +25,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 # "backend.recommender". Setting this alias here (after all imports but before
 # any class definitions) ensures sys.modules contains the mapping by the time
 # the module is fully initialised, which is always before any pickle.load() call.
-sys.modules['backend.recommender'] = sys.modules[__name__]
+sys.modules["backend.recommender"] = sys.modules[__name__]
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 MODEL_VERSION = "2.1.0"
@@ -149,16 +149,22 @@ class RecommenderEngine:
     def find_index(self, book_identifier: str) -> Optional[int]:
         """Find the DataFrame index for a book by its title or ISBN."""
         if not isinstance(book_identifier, str):
+            if isinstance(book_identifier, (int, float)):
+                book_identifier = str(int(book_identifier))
+            else:
+                return None
+
+        clean_id = book_identifier.strip()
+        if not clean_id or self.df.empty:
             return None
 
         # Prioritize ISBN matching
-        if len(book_identifier) == 13 and book_identifier.isdigit():
-            matches = self.df.index[self.df["isbn13"] == book_identifier].tolist()
-            if matches:
-                return matches[0]
+        matches = self.df.index[self.df["isbn13"] == clean_id].tolist()
+        if matches:
+            return matches[0]
 
         # Fallback to title matching
-        matches = self.df.index[self.df["title"].str.lower() == book_identifier.lower()].tolist()
+        matches = self.df.index[self.df["title"].str.lower() == clean_id.lower()].tolist()
         if matches:
             return matches[0]
 
@@ -211,9 +217,7 @@ class BookRecommender:
         try:
             df = pd.DataFrame(books)
             self.engine.df = preprocess_dataframe(df)
-            logger.info(
-                f"Data loaded and preprocessed. Shape: {self.engine.df.shape}"
-            )
+            logger.info(f"Data loaded and preprocessed. Shape: {self.engine.df.shape}")
         except Exception as e:
             logger.error(f"Failed to process book data: {e}")
             self.engine.df = pd.DataFrame()
@@ -333,10 +337,7 @@ class BookRecommender:
             )
         else:
             # Fallback for when semantic search is unavailable
-            final_scores = (
-                0.7 * raw_scores
-                + 0.3 * popularity_scores
-            )
+            final_scores = 0.7 * raw_scores + 0.3 * popularity_scores
 
         # Set scores of seed books to a very low value to exclude them
         final_scores[seed_indices] = -1.0
@@ -370,7 +371,7 @@ class BookRecommender:
         """Select diverse recommendations using Maximal Marginal Relevance (MMR)."""
         selected_indices = []
         # Limit candidates to speed up MMR calculation
-        candidate_indices = np.argsort(scores)[::-1][:max(100, top_n * 10)].tolist()
+        candidate_indices = np.argsort(scores)[::-1][: max(100, top_n * 10)].tolist()
 
         # Start with the highest-scoring item
         if not candidate_indices:
@@ -385,7 +386,9 @@ class BookRecommender:
 
             for cand_idx in candidate_indices:
                 if selected_indices:
-                    sim_scores = cosine_similarity(self.tfidf_matrix[cand_idx], self.tfidf_matrix[selected_indices])[0]
+                    sim_scores = cosine_similarity(
+                        self.tfidf_matrix[cand_idx], self.tfidf_matrix[selected_indices]
+                    )[0]
                     sim_to_selected = sim_scores.max()
                 else:
                     sim_to_selected = 0.0
@@ -409,7 +412,9 @@ class BookRecommender:
             idx = self.engine.find_index(rec["isbn13"])
             if idx is not None:
                 if selected_indices:
-                    sim_scores = cosine_similarity(self.tfidf_matrix[idx], self.tfidf_matrix[selected_indices])[0]
+                    sim_scores = cosine_similarity(
+                        self.tfidf_matrix[idx], self.tfidf_matrix[selected_indices]
+                    )[0]
                     sim_to_selected = sim_scores.max()
                 else:
                     sim_to_selected = 0.0
@@ -418,7 +423,10 @@ class BookRecommender:
         return recs
 
     def _explain_recommendation(
-        self, recommended_book: Dict[str, Any], seed_indices: List[int], semantic_scores: Optional[Dict[str, float]] = None
+        self,
+        recommended_book: Dict[str, Any],
+        seed_indices: List[int],
+        semantic_scores: Optional[Dict[str, float]] = None,
     ) -> Dict[str, str]:
         """Generate a simple explanation for a recommendation."""
         rec_idx = self.engine.find_index(recommended_book["isbn13"])
@@ -440,7 +448,9 @@ class BookRecommender:
             return {"explanation": explanation, "explanation_source_book": ""}
 
         # Hybrid case: we have both likes (seed_indices) and possibly semantic matches
-        sim_scores = cosine_similarity(self.tfidf_matrix[rec_idx], self.tfidf_matrix[seed_indices])[0]
+        sim_scores = cosine_similarity(self.tfidf_matrix[rec_idx], self.tfidf_matrix[seed_indices])[
+            0
+        ]
         if sim_scores.size == 0:
             return {}
 
@@ -460,7 +470,9 @@ class BookRecommender:
             if common_genres:
                 explanation = f"'{source_book['title']}' kitabını sevdiğiniz için, ortak {', '.join(list(common_genres)[:2])} türündeki bu kitabı önerdik."
             else:
-                explanation = f"'{source_book['title']}' kitabına benzer bir atmosferi olduğu için önerdik."
+                explanation = (
+                    f"'{source_book['title']}' kitabına benzer bir atmosferi olduğu için önerdik."
+                )
 
         return {"explanation": explanation, "explanation_source_book": source_book["title"]}
 
@@ -495,7 +507,7 @@ class BookRecommender:
         published_from: Optional[int] = None,
         published_to: Optional[int] = None,
         sort: Optional[str] = None,
-        order: Optional[str] = "asc"
+        order: Optional[str] = "asc",
     ) -> Dict[str, Any]:
         """Get a paginated list of all books, optionally filtered and sorted."""
         if self.df.empty:
@@ -507,20 +519,34 @@ class BookRecommender:
             cat = category.strip()
             if cat and cat.lower() != "all":
                 if cat in self.CANONICAL_CATEGORIES_ORDERED:
-                    mask = df["categories"].astype(str).apply(
-                        lambda raw: self._book_matches_canonical(raw, cat)
+                    mask = (
+                        df["categories"]
+                        .astype(str)
+                        .apply(lambda raw: self._book_matches_canonical(raw, cat))
                     )
                 else:
-                    mask = df["categories"].astype(str).str.contains(cat, case=False, na=False, regex=False)
+                    mask = (
+                        df["categories"]
+                        .astype(str)
+                        .str.contains(cat, case=False, na=False, regex=False)
+                    )
                 df = df[mask]
 
         if author:
-            df = df[df["authors"].astype(str).str.contains(author.strip(), case=False, na=False, regex=False)]
+            df = df[
+                df["authors"]
+                .astype(str)
+                .str.contains(author.strip(), case=False, na=False, regex=False)
+            ]
 
         if publisher:
             # Check if dataset has publisher, if not ignore or handle gracefully
             if "publisher" in df.columns:
-                df = df[df["publisher"].astype(str).str.contains(publisher.strip(), case=False, na=False, regex=False)]
+                df = df[
+                    df["publisher"]
+                    .astype(str)
+                    .str.contains(publisher.strip(), case=False, na=False, regex=False)
+                ]
 
         if min_pages is not None:
             if "page_count" in df.columns:
@@ -539,7 +565,7 @@ class BookRecommender:
                 # published_date is often a string like '2005-09-01' or just '2005'
                 # We can do a string comparison if we assume YYYY format, or convert to numeric year.
                 # Let's extract the year robustly.
-                years = df["published_date"].astype(str).str.extract(r'(\d{4})')[0].astype(float)
+                years = df["published_date"].astype(str).str.extract(r"(\d{4})")[0].astype(float)
                 if published_from is not None:
                     df = df[years >= published_from]
                 if published_to is not None:
@@ -606,7 +632,9 @@ class BookRecommender:
                     counts[canonical] = counts.get(canonical, 0) + 1
 
         # Return in canonical order, only those present
-        return [{"name": c, "count": counts[c]} for c in CANONICAL_CATEGORIES_ORDERED if c in counts]
+        return [
+            {"name": c, "count": counts[c]} for c in CANONICAL_CATEGORIES_ORDERED if c in counts
+        ]
 
     def get_book_by_isbn(self, isbn: str) -> Optional[Dict[str, Any]]:
         """Retrieve a single book by its ISBN13."""

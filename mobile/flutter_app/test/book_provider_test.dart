@@ -47,8 +47,12 @@ class FakeBookRepository implements BookRepository {
     return popularBooksResult;
   }
 
+  List<Book> morePopularBooksResult = [];
+
   @override
-  Future<List<Book>> getMorePopularBooks({required int offset, int limit = 20}) async => [];
+  Future<List<Book>> getMorePopularBooks(
+          {required int offset, int limit = 20}) async =>
+      morePopularBooksResult;
 
   @override
   Future<List<Book>> getPersonalizedRecommendations(String userId) async {
@@ -71,10 +75,18 @@ class FakeBookRepository implements BookRepository {
   Future<List<Map<String, dynamic>>> getCategories() async => [];
 
   @override
-  Future<bool> submitFeedback({required String userId, required String bookId, required String interaction}) async => true;
+  Future<bool> submitFeedback(
+          {required String userId,
+          required String bookId,
+          required String interaction}) async =>
+      true;
 
   @override
-  Future<bool> submitOnboarding({required String userId, required List<String> bookIds, required List<String> genres}) async => true;
+  Future<bool> submitOnboarding(
+          {required String userId,
+          required List<String> bookIds,
+          required List<String> genres}) async =>
+      true;
 
   @override
   Future<Map<String, dynamic>> getBooksByCategory({
@@ -89,7 +101,8 @@ class FakeBookRepository implements BookRepository {
     double? minRating,
     int? publishedFrom,
     int? publishedTo,
-  }) async => {};
+  }) async =>
+      {};
 
   Map<String, dynamic> chatWithAIResult = {};
   Exception? chatError;
@@ -108,13 +121,21 @@ class FakeBookRepository implements BookRepository {
   Future<List<Book>> getRecommendations(String title) async => [];
 
   @override
-  Future<void> trackActivity({required String userId, required String activityType, required String bookId}) async {}
+  Future<void> trackActivity(
+      {required String userId,
+      required String activityType,
+      required String bookId}) async {}
 
   @override
   Future<Book?> getBookByIsbn(String isbn) async => null;
 
   @override
-  Future<void> upsertUserProfile({required String userId, required List<String> preferredGenres, required int readingFrequency, required List<String> preferredAuthors, required String preferredVibe}) async {}
+  Future<void> upsertUserProfile(
+      {required String userId,
+      required List<String> preferredGenres,
+      required int readingFrequency,
+      required List<String> preferredAuthors,
+      required String preferredVibe}) async {}
 
   @override
   Future<Map<String, dynamic>?> getUserProfile(String userId) async => null;
@@ -170,7 +191,8 @@ void main() {
       provider.dispose();
     });
 
-    test('duplicate request prevention: second call while loading is ignored', () async {
+    test('duplicate request prevention: second call while loading is ignored',
+        () async {
       final repo = FakeBookRepository();
       repo.popularBooksResult = [];
 
@@ -188,7 +210,8 @@ void main() {
       provider.dispose();
     });
 
-    test('state correctness: after success, status is loaded and books match', () async {
+    test('state correctness: after success, status is loaded and books match',
+        () async {
       final repo = FakeBookRepository();
       final expected = [
         FakeBookRepository.book('A1', 'Alpha'),
@@ -230,8 +253,11 @@ void main() {
     });
   });
 
-  group('RecommendationProvider.fetchPersonalizedRecs - stale response protection', () {
-    test('stale userId response does not overwrite newer userId state', () async {
+  group(
+      'RecommendationProvider.fetchPersonalizedRecs - stale response protection',
+      () {
+    test('stale userId response does not overwrite newer userId state',
+        () async {
       final repo = FakeBookRepository();
       repo.personalizedResult = [FakeBookRepository.book('P1', 'PersonalBook')];
       final provider = RecommendationProvider(
@@ -252,7 +278,8 @@ void main() {
       provider.dispose();
     });
 
-    test('personalized failure + fallback failure: status becomes error', () async {
+    test('personalized failure + fallback failure: status becomes error',
+        () async {
       final repo = FakeBookRepository();
       repo.personalizedError = Exception('AI service down');
       repo.fallbackError = Exception('Fallback down');
@@ -266,11 +293,21 @@ void main() {
       expect(provider.status, RecommendationStatus.error);
       provider.dispose();
     });
-    
+
     test('clearUserData: clears personalized recs and status', () async {
       final repo = FakeBookRepository();
       repo.personalizedResult = [
-        const Book(isbn13: '1', title: 'Personalized 1', authors: 'Author', categories: '', description: '', thumbnail: '', averageRating: 0, ratingsCount: 0, publishedDate: '', pageCount: 0)
+        const Book(
+            isbn13: '1',
+            title: 'Personalized 1',
+            authors: 'Author',
+            categories: '',
+            description: '',
+            thumbnail: '',
+            averageRating: 0,
+            ratingsCount: 0,
+            publishedDate: '',
+            pageCount: 0)
       ];
 
       final provider = RecommendationProvider(
@@ -284,6 +321,260 @@ void main() {
       provider.clearUserData();
       expect(provider.status, RecommendationStatus.initial);
       expect(provider.personalizedRecs, isEmpty);
+    });
+  });
+
+  group('CatalogProvider - Filtering and State Correctness', () {
+    late FakeBookRepository repo;
+    late List<Book> testBooks;
+
+    setUp(() {
+      repo = FakeBookRepository();
+      testBooks = [
+        const Book(
+          isbn13: '9780141439518',
+          title: 'Pride and Prejudice',
+          authors: 'Jane Austen',
+          categories: 'Classic, Romance',
+          description: 'A romantic novel of manners.',
+          thumbnail: '',
+          averageRating: 4.5,
+          ratingsCount: 1000,
+          publishedDate: '1813',
+          pageCount: 279,
+        ),
+        const Book(
+          isbn13: '9780061120084',
+          title: 'To Kill a Mockingbird',
+          authors: 'Harper Lee',
+          categories: 'Classic, Fiction',
+          description: 'A story of racial injustice and loss of innocence.',
+          thumbnail: '',
+          averageRating: 4.8,
+          ratingsCount: 2000,
+          publishedDate: '1960',
+          pageCount: 336,
+        ),
+        const Book(
+          isbn13: '9780451524935',
+          title: '1984',
+          authors: 'George Orwell',
+          categories: 'Dystopian, Science Fiction',
+          description: 'A totalitarian regime surveillance state.',
+          thumbnail: '',
+          averageRating: 4.2,
+          ratingsCount: 1500,
+          publishedDate: '1949',
+          pageCount: 328,
+        ),
+        const Book(
+          isbn13: '9780261103252',
+          title: 'The Lord of the Rings',
+          authors: 'J.R.R. Tolkien',
+          categories: 'Fantasy, Adventure',
+          description: 'An epic high-fantasy novel.',
+          thumbnail: '',
+          averageRating: 4.9,
+          ratingsCount: 5000,
+          publishedDate: '1954',
+          pageCount: 1178,
+        ),
+        const Book(
+          isbn13: '9780000000000',
+          title: 'Unknown Pamphlet',
+          authors: '',
+          categories: '',
+          description: '',
+          thumbnail: '',
+          averageRating: 0.0,
+          ratingsCount: 0,
+          publishedDate: '2020',
+          pageCount: 0, // missing/zero pages
+        ),
+      ];
+      repo.popularBooksResult = testBooks;
+    });
+
+    test('author filter filters correctly (case-insensitive substring)',
+        () async {
+      final provider =
+          CatalogProvider(manageCatalog: ManageCatalogUseCase(repo));
+      await Future.delayed(Duration.zero);
+      await provider.fetchPopular(force: true);
+
+      expect(provider.popularBooks.length, 5);
+
+      provider.setFilters(author: 'austen');
+      expect(provider.popularBooks.length, 1);
+      expect(provider.popularBooks.first.title, 'Pride and Prejudice');
+
+      // Partial author match
+      provider.setFilters(author: 'orwell');
+      expect(provider.popularBooks.length, 1);
+      expect(provider.popularBooks.first.title, '1984');
+
+      provider.dispose();
+    });
+
+    test(
+        'page range filter: 1 (<300), 2 (300-500), 3 (>500) and excludes zero/missing pages',
+        () async {
+      final provider =
+          CatalogProvider(manageCatalog: ManageCatalogUseCase(repo));
+      await Future.delayed(Duration.zero);
+      await provider.fetchPopular(force: true);
+
+      // Range 1: <300 pages (Pride and Prejudice: 279, Unknown: 0 -> excluded)
+      provider.setFilters(pageRange: 1);
+      expect(provider.popularBooks.length, 1);
+      expect(provider.popularBooks.first.title, 'Pride and Prejudice');
+
+      // Range 2: 300-500 pages (Mockingbird: 336, 1984: 328)
+      provider.setFilters(pageRange: 2);
+      expect(provider.popularBooks.length, 2);
+      expect(provider.popularBooks.map((b) => b.title),
+          containsAll(['To Kill a Mockingbird', '1984']));
+
+      // Range 3: >500 pages (LotR: 1178)
+      provider.setFilters(pageRange: 3);
+      expect(provider.popularBooks.length, 1);
+      expect(provider.popularBooks.first.title, 'The Lord of the Rings');
+
+      provider.dispose();
+    });
+
+    test('combined filters: author, category, and page range work in unison',
+        () async {
+      final provider =
+          CatalogProvider(manageCatalog: ManageCatalogUseCase(repo));
+      await Future.delayed(Duration.zero);
+      await provider.fetchPopular(force: true);
+
+      provider.setFilters(
+        category: 'Classic',
+        pageRange: 2, // 300-500
+      );
+      // Mockingbird (Classic, 336 pages) matches; Pride and Prejudice (279 pages) does not
+      expect(provider.popularBooks.length, 1);
+      expect(provider.popularBooks.first.title, 'To Kill a Mockingbird');
+
+      // Non-matching combined filter results in empty list
+      provider.setFilters(author: 'Tolkien');
+      expect(provider.popularBooks, isEmpty);
+
+      provider.dispose();
+    });
+
+    test('search query filter matches title, author, or description', () async {
+      final provider =
+          CatalogProvider(manageCatalog: ManageCatalogUseCase(repo));
+      await Future.delayed(Duration.zero);
+      await provider.fetchPopular(force: true);
+
+      provider.setFilters(searchQuery: 'surveillance');
+      expect(provider.popularBooks.length, 1);
+      expect(provider.popularBooks.first.title, '1984');
+
+      provider.dispose();
+    });
+
+    test('sorting: rating, pages, title without mutating source catalog',
+        () async {
+      final provider =
+          CatalogProvider(manageCatalog: ManageCatalogUseCase(repo));
+      await Future.delayed(Duration.zero);
+      await provider.fetchPopular(force: true);
+
+      // Sort by rating descending
+      provider.setFilters(sortBy: 'rating');
+      expect(provider.popularBooks.first.title, 'The Lord of the Rings'); // 4.9
+
+      // Sort by pages ascending
+      provider.setFilters(sortBy: 'pages');
+      expect(provider.popularBooks.first.title, 'Unknown Pamphlet'); // 0 pages
+      expect(provider.popularBooks.last.title,
+          'The Lord of the Rings'); // 1178 pages
+
+      // Sort by title ascending
+      provider.setFilters(sortBy: 'title');
+      expect(provider.popularBooks.first.title, '1984');
+
+      // Verify source raw catalog data was not permanently mutated
+      expect(provider.hasActiveFilters, isTrue);
+      provider.clearFilters();
+      expect(provider.hasActiveFilters, isFalse);
+      expect(provider.popularBooks.length, 5);
+      expect(provider.popularBooks.first.title,
+          'Pride and Prejudice'); // original order restored
+
+      provider.dispose();
+    });
+
+    test('clearFilters resets all filter state and restores catalog', () async {
+      final provider =
+          CatalogProvider(manageCatalog: ManageCatalogUseCase(repo));
+      await Future.delayed(Duration.zero);
+      await provider.fetchPopular(force: true);
+
+      provider.setFilters(author: 'Nonexistent Author', pageRange: 3);
+      expect(provider.popularBooks, isEmpty);
+      expect(provider.hasActiveFilters, isTrue);
+
+      provider.clearFilters();
+      expect(provider.hasActiveFilters, isFalse);
+      expect(provider.filterAuthor, '');
+      expect(provider.filterPageRange, 0);
+      expect(provider.popularBooks.length, 5);
+
+      provider.dispose();
+    });
+
+    test('pagination: fetchMorePopular maintains active filters on new items',
+        () async {
+      final provider =
+          CatalogProvider(manageCatalog: ManageCatalogUseCase(repo));
+      await Future.delayed(Duration.zero);
+      await provider.fetchPopular(force: true);
+
+      provider.setFilters(author: 'Tolkien');
+      expect(provider.popularBooks.length, 1);
+      expect(provider.popularBooks.first.title, 'The Lord of the Rings');
+
+      // Fetch more books containing another Tolkien book and an unrelated book
+      repo.morePopularBooksResult = [
+        const Book(
+          isbn13: '9780261102217',
+          title: 'The Hobbit',
+          authors: 'J.R.R. Tolkien',
+          categories: 'Fantasy',
+          description: 'There and Back Again.',
+          thumbnail: '',
+          averageRating: 4.7,
+          ratingsCount: 3000,
+          publishedDate: '1937',
+          pageCount: 310,
+        ),
+        const Book(
+          isbn13: '9780140449136',
+          title: 'Crime and Punishment',
+          authors: 'Fyodor Dostoevsky',
+          categories: 'Classic',
+          description: 'A psychological novel.',
+          thumbnail: '',
+          averageRating: 4.3,
+          ratingsCount: 1200,
+          publishedDate: '1866',
+          pageCount: 671,
+        ),
+      ];
+
+      await provider.fetchMorePopular();
+      // Should now contain both Tolkien books while excluding Dostoevsky
+      expect(provider.popularBooks.length, 2);
+      expect(provider.popularBooks.map((b) => b.title),
+          containsAll(['The Lord of the Rings', 'The Hobbit']));
+
+      provider.dispose();
     });
   });
 }
