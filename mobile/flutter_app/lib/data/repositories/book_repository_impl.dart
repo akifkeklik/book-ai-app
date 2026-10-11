@@ -11,7 +11,7 @@ import '../models/book_dto.dart';
 class BookRepositoryImpl implements BookRepository {
   final ApiService _api;
   final SupabaseService _supabase;
-  
+
   BookRepositoryImpl(this._api, this._supabase);
 
   @override
@@ -29,7 +29,8 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   @override
-  Future<List<Book>> getMorePopularBooks({required int offset, int limit = 20}) async {
+  Future<List<Book>> getMorePopularBooks(
+      {required int offset, int limit = 20}) async {
     final response = await _supabase.client
         .from('books')
         .select()
@@ -82,7 +83,7 @@ class BookRepositoryImpl implements BookRepository {
     final firstFav = favorites.first;
     final bookId = (firstFav['book_id'] ?? '').toString();
     final bookData = await _supabase.getBookByIsbn(bookId);
-    
+
     if (bookData != null && bookData.categories.isNotEmpty) {
       // UI Logic primaryCategory should be extracted
       final category = bookData.categories.split(RegExp(r'[|;,]')).first.trim();
@@ -93,7 +94,7 @@ class BookRepositoryImpl implements BookRepository {
       );
       final books = response['books'] as List<Book>;
       return books.where((b) => !seedIds.contains(b.isbn13)).take(20).toList();
-    } 
+    }
 
     return await _api.getPopularBooks(limit: 20);
   }
@@ -109,13 +110,21 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   @override
-  Future<bool> submitFeedback({required String userId, required String bookId, required String interaction}) async {
-    return await _api.submitFeedback(userId: userId, bookId: bookId, interaction: interaction);
+  Future<bool> submitFeedback(
+      {required String userId,
+      required String bookId,
+      required String interaction}) async {
+    return await _api.submitFeedback(
+        userId: userId, bookId: bookId, interaction: interaction);
   }
 
   @override
-  Future<bool> submitOnboarding({required String userId, required List<String> bookIds, required List<String> genres}) async {
-    return await _api.submitOnboarding(userId: userId, bookIds: bookIds, genres: genres);
+  Future<bool> submitOnboarding(
+      {required String userId,
+      required List<String> bookIds,
+      required List<String> genres}) async {
+    return await _api.submitOnboarding(
+        userId: userId, bookIds: bookIds, genres: genres);
   }
 
   @override
@@ -187,9 +196,18 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   @override
-  Future<void> trackActivity({required String userId, required String activityType, required String bookId}) async {
-    await _api.trackActivity(userId: userId, bookName: bookId); // API uses bookName
-    await _supabase.trackActivity(userId: userId, activityType: activityType, bookId: bookId);
+  Future<void> trackActivity(
+      {required String userId,
+      required String activityType,
+      required String bookId}) async {
+    await _api.trackActivity(
+      userId: userId,
+      bookId: bookId,
+      bookName: bookId,
+      action: activityType,
+    );
+    await _supabase.trackActivity(
+        userId: userId, activityType: activityType, bookId: bookId);
   }
 
   @override
@@ -200,8 +218,18 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   @override
-  Future<void> upsertUserProfile({required String userId, required List<String> preferredGenres, required int readingFrequency, required List<String> preferredAuthors, required String preferredVibe}) async {
-    await _supabase.upsertUserProfile(userId: userId, preferredGenres: preferredGenres, readingFrequency: readingFrequency, preferredAuthors: preferredAuthors, preferredVibe: preferredVibe);
+  Future<void> upsertUserProfile(
+      {required String userId,
+      required List<String> preferredGenres,
+      required int readingFrequency,
+      required List<String> preferredAuthors,
+      required String preferredVibe}) async {
+    await _supabase.upsertUserProfile(
+        userId: userId,
+        preferredGenres: preferredGenres,
+        readingFrequency: readingFrequency,
+        preferredAuthors: preferredAuthors,
+        preferredVibe: preferredVibe);
   }
 
   @override

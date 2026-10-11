@@ -67,7 +67,13 @@ def fake_interaction_repo(monkeypatch):
             self.calls.append(("user_interactions", "upsert", entries))
 
         def upsert_profile(self, user_id, genres, updated_at):
-            self.calls.append(("user_profiles", "upsert", {"user_id": user_id, "preferred_genres": genres, "updated_at": updated_at}))
+            self.calls.append(
+                (
+                    "user_profiles",
+                    "upsert",
+                    {"user_id": user_id, "preferred_genres": genres, "updated_at": updated_at},
+                )
+            )
 
         def track_activity(self, payload):
             self.calls.append(("user_activities", "insert", payload))
@@ -323,7 +329,6 @@ class TestActivityTracking:
         assert track_inserts[0][2]["activity_type"] == "view"
         assert track_inserts[0][2]["book_id"] == "9780441013593"
 
-
     def test_track_missing_fields(self, client, auth_headers):
         resp = client.post(
             "/api/track",
@@ -367,6 +372,93 @@ class TestActivityTracking:
             content_type="application/json",
         )
         assert resp.status_code == 400
+
+    def test_track_with_book_name_fallback(self, client, auth_headers, fake_interaction_repo):
+        resp = client.post(
+            "/api/track",
+            headers=auth_headers,
+            data=json.dumps({"book_name": "9780441013593", "action": "view"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        track_inserts = [
+            c for c in fake_interaction_repo.calls if c[0] == "user_activities" and c[1] == "insert"
+        ]
+        assert track_inserts
+        assert track_inserts[-1][2]["book_id"] == "9780441013593"
+
+    def test_track_activity_like_syncs_to_interactions(
+        self, client, auth_headers, fake_interaction_repo
+    ):
+        resp = client.post(
+            "/api/track",
+            headers=auth_headers,
+            data=json.dumps(
+                {
+                    "book_id": "9780441013593",
+                    "action": "book_like",
+                }
+            ),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        # Verify it inserted into user_activities
+        act_inserts = [
+            c for c in fake_interaction_repo.calls if c[0] == "user_activities" and c[1] == "insert"
+        ]
+        assert act_inserts
+        assert act_inserts[-1][2]["activity_type"] == "book_like"
+
+        # Verify it synchronized to user_interactions with canonical 'like'
+        interaction_upserts = [
+            c
+            for c in fake_interaction_repo.calls
+            if c[0] == "user_interactions" and c[1] == "upsert"
+        ]
+        assert interaction_upserts
+        assert interaction_upserts[-1][2] == [
+            {"user_id": "test-user-123", "book_id": "9780441013593", "interaction_type": "like"}
+        ]
+
+    def test_track_ignores_client_supplied_user_id(
+        self, client, auth_headers, fake_interaction_repo
+    ):
+        # Client tries to impersonate another user via payload
+        resp = client.post(
+            "/api/track",
+            headers=auth_headers,
+            data=json.dumps(
+                {
+                    "user_id": "attacker-evil-uuid",
+                    "book_id": "9780441013593",
+                    "action": "view",
+                }
+            ),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        act_inserts = [
+            c for c in fake_interaction_repo.calls if c[0] == "user_activities" and c[1] == "insert"
+        ]
+        assert act_inserts
+        # Server must enforce authenticated user from g.user_id, ignoring client payload
+        assert act_inserts[-1][2]["user_id"] == "test-user-123"
+
+    def test_track_database_failure_returns_500(self, client, auth_headers, monkeypatch):
+        class FailingRepo:
+            def track_activity(self, payload):
+                raise RuntimeError("Database connection lost")
+
+        monkeypatch.setattr(
+            "backend.routes.routes._track_activity_uc._interaction_repo", FailingRepo()
+        )
+        with pytest.raises(RuntimeError):
+            client.post(
+                "/api/track",
+                headers=auth_headers,
+                data=json.dumps({"book_id": "9780441013593", "action": "view"}),
+                content_type="application/json",
+            )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -467,6 +559,53 @@ class TestMutationEndpoints:
             content_type="application/json",
         )
         assert resp.status_code == 400
+
+    def test_feedback_ignores_client_supplied_user_id(
+        self, client, auth_headers, fake_interaction_repo
+    ):
+        resp = client.post(
+            "/api/feedback",
+            headers=auth_headers,
+            data=json.dumps(
+                {"user_id": "spoofed-user-id", "book_id": "123", "interaction": "dislike"}
+            ),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        feedback_upserts = [
+            call
+            for call in fake_interaction_repo.calls
+            if call[0] == "user_interactions" and call[1] == "upsert"
+        ]
+        assert feedback_upserts
+        assert feedback_upserts[-1][2] == [
+            {"user_id": "test-user-123", "book_id": "123", "interaction_type": "dislike"}
+        ]
+
+    def test_feedback_invalid_interaction_rejected(self, client, auth_headers):
+        resp = client.post(
+            "/api/feedback",
+            headers=auth_headers,
+            data=json.dumps({"book_id": "123", "interaction": "love_it"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_feedback_database_failure_returns_500(self, client, auth_headers, monkeypatch):
+        class FailingRepo:
+            def upsert_interactions(self, entries):
+                raise RuntimeError("Database error")
+
+        monkeypatch.setattr(
+            "backend.routes.routes._submit_feedback_uc._interaction_repo", FailingRepo()
+        )
+        resp = client.post(
+            "/api/feedback",
+            headers=auth_headers,
+            data=json.dumps({"book_id": "123", "interaction": "like"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 500
 
     def test_personalized_recs_success(self, client, auth_headers):
         resp = client.get("/api/recommend/personalized", headers=auth_headers)

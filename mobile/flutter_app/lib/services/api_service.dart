@@ -92,7 +92,8 @@ class ApiService {
           if (session != null) {
             options.headers['Authorization'] = 'Bearer ${session.accessToken}';
           } else {
-            options.headers['Authorization'] = 'Bearer ${AppConfig.supabaseAnonKey}';
+            options.headers['Authorization'] =
+                'Bearer ${AppConfig.supabaseAnonKey}';
           }
           handler.next(options);
         },
@@ -113,7 +114,8 @@ class ApiService {
           if ((response.statusCode ?? 0) >= 400 &&
               contentType.contains('text/html')) {
             // ignore: avoid_print
-            print('[API] HTML error response (${response.statusCode}) — rejecting');
+            print(
+                '[API] HTML error response (${response.statusCode}) — rejecting');
             handler.reject(
               DioException(
                 requestOptions: response.requestOptions,
@@ -156,7 +158,9 @@ class ApiService {
       queryParameters: {'limit': limit},
     );
     final List<dynamic> list = resp.data['books'] as List;
-    return list.map((j) => BookDto.fromJson(j as Map<String, dynamic>)).toList();
+    return list
+        .map((j) => BookDto.fromJson(j as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Map<String, dynamic>> getAllBooks(
@@ -194,7 +198,9 @@ class ApiService {
       queryParameters: {'q': query, 'limit': limit},
     );
     final List<dynamic> list = resp.data['books'] as List;
-    return list.map((j) => BookDto.fromJson(j as Map<String, dynamic>)).toList();
+    return list
+        .map((j) => BookDto.fromJson(j as Map<String, dynamic>))
+        .toList();
   }
 
   // ── Recommendations ────────────────────────────────────────────────────────
@@ -206,7 +212,9 @@ class ApiService {
       queryParameters: {'book': bookTitle, 'top_n': topN, 'hybrid': 'true'},
     );
     final List<dynamic> list = resp.data['recommendations'] as List;
-    return list.map((j) => BookDto.fromJson(j as Map<String, dynamic>)).toList();
+    return list
+        .map((j) => BookDto.fromJson(j as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<Book>> getPersonalizedRecommendations(
@@ -262,16 +270,26 @@ class ApiService {
 
   // ── Activity tracking ──────────────────────────────────────────────────────
 
-  Future<void> trackActivity({
+  Future<bool> trackActivity({
     required String userId,
     required String bookName,
+    String? bookId,
     String action = 'view',
   }) async {
     try {
-      await _dio.post(
+      final id = (bookId != null && bookId.isNotEmpty) ? bookId : bookName;
+      final response = await _dio.post(
         AppConfig.apiTrack,
-        data: {'user_id': userId, 'book_name': bookName, 'action': action},
+        data: {
+          'user_id': userId,
+          'book_id': id,
+          'book_name': bookName,
+          'action': action,
+        },
       );
-    } catch (_) {}
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 }

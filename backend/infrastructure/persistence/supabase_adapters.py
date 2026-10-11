@@ -62,7 +62,9 @@ class SupabaseInteractionRepository:
 
     def upsert_interactions(self, entries: List[Dict[str, Any]]) -> None:
         client = self._get_client()
-        if not client or not entries:
+        if not client:
+            raise RuntimeError("Database client is not available")
+        if not entries:
             return
         try:
             client.table("user_interactions").upsert(
@@ -75,7 +77,7 @@ class SupabaseInteractionRepository:
     def upsert_profile(self, user_id: str, genres: List[str], updated_at: str) -> None:
         client = self._get_client()
         if not client:
-            return
+            raise RuntimeError("Database client is not available")
         try:
             client.table("user_profiles").upsert(
                 {
@@ -91,7 +93,7 @@ class SupabaseInteractionRepository:
     def track_activity(self, payload: Dict[str, Any]) -> None:
         client = self._get_client()
         if not client:
-            return
+            raise RuntimeError("Database client is not available")
         try:
             client.table("user_activities").insert(payload).execute()
         except Exception as e:

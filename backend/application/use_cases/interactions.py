@@ -18,7 +18,9 @@ class SubmitOnboardingUseCase:
 
         try:
             entries = [
-                UserInteraction(user_id=user_id, book_id=bid, interaction_type="like").model_dump(exclude_unset=True)
+                UserInteraction(user_id=user_id, book_id=bid, interaction_type="like").model_dump(
+                    exclude_unset=True
+                )
                 for bid in book_ids
             ]
             if entries:
@@ -44,8 +46,12 @@ class SubmitFeedbackUseCase:
         if not self._interaction_repo:
             return {"status": "error"}
         try:
-            interaction_model = UserInteraction(user_id=user_id, book_id=book_id, interaction_type=interaction)
-            self._interaction_repo.upsert_interactions([interaction_model.model_dump(exclude_unset=True)])
+            interaction_model = UserInteraction(
+                user_id=user_id, book_id=book_id, interaction_type=interaction
+            )
+            self._interaction_repo.upsert_interactions(
+                [interaction_model.model_dump(exclude_unset=True)]
+            )
             return {"status": "success"}
         except Exception as e:
             logger.error(f"Feedback error: {e}")
@@ -59,6 +65,9 @@ class TrackUserActivityUseCase:
     def execute(
         self, user_id: str, action: str, book_id: str = "", book_name: str = ""
     ) -> Dict[str, Any]:
+        if not user_id:
+            raise ValueError("user_id is required")
+
         logger.info(
             "Activity | user=%s book_id=%s book_name=%s action=%s",
             user_id,
@@ -68,7 +77,7 @@ class TrackUserActivityUseCase:
         )
 
         if not self._interaction_repo:
-            return {"status": "error", "message": "Interaction repo not initialized"}
+            raise RuntimeError("Interaction repo not initialized")
 
         try:
             payload = {
@@ -80,6 +89,26 @@ class TrackUserActivityUseCase:
                 payload["book_id"] = book_id
 
             self._interaction_repo.track_activity(payload)
+
+            # Synchronize explicit rating/preference actions to user_interactions table
+            interaction_mapping = {
+                "like": "like",
+                "book_like": "like",
+                "dislike": "dislike",
+                "book_dislike": "dislike",
+                "favorite": "favorite",
+                "book_favorite": "favorite",
+            }
+            if (
+                action in interaction_mapping
+                and book_id
+                and hasattr(self._interaction_repo, "upsert_interactions")
+            ):
+                mapped_interaction = interaction_mapping[action]
+                model = UserInteraction(
+                    user_id=user_id, book_id=book_id, interaction_type=mapped_interaction
+                )
+                self._interaction_repo.upsert_interactions([model.model_dump(exclude_unset=True)])
 
             return {"status": "tracked", "user_id": user_id, "action": action}
         except Exception as e:
