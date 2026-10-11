@@ -34,10 +34,6 @@ class AppConfig {
     return defaultUrl;
   }
 
-  static String get librisApiKey {
-    return 'DUMMY_KEY_FOR_DEV_ONLY';
-  }
-
   // ── Supabase ───────────────────────────────────────────────────────────────
 
   static String get supabaseUrl {

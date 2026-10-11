@@ -59,7 +59,6 @@ void main() {
 
       // 3. Shared backend LIBRIS_API_KEY is not in default headers or client config
       expect(dio.options.headers.containsKey('X-Api-Key'), isFalse);
-      expect(AppConfig.librisApiKey, equals('DUMMY_KEY_FOR_DEV_ONLY'));
     });
   });
 }
