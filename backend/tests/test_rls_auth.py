@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from backend.infrastructure.persistence.supabase_adapters import SupabaseInteractionRepository
-from backend.routes.routes import books_bp
+from backend.routes.routes import activity_bp
 from flask import Flask, g
 
 
@@ -11,7 +11,7 @@ from flask import Flask, g
 @pytest.fixture
 def auth_app():
     app = Flask(__name__)
-    app.register_blueprint(books_bp, url_prefix="/api")
+    app.register_blueprint(activity_bp, url_prefix="/api")
     app.config["TESTING"] = True
     return app
 

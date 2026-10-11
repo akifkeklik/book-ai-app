@@ -2,6 +2,7 @@ import datetime
 import logging
 from typing import Any, Dict, List, Optional
 
+from ...domain.models import UserInteraction
 from ...domain.ports import UserInteractionRepository
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,8 @@ class SubmitOnboardingUseCase:
 
         try:
             entries = [
-                {"user_id": user_id, "book_id": bid, "interaction_type": "like"} for bid in book_ids
+                UserInteraction(user_id=user_id, book_id=bid, interaction_type="like").model_dump(exclude_unset=True)
+                for bid in book_ids
             ]
             if entries:
                 self._interaction_repo.upsert_interactions(entries)
@@ -42,9 +44,8 @@ class SubmitFeedbackUseCase:
         if not self._interaction_repo:
             return {"status": "error"}
         try:
-            self._interaction_repo.upsert_interactions([
-                {"user_id": user_id, "book_id": book_id, "interaction_type": interaction}
-            ])
+            interaction_model = UserInteraction(user_id=user_id, book_id=book_id, interaction_type=interaction)
+            self._interaction_repo.upsert_interactions([interaction_model.model_dump(exclude_unset=True)])
             return {"status": "success"}
         except Exception as e:
             logger.error(f"Feedback error: {e}")

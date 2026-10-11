@@ -3,6 +3,7 @@ import random
 import time
 from typing import Any, Dict, List, Optional
 
+from ...domain.models import Recommendation
 from ...domain.ports import BookDataPort, EnrichmentPort, RecommenderPort, UserInteractionRepository
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,8 @@ class GetRecommendationsUseCase:
         )
         latency = round((time.time() - t0) * 1000, 2)
         logger.info("Recommendation generated", extra={"extra_data": {"recommendation_latency_ms": latency, "seed": book_title, "count": len(books)}})
-        return self._enrichment_service.enrich(books)
+        enriched_books = self._enrichment_service.enrich(books)
+        return [Recommendation(**book).model_dump() for book in enriched_books]
 
 
 class GetPersonalizedRecommendationsUseCase:
@@ -90,7 +92,8 @@ class GetPersonalizedRecommendationsUseCase:
                     unique_recs = {r["isbn13"]: r for r in genre_recs}.values()
                     final_genre_recs = list(unique_recs)
                     random.shuffle(final_genre_recs)
-                    return self._enrichment_service.enrich(final_genre_recs[:limit])
+                    enriched_books = self._enrichment_service.enrich(final_genre_recs[:limit])
+                    return [Recommendation(**book).model_dump() for book in enriched_books]
 
             if not seed_titles and not genres:
                 logger.info(f"User {user_id} has no profile info. Returning trending books.")
@@ -130,7 +133,8 @@ class GetPersonalizedRecommendationsUseCase:
                 "semantic_candidates": len(semantic_scores) if semantic_scores else 0,
                 "count": len(final_recs)
             }})
-            return self._enrichment_service.enrich(final_recs)
+            enriched_books = self._enrichment_service.enrich(final_recs)
+            return [Recommendation(**book).model_dump() for book in enriched_books]
         except Exception as e:
             logger.error(f"Failed cached personalized recs computation: {e}")
             return self._fallback_popular(limit)
@@ -139,4 +143,5 @@ class GetPersonalizedRecommendationsUseCase:
         books = self._recommender.get_popular_books(limit=limit)
         for b in books:
             b["recommendation_reason"] = "Trending on Libris right now"
-        return self._enrichment_service.enrich(books)
+        enriched_books = self._enrichment_service.enrich(books)
+        return [Recommendation(**book).model_dump() for book in enriched_books]

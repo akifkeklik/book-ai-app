@@ -12,7 +12,6 @@ class AppConfig {
   static const String _envSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
   static const String _envSupabaseKey =
       String.fromEnvironment('SUPABASE_ANON_KEY');
-  static const String _envApiKey = String.fromEnvironment('LIBRIS_API_KEY');
 
   // ── Flask Backend ──────────────────────────────────────────────────────────
 
@@ -33,14 +32,6 @@ class AppConfig {
           .replaceAll('127.0.0.1', '10.0.2.2');
     }
     return defaultUrl;
-  }
-
-  static String get librisApiKey {
-    if (_envApiKey.isNotEmpty) return _envApiKey;
-    if (kReleaseMode) {
-      throw Exception('API Key is missing in release mode! Use --dart-define=LIBRIS_API_KEY=...');
-    }
-    return 'DUMMY_KEY_FOR_DEV_ONLY'; // Debug fallback
   }
 
   // ── Supabase ───────────────────────────────────────────────────────────────

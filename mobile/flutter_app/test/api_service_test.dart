@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:book_ai_app/config.dart';
 import 'package:book_ai_app/services/api_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:dio/dio.dart';
@@ -15,26 +16,20 @@ class FakeHandler extends RequestInterceptorHandler {
 }
 
 void main() {
-  group('ApiService Interceptors', () {
-    test('interceptor adds Authorization header only if session is present', () async {
+  group('ApiService Interceptors and Auth Security', () {
+    test('verifies JWT auth, anon key fallback, and absence of backend LIBRIS_API_KEY', () async {
       final apiService = ApiService.instance;
       Session? currentSession;
 
+      // Initialize once with dynamic session provider
       apiService.init(sessionProvider: () => currentSession);
 
       final dio = apiService.testDio;
       final interceptor = dio.interceptors.whereType<InterceptorsWrapper>().first;
 
-      // --- Test 1: Null Session ---
-      currentSession = null;
-      var options = RequestOptions(path: '/test');
-      var handler = FakeHandler();
-      interceptor.onRequest.call(options, handler);
-      expect(handler.capturedOptions?.headers.containsKey('Authorization'), isFalse);
-
-      // --- Test 2: Dummy Session ---
+      // 1. Session is present -> Authorization Bearer with user JWT
       currentSession = Session(
-        accessToken: 'dummy_token',
+        accessToken: 'user_jwt_token_123',
         expiresIn: 3600,
         tokenType: 'bearer',
         user: const User(
@@ -46,10 +41,24 @@ void main() {
         ),
       );
 
+      var options = RequestOptions(path: '/test');
+      var handler = FakeHandler();
+      interceptor.onRequest.call(options, handler);
+
+      expect(handler.capturedOptions?.headers['Authorization'], 'Bearer user_jwt_token_123');
+      expect(handler.capturedOptions?.headers.containsKey('X-Api-Key'), isFalse);
+
+      // 2. Session is null -> Authorization Bearer with Supabase anon key
+      currentSession = null;
       options = RequestOptions(path: '/test');
       handler = FakeHandler();
       interceptor.onRequest.call(options, handler);
-      expect(handler.capturedOptions?.headers['Authorization'], 'Bearer dummy_token');
+
+      expect(handler.capturedOptions?.headers['Authorization'], 'Bearer ${AppConfig.supabaseAnonKey}');
+      expect(handler.capturedOptions?.headers.containsKey('X-Api-Key'), isFalse);
+
+      // 3. Shared backend LIBRIS_API_KEY is not in default headers or client config
+      expect(dio.options.headers.containsKey('X-Api-Key'), isFalse);
     });
   });
 }

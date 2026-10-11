@@ -50,16 +50,17 @@ def test_rate_limiter_isolates_users(client):
 
 
 def test_rate_limiter_proxy_header(client):
+    # Verify that X-Forwarded-For is ignored to prevent IP spoofing bypass
     for _ in range(5):
-        resp = client.get("/test_limit", headers={"X-Forwarded-For": "10.0.0.1, 192.168.1.1"})
+        resp = client.get("/test_limit", headers={"X-Forwarded-For": "10.0.0.1, 192.168.1.1"}, environ_base={"REMOTE_ADDR": "127.0.0.1"})
         assert resp.status_code == 200
 
-    resp = client.get("/test_limit", headers={"X-Forwarded-For": "10.0.0.1"})
+    resp = client.get("/test_limit", headers={"X-Forwarded-For": "10.0.0.1"}, environ_base={"REMOTE_ADDR": "127.0.0.1"})
     assert resp.status_code == 429
 
-    # 10.0.0.2 should be allowed
-    resp = client.get("/test_limit", headers={"X-Forwarded-For": "10.0.0.2"})
-    assert resp.status_code == 200
+    # Even with a different spoofed IP in header, it should still be blocked because REMOTE_ADDR is the same
+    resp = client.get("/test_limit", headers={"X-Forwarded-For": "10.0.0.2"}, environ_base={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 429
 
 
 def test_rate_limiter_concurrency():

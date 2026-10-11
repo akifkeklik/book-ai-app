@@ -353,6 +353,7 @@ class _DetailScreenState extends State<DetailScreen> {
           alignment: WrapAlignment.spaceEvenly,
           children: [
             _InteractionButton(book: book, interaction: 'like', icon: Icons.thumb_up_outlined, label: context.tr('like')),
+            _InteractionButton(book: book, interaction: 'dislike', icon: Icons.thumb_down_outlined, label: context.tr('dislike')),
             _InteractionButton(book: book, interaction: 'want_to_read', icon: Icons.bookmark_add_outlined, label: context.tr('want_to_read')),
             _InteractionButton(book: book, interaction: 'finished', icon: Icons.check_circle_outline, label: context.tr('finished')),
           ],

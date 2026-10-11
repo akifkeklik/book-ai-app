@@ -14,7 +14,10 @@ from ..container import container
 
 logger = logging.getLogger(__name__)
 
-books_bp = Blueprint("books", __name__)
+catalog_bp = Blueprint("catalog", __name__)
+discovery_bp = Blueprint("discovery", __name__)
+activity_bp = Blueprint("activity", __name__)
+health_bp = Blueprint("health", __name__)
 
 # Re-exporting aliases for convenience and to avoid changing the rest of this file
 _book_data_port = container.book_data_port
@@ -35,14 +38,26 @@ _process_rag_query_uc = container.process_rag_query_uc
 def require_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        # 1. If caller is explicitly anonymous (e.g. Supabase anon key), reject personal data access
+        if getattr(g, "is_anon", False):
+            return jsonify({"error": "Unauthorized: Real user authentication required, anonymous access provided"}), 401
+
+        # 2. If user already verified by middleware
+        if getattr(g, "user_id", None):
+            return f(*args, **kwargs)
+
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             return jsonify({"error": "Unauthorized: Missing or invalid Authorization header"}), 401
 
-        token = auth_header.split(" ")[1]
+        token = auth_header.split(" ", 1)[1].strip()
+        from backend.config import Config
+        if Config.SUPABASE_ANON_KEY and token == Config.SUPABASE_ANON_KEY:
+            return jsonify({"error": "Unauthorized: Real user authentication required, anonymous key provided"}), 401
+
         try:
             user = _auth_port.verify_token(token) if _auth_port else None
-            if not user or not user.id:
+            if not user or not getattr(user, "id", None):
                 return jsonify({"error": "Unauthorized: Invalid token"}), 401
             g.user_id = user.id
             g.jwt_token = token
@@ -58,12 +73,21 @@ def require_auth(f):
 def optional_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        # If user_id already resolved by middleware, proceed
+        if getattr(g, "user_id", None):
+            return f(*args, **kwargs)
+
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
+            token = auth_header.split(" ", 1)[1].strip()
+            from backend.config import Config
+            if Config.SUPABASE_ANON_KEY and token == Config.SUPABASE_ANON_KEY:
+                g.is_anon = True
+                return f(*args, **kwargs)
+
             try:
                 user = _auth_port.verify_token(token) if _auth_port else None
-                if user and user.id:
+                if user and getattr(user, "id", None):
                     g.user_id = user.id
                     g.jwt_token = token
             except Exception:
@@ -78,12 +102,12 @@ def optional_auth(f):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@books_bp.route("/health", methods=["GET"])
+@health_bp.route("/health", methods=["GET"])
 def health_check():
     return jsonify({"status": "healthy", "service": "book-ai-api"}), 200
 
 
-@books_bp.route("/docs", methods=["GET"])
+@health_bp.route("/docs", methods=["GET"])
 def swagger_ui():
     import os
 
@@ -94,7 +118,7 @@ def swagger_ui():
     return send_from_directory(static_dir, "index.html")
 
 
-@books_bp.route("/docs/<path:filename>", methods=["GET"])
+@health_bp.route("/docs/<path:filename>", methods=["GET"])
 def swagger_ui_files(filename):
     import os
 
@@ -104,7 +128,7 @@ def swagger_ui_files(filename):
     return send_from_directory(static_dir, filename)
 
 
-@books_bp.route("/health/ready", methods=["GET"])
+@health_bp.route("/health/ready", methods=["GET"])
 def readiness_check():
     try:
         if _book_data_port and not _book_data_port.check_health():
@@ -119,7 +143,7 @@ def readiness_check():
         return jsonify({"status": "not_ready", "error": "Database unavailable"}), 503
 
 
-@books_bp.route("/categories", methods=["GET"])
+@catalog_bp.route("/categories", methods=["GET"])
 def get_categories():
     try:
         return jsonify({"categories": _svc.get_categories()}), 200
@@ -132,7 +156,7 @@ def get_categories():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@books_bp.route("/books", methods=["GET"])
+@catalog_bp.route("/books", methods=["GET"])
 def get_books():
     try:
         page = max(1, int(request.args.get("page", 1)))
@@ -171,7 +195,7 @@ def get_books():
         raise exc
 
 
-@books_bp.route("/books/popular", methods=["GET"])
+@catalog_bp.route("/books/popular", methods=["GET"])
 def get_popular_books():
     try:
         # Senior Update: Increased limit for "All Books" section
@@ -182,7 +206,7 @@ def get_popular_books():
         raise exc
 
 
-@books_bp.route("/books/<isbn>", methods=["GET"])
+@catalog_bp.route("/books/<isbn>", methods=["GET"])
 def get_book_by_isbn(isbn: str):
     try:
         book = _get_book_details_uc.execute(isbn)
@@ -198,7 +222,7 @@ def get_book_by_isbn(isbn: str):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@books_bp.route("/search", methods=["GET"])
+@catalog_bp.route("/search", methods=["GET"])
 def search_books():
     query = request.args.get("q", "").strip()
     if not query:
@@ -218,7 +242,7 @@ def search_books():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@books_bp.route("/recommend", methods=["GET"])
+@discovery_bp.route("/recommend", methods=["GET"])
 def get_recommendations():
     book_title = request.args.get("book", "").strip()
     if not book_title:
@@ -249,7 +273,7 @@ def get_recommendations():
         raise exc
 
 
-@books_bp.route("/recommend/personalized", methods=["GET"])
+@discovery_bp.route("/recommend/personalized", methods=["GET"])
 @require_auth
 def get_personalized():
     user_id = g.user_id
@@ -265,7 +289,7 @@ def get_personalized():
         raise exc
 
 
-@books_bp.route("/onboarding", methods=["POST"])
+@activity_bp.route("/onboarding", methods=["POST"])
 @require_auth
 def onboarding():
     data = request.get_json(silent=True)
@@ -286,7 +310,7 @@ def onboarding():
         raise exc
 
 
-@books_bp.route("/feedback", methods=["POST"])
+@activity_bp.route("/feedback", methods=["POST"])
 @require_auth
 def feedback():
     data = request.get_json(silent=True)
@@ -314,32 +338,59 @@ def feedback():
 
 _ai_rate_limits = {}
 _ai_rate_lock = threading.Lock()
+_ai_rate_cleanup_time = time.time()
 
 
 def rate_limit_ai(f):
+    """
+    Tiered AI Rate Limiter.
+    - Anonymous (IP-based): 5 requests / 60 seconds
+    - Authenticated User (user_id-based): 10 requests / 60 seconds
+    - Server (X-Api-Key): 30 requests / 60 seconds
+
+    ARCHITECTURAL NOTE (PRE-PRODUCTION):
+    This limiter is currently in-memory (per Python process). In multi-worker
+    WSGI/Gunicorn deployments, each worker process maintains an isolated bucket.
+    For multi-instance horizontal scaling, a distributed store (e.g. Redis) is required.
+    IP resolution uses request.remote_addr to prevent unverified X-Forwarded-For spoofing.
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
-        # Prevent memory leak by periodically cleaning up old records
+        global _ai_rate_cleanup_time
         now = time.time()
-        limit = 5
         window = 60
 
-        # Use X-Forwarded-For if available to prevent proxy spoofing (simplistic approach for now)
-        client_ip = (
-            request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
-        )
-        user_id = getattr(g, "user_id", client_ip)
+        # Do not blindly trust X-Forwarded-For without proper proxy configuration
+        client_ip = request.remote_addr or "unknown"
+        user_id = getattr(g, "user_id", None)
+        is_server = getattr(g, "is_server", False)
+
+        if user_id:
+            bucket_key = f"user:{user_id}"
+            limit = 10
+        elif is_server:
+            bucket_key = f"server:{client_ip}"
+            limit = 30
+        else:
+            # Anonymous access (with valid SUPABASE_ANON_KEY or test fixture)
+            bucket_key = f"anon:{client_ip}"
+            limit = 5
 
         with _ai_rate_lock:
-            # Simple cleanup
-            if len(_ai_rate_limits) > 1000:
+            # Cleanup at most once every minute to prevent O(N) sweeps on every request
+            if now - _ai_rate_cleanup_time > 60:
                 for k in list(_ai_rate_limits.keys()):
                     _ai_rate_limits[k] = [t for t in _ai_rate_limits[k] if now - t < window]
                     if not _ai_rate_limits[k]:
                         del _ai_rate_limits[k]
+                _ai_rate_cleanup_time = now
 
-            if user_id in _ai_rate_limits:
-                reqs = _ai_rate_limits[user_id]
+            # Hard cap to prevent memory exhaustion under heavy unique IP spoofing/attacks
+            if len(_ai_rate_limits) > 10000:
+                return jsonify({"error": "Service overloaded. Rate limiter capacity reached."}), 503
+
+            if bucket_key in _ai_rate_limits:
+                reqs = _ai_rate_limits[bucket_key]
                 reqs = [t for t in reqs if now - t < window]
                 if len(reqs) >= limit:
                     retry_after = int(window - (now - reqs[0]))
@@ -347,16 +398,16 @@ def rate_limit_ai(f):
                     response.headers["Retry-After"] = str(retry_after)
                     return response, 429
                 reqs.append(now)
-                _ai_rate_limits[user_id] = reqs
+                _ai_rate_limits[bucket_key] = reqs
             else:
-                _ai_rate_limits[user_id] = [now]
+                _ai_rate_limits[bucket_key] = [now]
 
         return f(*args, **kwargs)
 
     return decorated
 
 
-@books_bp.route("/ai/chat", methods=["POST"])
+@discovery_bp.route("/ai/chat", methods=["POST"])
 @optional_auth
 @rate_limit_ai
 def ai_chat():
@@ -367,6 +418,19 @@ def ai_chat():
     query = data["query"].strip()
     if not query:
         return jsonify({"error": "Query cannot be empty"}), 400
+
+    MAX_QUERY_LENGTH = 1000
+    if len(query) > MAX_QUERY_LENGTH:
+        return (
+            jsonify(
+                {
+                    "error": f"Query exceeds maximum allowed length of {MAX_QUERY_LENGTH} characters",
+                    "max_length": MAX_QUERY_LENGTH,
+                    "actual_length": len(query),
+                }
+            ),
+            400,
+        )
 
     user_id = getattr(g, "user_id", None)  # Optional if auth is not strictly enforced here
     try:
@@ -382,7 +446,7 @@ def ai_chat():
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@books_bp.route("/track", methods=["POST"])
+@activity_bp.route("/track", methods=["POST"])
 @require_auth
 def track_activity():
     data = request.get_json(silent=True)

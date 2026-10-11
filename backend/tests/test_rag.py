@@ -107,7 +107,7 @@ def test_process_rag_query_json_parsing_success():
 
     mock_embedding.generate_embedding.return_value = [0.1]
     mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
-    mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book"}]
+    mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book", "authors": "Author"}]
     mock_enrichment.enrich.side_effect = lambda books: books
 
     mock_llm.generate_response.return_value = json.dumps({
@@ -133,7 +133,7 @@ def test_process_rag_query_json_markdown_parsing():
 
     mock_embedding.generate_embedding.return_value = [0.1]
     mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
-    mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book"}]
+    mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book", "authors": "Author"}]
     mock_enrichment.enrich.side_effect = lambda books: books
 
     # Model returned markdown code fence
@@ -159,7 +159,7 @@ def test_process_rag_query_legacy_fallback():
 
     mock_embedding.generate_embedding.return_value = [0.1]
     mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
-    mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book"}]
+    mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book", "authors": "Author"}]
     mock_enrichment.enrich.side_effect = lambda books: books
 
     # Model returned raw string instead of JSON
@@ -169,4 +169,4 @@ def test_process_rag_query_legacy_fallback():
     response = use_case.execute("fantasy")
 
     assert response["answer"] == "I am a plain text response."
-    assert "explanation" not in response["referenced_books"][0]
+    assert response["referenced_books"][0]["explanation"] is None

@@ -77,6 +77,7 @@ class RecommenderPort(Protocol):
     ) -> List[Dict[str, Any]]:
         ...
 
+class CatalogPort(Protocol):
     def search_books(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         ...
 
@@ -105,7 +106,6 @@ class RecommenderPort(Protocol):
 
     def get_book_by_isbn(self, isbn: str) -> Optional[Dict[str, Any]]:
         ...
-
 
 class EnrichmentPort(Protocol):
     def enrich(self, books: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

@@ -1,0 +1,29 @@
+export interface Book {
+  isbn13: string;
+  title: string;
+  authors: string;
+  categories: string;
+  description: string;
+  thumbnail: string;
+  averageRating: number;
+  ratingsCount: number;
+  publishedDate: string;
+  pageCount: number;
+  
+  // Recommendation fields
+  similarityScore?: number;
+  explanation?: string;
+  explanationSourceBook?: string;
+  recommendationReason?: string;
+}
+
+export interface Category {
+  name: string;
+  count: number;
+}
+
+export interface PaginatedResponse<T> {
+  books: T[];
+  total: number;
+  total_pages: number;
+}
