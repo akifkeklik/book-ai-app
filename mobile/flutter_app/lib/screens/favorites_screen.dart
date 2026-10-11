@@ -212,23 +212,27 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             contentPadding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing16, vertical: DesignSystem.spacing8),
             leading: ClipRRect(
               borderRadius: DesignSystem.borderRadiusSmall,
-              child: CachedNetworkImage(
-                imageUrl: fav.thumbnail.isNotEmpty
-                    ? fav.thumbnail
-                    : 'https://placehold.co/56x80.png?text=Book',
-                width: 60,
-                height: 85,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                    width: 60,
-                    height: 85,
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest),
-                errorWidget: (_, __, ___) => Container(
-                    width: 60,
-                    height: 85,
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    child: const Icon(Icons.menu_book_rounded, size: 24)),
-              ),
+              child: fav.thumbnail.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: fav.thumbnail,
+                      width: 60,
+                      height: 85,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(
+                          width: 60,
+                          height: 85,
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest),
+                      errorWidget: (_, __, ___) => Container(
+                          width: 60,
+                          height: 85,
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          child: const Icon(Icons.menu_book_rounded, size: 24)),
+                    )
+                  : Container(
+                      width: 60,
+                      height: 85,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      child: const Icon(Icons.menu_book_rounded, size: 24)),
             ),
             title: Text(
               fav.bookTitle,

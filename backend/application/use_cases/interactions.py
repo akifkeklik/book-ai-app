@@ -98,6 +98,8 @@ class TrackUserActivityUseCase:
                 "book_dislike": "dislike",
                 "favorite": "favorite",
                 "book_favorite": "favorite",
+                "want_to_read": "want_to_read",
+                "finished": "finished",
             }
             if (
                 action in interaction_mapping

@@ -73,7 +73,7 @@ class RecommendationProvider extends ChangeNotifier {
       );
 
       if (success) {
-        fetchPersonalizedRecs(userId, _lastPopularBooks, force: true);
+        await fetchPersonalizedRecs(userId, _lastPopularBooks, force: true);
       }
     } catch (e) {
       debugPrint('Feedback submission error: $e');

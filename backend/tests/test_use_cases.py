@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 from backend.application.use_cases.ai_rag import ProcessRagQueryUseCase
+from backend.application.use_cases.catalog import GetBooksUseCase
 from backend.application.use_cases.recommendations import GetPersonalizedRecommendationsUseCase
 from backend.domain.ports import BookDataPort, EmbeddingPort, LlmPort, UserInteractionRepository
 
@@ -322,3 +323,44 @@ def test_track_activity_missing_user_id_raises():
     uc = TrackUserActivityUseCase(repo)
     with pytest.raises(ValueError):
         uc.execute("", "view", "b1")
+
+
+def test_get_books_usecase_with_query_filter():
+    class QueryCatalog:
+        def get_all_books(self, **kwargs):
+            q = kwargs.get("query")
+            assert q == "fantasy"
+            return {
+                "books": [{"isbn13": "9781111111111", "title": "Fantasy Tale", "authors": "A. Writer"}],
+                "total": 1,
+                "page": 1,
+                "per_page": 20,
+                "total_pages": 1,
+            }
+
+    uc = GetBooksUseCase(QueryCatalog(), FakeEnrichmentService())
+    result = uc.execute(query="fantasy")
+    assert result["total"] == 1
+    assert result["books"][0]["title"] == "Fantasy Tale"
+
+
+def test_track_activity_want_to_read_and_finished_sync():
+    from backend.application.use_cases.interactions import TrackUserActivityUseCase
+
+    repo = FakeInteractionRepo()
+    repo.upserted_interactions = []
+
+    def mock_upsert(entries):
+        repo.upserted_interactions.extend(entries)
+
+    repo.upsert_interactions = mock_upsert
+
+    uc = TrackUserActivityUseCase(repo)
+    res1 = uc.execute("u1", "want_to_read", "9780001", "Book 1")
+    assert res1["status"] == "tracked"
+    assert repo.upserted_interactions[-1]["interaction_type"] == "want_to_read"
+
+    res2 = uc.execute("u1", "finished", "9780002", "Book 2")
+    assert res2["status"] == "tracked"
+    assert repo.upserted_interactions[-1]["interaction_type"] == "finished"
+

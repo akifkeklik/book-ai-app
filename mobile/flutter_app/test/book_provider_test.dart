@@ -322,6 +322,61 @@ void main() {
       expect(provider.status, RecommendationStatus.initial);
       expect(provider.personalizedRecs, isEmpty);
     });
+
+    test('submitFeedback dislike optimistically removes book and refreshes recs',
+        () async {
+      final repo = FakeBookRepository();
+      repo.personalizedResult = [
+        FakeBookRepository.book('B1', 'Book One'),
+        FakeBookRepository.book('B2', 'Book Two'),
+      ];
+
+      final provider = RecommendationProvider(
+        manageRecommendations: ManageRecommendationsUseCase(repo),
+      );
+
+      await provider.fetchPersonalizedRecs('userA', []);
+      expect(provider.personalizedRecs.length, 2);
+
+      // Submit dislike for B1 - should be optimistically removed
+      repo.personalizedResult = [FakeBookRepository.book('B2', 'Book Two')];
+      await provider.submitFeedback(
+        userId: 'userA',
+        bookId: 'B1',
+        interaction: 'dislike',
+      );
+
+      expect(provider.personalizedRecs.any((b) => b.isbn13 == 'B1'), isFalse);
+      expect(provider.personalizedRecs.length, 1);
+      expect(provider.personalizedRecs.first.isbn13, 'B2');
+    });
+
+    test('submitFeedback favorite/like/want_to_read triggers recs refresh',
+        () async {
+      final repo = FakeBookRepository();
+      repo.personalizedResult = [FakeBookRepository.book('B1', 'Initial Rec')];
+
+      final provider = RecommendationProvider(
+        manageRecommendations: ManageRecommendationsUseCase(repo),
+      );
+
+      await provider.fetchPersonalizedRecs('userA', []);
+      expect(provider.personalizedRecs.first.title, 'Initial Rec');
+
+      // Update backend returned recs
+      repo.personalizedResult = [
+        FakeBookRepository.book('B2', 'Updated Rec Based on Feedback')
+      ];
+
+      await provider.submitFeedback(
+        userId: 'userA',
+        bookId: 'B1',
+        interaction: 'want_to_read',
+      );
+
+      expect(provider.personalizedRecs.first.title,
+          'Updated Rec Based on Feedback');
+    });
   });
 
   group('CatalogProvider - Filtering and State Correctness', () {

@@ -16,28 +16,27 @@ export function Navbar() {
         </Link>
         
         <div className="nav-links">
+          <Link href="/catalog" className="text-muted flex items-center gap-2 hover:text-white transition-colors">
+            <Compass size={18} />
+            <span>Catalog</span>
+          </Link>
+          <Link href="/ai-discovery" className="text-muted flex items-center gap-2 hover:text-white transition-colors">
+            <Sparkles size={18} color="var(--accent)" />
+            <span className="text-gradient">AI Discovery</span>
+          </Link>
+
           {!loading && (
             <>
               {user ? (
-                <>
-                  <Link href="/catalog" className="text-muted flex items-center gap-2 hover:text-white transition-colors">
-                    <Compass size={18} />
-                    <span>Catalog</span>
-                  </Link>
-                  <Link href="/ai-discovery" className="text-muted flex items-center gap-2 hover:text-white transition-colors">
-                    <Sparkles size={18} color="var(--accent)" />
-                    <span className="text-gradient">AI Discovery</span>
-                  </Link>
-                  <button onClick={signOut} className="btn btn-outline ml-4">
-                    <LogOut size={16} />
-                    <span>Sign Out</span>
-                  </button>
-                </>
+                <button onClick={signOut} className="btn btn-outline" style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', marginLeft: '0.5rem' }}>
+                  <LogOut size={16} />
+                  <span>Sign Out</span>
+                </button>
               ) : (
-                <>
-                  <Link href="/login" className="btn btn-outline">Log in</Link>
-                  <Link href="/signup" className="btn btn-primary">Sign up</Link>
-                </>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginLeft: '0.5rem' }}>
+                  <Link href="/login" className="btn btn-outline" style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}>Log in</Link>
+                  <Link href="/signup" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}>Sign up</Link>
+                </div>
               )}
             </>
           )}

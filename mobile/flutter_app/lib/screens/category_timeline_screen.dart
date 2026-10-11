@@ -37,9 +37,7 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
   }
 
   Future<void> _fetchInitial() async {
-    setState(() => _isLoading = true);
     await _fetchMore();
-    setState(() => _isLoading = false);
   }
 
   Future<void> _applyFilters({String? sort, int? minPages, int? maxPages, double? minRating}) async {
@@ -56,7 +54,7 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
       _page = 1;
       _hasMore = true;
     });
-    await _fetchInitial();
+    await _fetchMore();
   }
 
   Future<void> _fetchMore() async {
@@ -197,17 +195,32 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 40),
-            ElevatedButton.icon(
-              onPressed: () => context.go('/'),
-              icon: const Icon(Icons.explore_outlined),
-              label: Text(context.tr('explore_all_books')),
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
-              ),
+            const SizedBox(height: 32),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              alignment: WrapAlignment.center,
+              children: [
+                if (_minPages != null || _maxPages != null || _minRating != null || _sort != 'popularity')
+                  OutlinedButton.icon(
+                    onPressed: () => _applyFilters(sort: 'popularity', minPages: -1, maxPages: -1, minRating: -1),
+                    icon: const Icon(Icons.refresh),
+                    label: Text(context.tr('reset')),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
+                ElevatedButton.icon(
+                  onPressed: () => context.go('/'),
+                  icon: const Icon(Icons.explore_outlined),
+                  label: Text(context.tr('explore_all_books')),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

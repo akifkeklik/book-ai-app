@@ -8,6 +8,7 @@ import '../domain/entities/book.dart';
 import '../providers/auth_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/recommendation_provider.dart';
 import '../application/use_cases/view_book_details_use_case.dart';
 import '../application/use_cases/manage_recommendations_use_case.dart';
 
@@ -252,7 +253,15 @@ class _DetailScreenState extends State<DetailScreen> {
                 return;
               }
               HapticFeedback.mediumImpact();
+              final willBeFav = !isFavorite;
               favs.toggleFavorite(userId: uid, book: book);
+              if (willBeFav) {
+                context.read<RecommendationProvider>().submitFeedback(
+                  userId: uid,
+                  bookId: book.isbn13,
+                  interaction: 'favorite',
+                );
+              }
             },
           ),
         ),
@@ -509,8 +518,12 @@ class _InteractionButton extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.tr('please_log_in'))));
           return;
         }
-        final success = await context.read<ManageRecommendationsUseCase>().submitFeedback(userId: auth.currentUser!.id, bookId: book.isbn13, interaction: interaction);
-        if (success && context.mounted) {
+        await context.read<RecommendationProvider>().submitFeedback(
+          userId: auth.currentUser!.id,
+          bookId: book.isbn13,
+          interaction: interaction,
+        );
+        if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.tr('marked_as', args: {'label': label}))));
         }
       },

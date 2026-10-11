@@ -23,13 +23,14 @@ class GetBooksUseCase:
         published_to: Optional[int] = None,
         sort: Optional[str] = None,
         order: Optional[str] = "asc",
+        query: Optional[str] = None,
     ) -> Dict[str, Any]:
         result = self._catalog.get_all_books(
             page=page, per_page=per_page, category=category,
             author=author, publisher=publisher, min_pages=min_pages,
             max_pages=max_pages, min_rating=min_rating,
             published_from=published_from, published_to=published_to,
-            sort=sort, order=order
+            sort=sort, order=order, query=query
         )
         enriched_books = self._enrichment_service.enrich(result["books"])
         result["books"] = [Book(**book).model_dump() for book in enriched_books]

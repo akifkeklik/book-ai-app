@@ -35,22 +35,62 @@ export default function AIDiscoveryPage() {
     }
   };
 
+  const PROMPT_SUGGESTIONS = [
+    'Fast-paced sci-fi with mind-bending time travel',
+    'Deep mystery novel set in atmospheric rainy London',
+    'Epic fantasy with rich worldbuilding and dragons',
+    'Heartwarming fiction about second chances in life',
+  ];
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    setQuery(suggestion);
+  };
+
   return (
-    <div className="container animate-fade-in" style={{ maxWidth: '800px', paddingBottom: '4rem' }}>
-      <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-        <h1 style={{ fontSize: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+    <div className="container animate-fade-in" style={{ maxWidth: '850px', paddingBottom: '4rem' }}>
+      <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+        <h1 style={{ fontSize: '2.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
           <Sparkles className="text-gradient" size={32} />
           <span>AI Discovery</span>
         </h1>
-        <p className="text-muted">Tell me what kind of book you&apos;re looking for.</p>
+        <p className="text-muted" style={{ fontSize: '1.1rem' }}>
+          Describe what you feel like reading, and our AI recommender will find books to match your mood and interests.
+        </p>
       </div>
 
-      <div className="glass-panel" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', marginBottom: '1.5rem' }}>
+      <div className="glass-panel" style={{ minHeight: '420px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
           {messages.length === 0 && (
-            <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--muted)' }}>
-              <Sparkles size={48} style={{ opacity: 0.2, margin: '0 auto 1rem' }} />
-              <p>Try saying: &quot;I want a sci-fi book about time travel with a strong female lead&quot;</p>
+            <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--muted)', padding: '2rem 1rem' }}>
+              <Sparkles size={44} style={{ opacity: 0.3, margin: '0 auto 1rem', color: 'var(--accent)' }} />
+              <p style={{ marginBottom: '1.25rem', fontSize: '1rem' }}>Not sure what to ask? Click a suggestion below to start:</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', justifyContent: 'center', maxWidth: '600px', margin: '0 auto' }}>
+                {PROMPT_SUGGESTIONS.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => handleSelectSuggestion(suggestion)}
+                    style={{
+                      background: 'rgba(139, 92, 246, 0.1)',
+                      border: '1px solid rgba(139, 92, 246, 0.25)',
+                      color: 'var(--foreground)',
+                      padding: '0.45rem 0.9rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.825rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = 'rgba(139, 92, 246, 0.25)';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = 'rgba(139, 92, 246, 0.1)';
+                    }}
+                  >
+                    ✨ {suggestion}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           
