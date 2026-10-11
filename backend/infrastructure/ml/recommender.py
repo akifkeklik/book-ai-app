@@ -694,12 +694,25 @@ class BookRecommender:
         published_to: Optional[int] = None,
         sort: Optional[str] = None,
         order: Optional[str] = "asc",
+        query: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Get a paginated list of all books, optionally filtered and sorted."""
         if self.df.empty:
             return {"books": [], "total": 0, "page": page, "per_page": per_page, "total_pages": 0}
 
         df = self.df.copy()
+
+        if query:
+            q_clean = query.strip()
+            if q_clean:
+                title_mask = df["title"].astype(str).str.contains(q_clean, case=False, na=False, regex=False)
+                author_mask = df["authors"].astype(str).str.contains(q_clean, case=False, na=False, regex=False)
+                desc_mask = (
+                    df["description"].astype(str).str.contains(q_clean, case=False, na=False, regex=False)
+                    if "description" in df.columns
+                    else False
+                )
+                df = df[title_mask | author_mask | desc_mask]
 
         if category:
             cat = category.strip()

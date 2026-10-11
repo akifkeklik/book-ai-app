@@ -83,6 +83,7 @@ class CatalogPort(Protocol):
         published_to: Optional[int] = None,
         sort: Optional[str] = None,
         order: Optional[str] = "asc",
+        query: Optional[str] = None,
     ) -> Dict[str, Any]: ...
 
     def get_unique_categories(self) -> List[Dict[str, Any]]: ...

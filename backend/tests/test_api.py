@@ -142,6 +142,20 @@ class TestBooksList:
         assert data["per_page"] == 5
         assert len(data["books"]) <= 5
 
+    def test_get_books_query_parameter(self, client):
+        resp = client.get("/api/books?q=Potter&per_page=10")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "books" in data
+        assert "total" in data
+        for book in data["books"]:
+            match = (
+                "potter" in book.get("title", "").lower()
+                or "potter" in book.get("authors", "").lower()
+                or "potter" in book.get("description", "").lower()
+            )
+            assert match
+
     def test_get_books_page_2(self, client):
         resp1 = client.get("/api/books?page=1&per_page=3")
         resp2 = client.get("/api/books?page=2&per_page=3")
@@ -551,6 +565,16 @@ class TestMutationEndpoints:
         assert feedback_upserts[0][2] == [
             {"user_id": "test-user-123", "book_id": "123", "interaction_type": "like"}
         ]
+
+    def test_feedback_accepts_extended_interactions(self, client, auth_headers, fake_interaction_repo):
+        for interaction in ["want_to_read", "finished", "favorite"]:
+            resp = client.post(
+                "/api/feedback",
+                headers=auth_headers,
+                data=json.dumps({"book_id": "456", "interaction": interaction}),
+                content_type="application/json",
+            )
+            assert resp.status_code == 200
 
     def test_feedback_missing_fields(self, client, auth_headers):
         resp = client.post(

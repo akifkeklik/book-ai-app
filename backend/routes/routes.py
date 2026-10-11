@@ -196,6 +196,7 @@ def get_books():
             "published_to": safe_int(request.args.get("published_to")),
             "sort": request.args.get("sort"),
             "order": request.args.get("order", "asc"),
+            "query": request.args.get("q") or request.args.get("query"),
         }
 
         return jsonify(_get_books_uc.execute(**kwargs)), 200
@@ -339,7 +340,7 @@ def feedback():
         return jsonify({"error": "interaction is required"}), 400
     interaction = interaction.strip().lower()
 
-    valid_interactions = ["like", "dislike", "favorite"]
+    valid_interactions = ["like", "dislike", "favorite", "want_to_read", "finished"]
     if interaction not in valid_interactions:
         return jsonify({"error": f"Invalid interaction. Supported: {valid_interactions}"}), 400
 
@@ -499,6 +500,8 @@ def track_activity():
         "book_dislike",
         "favorite",
         "book_favorite",
+        "want_to_read",
+        "finished",
         "recommendation_click",
         "search",
     ]
