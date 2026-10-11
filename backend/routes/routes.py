@@ -511,4 +511,6 @@ def track_activity():
         )
         return jsonify(result), 200
     except Exception as exc:
-        raise exc
+        logger.error(f"Tracking error: {exc}")
+        return jsonify({"error": "Failed to track activity"}), 500
+

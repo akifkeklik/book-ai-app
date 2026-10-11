@@ -452,13 +452,14 @@ class TestActivityTracking:
         monkeypatch.setattr(
             "backend.routes.routes._track_activity_uc._interaction_repo", FailingRepo()
         )
-        with pytest.raises(RuntimeError):
-            client.post(
-                "/api/track",
-                headers=auth_headers,
-                data=json.dumps({"book_id": "9780441013593", "action": "view"}),
-                content_type="application/json",
-            )
+        resp = client.post(
+            "/api/track",
+            headers=auth_headers,
+            data=json.dumps({"book_id": "9780441013593", "action": "view"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 500
+        assert resp.get_json()["error"] == "Failed to track activity"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
