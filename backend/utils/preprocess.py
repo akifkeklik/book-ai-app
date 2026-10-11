@@ -88,6 +88,22 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Complete preprocessing pipeline for the recommender dataset."""
     df = df.copy()
 
+    expected_defaults = {
+        "title": "Unknown Title",
+        "authors": "Unknown Author",
+        "categories": "General",
+        "description": "",
+        "thumbnail": "",
+        "published_date": "",
+        "average_rating": 0.0,
+        "ratings_count": 0,
+        "page_count": 0,
+        "isbn13": "",
+    }
+    for col, default_val in expected_defaults.items():
+        if col not in df.columns:
+            df[col] = default_val
+
     # Fill missing values with sensible defaults.
     df["title"] = df["title"].fillna("Unknown Title")
     df["authors"] = df["authors"].fillna("Unknown Author")
