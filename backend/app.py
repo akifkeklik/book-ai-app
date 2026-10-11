@@ -60,9 +60,17 @@ def create_app(config_class=Config) -> Flask:
                 return jsonify({"error": "Server misconfigured"}), 503
 
             api_key = request.headers.get("X-Api-Key")
-            if not api_key or api_key != app.config["LIBRIS_API_KEY"]:
-                log_event(__name__, logging.WARNING, msg="Unauthorized access attempt", ip=request.remote_addr)
-                return jsonify({"error": "Unauthorized: Invalid or missing API Key"}), 401
+            if api_key and api_key == app.config["LIBRIS_API_KEY"]:
+                return None  # Authorized via Server-to-Server API Key
+
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                # Token could be Anon Key or User JWT.
+                # Global guard passes; protected endpoints verify user JWTs explicitly via @require_auth.
+                return None
+
+            log_event(__name__, logging.WARNING, msg="Unauthorized access attempt", ip=request.remote_addr)
+            return jsonify({"error": "Unauthorized: Missing API Key or Bearer Token"}), 401
 
         return None
 

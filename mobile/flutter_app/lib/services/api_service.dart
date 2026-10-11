@@ -76,7 +76,6 @@ class ApiService {
         receiveTimeout: const Duration(seconds: 30),
         headers: {
           'Content-Type': 'application/json',
-          'X-Api-Key': AppConfig.librisApiKey,
         },
         // Accept all HTTP statuses so we can handle errors cleanly ourselves
         // (prevents Dio from throwing before we can inspect the response)
@@ -92,6 +91,8 @@ class ApiService {
               : Supabase.instance.client.auth.currentSession;
           if (session != null) {
             options.headers['Authorization'] = 'Bearer ${session.accessToken}';
+          } else {
+            options.headers['Authorization'] = 'Bearer ${AppConfig.supabaseAnonKey}';
           }
           handler.next(options);
         },
