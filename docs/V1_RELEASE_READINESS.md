@@ -54,16 +54,18 @@ Each tier contains dedicated environment templates:
 
 | Variable | Tier | Description | Production Requirement |
 | :--- | :--- | :--- | :--- |
-| `SECRET_KEY` | Backend | Flask session cryptographic secret | Long random string |
+| `SECRET_KEY` | Backend | Flask session cryptographic secret | Required non-empty string in production (fails fast if omitted) |
 | `LIBRIS_API_KEY` | Backend / Web | Shared secret for server-to-server endpoints | Secure random token |
-| `LLM_PROVIDER` | Backend | LLM engine (`gemini` or `openai`) | `gemini` (default) |
-| `LLM_API_KEY` | Backend | API key for Gemini 2.5 or OpenAI | Valid provider key |
+| `NUM_PROXIES` | Backend | Count of trusted proxy hops for Werkzeug ProxyFix | Integer (`1` for Render / Railway / reverse proxies) |
+| `LLM_PROVIDER` | Backend | LLM engine (`gemini` default, or `openai`) | `gemini` (recommended) |
+| `LLM_API_KEY` | Backend | API key for Gemini 2.5 (or OpenAI) | Valid provider key |
+| `GEMINI_API_KEY` | Backend | Dedicated key for 3072-dim embeddings | Required if `LLM_PROVIDER=openai` |
 | `GOOGLE_BOOKS_API_KEY`| Backend | Book cover and metadata enrichment | Optional fallback |
 | `SUPABASE_URL` | Backend / Web / Mobile | Supabase project HTTPS URL | Required |
 | `SUPABASE_ANON_KEY` | Backend / Web / Mobile | Supabase public anonymous key | Required |
 | `NEXT_PUBLIC_SUPABASE_URL` | Web | Client-side Supabase URL | Required |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY`| Web | Client-side Supabase anon key | Required |
-| `BACKEND_URL` | Web / Mobile | Base URL to Flask API | Required (e.g., internal service URL) |
+| `BACKEND_URL` | Web / Mobile | Base URL to Flask API | Required (compile-time define in Mobile) |
 
 > [!CAUTION]
 > Never commit `.env` or `.env.local` to version control. Production keys must be injected via secret managers or deployment environment variables (e.g., Render, Vercel, Supabase Secrets).
@@ -95,6 +97,12 @@ PYTHONPATH=backend python -m pytest backend/tests/ -v --tb=short
 
 # Run local development server (port 5000)
 python backend/app.py
+
+# Canonical persistent production startup command (single worker with preload fits 512MB RAM):
+# When CWD is backend (e.g., Render / Procfile):
+gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --preload --timeout 120
+# When running via container / Dockerfile:
+gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --preload --timeout 120 backend.app:app
 ```
 
 ### B. Web Application (Next.js 16 / TypeScript)
@@ -136,27 +144,38 @@ flutter run --dart-define=BACKEND_URL=http://localhost:5000
 
 ---
 
-## 4. Database Migrations & Schema Runbook
+## 4. Database Migrations & Catalog Seeding Runbook
 
 Migrations are ordered sequentially in `backend/scripts/`:
-1. `01_schema.sql` — `user_interactions` table, base indexes, and RLS policies.
-2. `02_phase3_migration.sql` — Unique `(user_id, book_id)` constraint, trigger `sync_favorites_to_interactions`, favorites backfill.
-3. `03_phase3_embeddings.sql` — `pgvector` extension and vector columns on `books`.
-4. `04_phase3_hybrid.sql` — Stored procedures for hybrid vector & semantic matching.
-5. `05_phase3_performance.sql` — Trigram and search indexes.
-6. `06_phase2_rag.sql` — RAG retrieval helper functions.
-7. `07_phase3_collections.sql` — Expanded interaction type constraints (`like`, `dislike`, `want_to_read`, `reading`, `finished`, `favorite`).
-8. `08_user_profiles_and_activities.sql` — `user_profiles` and `user_activities` tables with RLS policies.
+1. `00_init_books.sql` — Base catalog (`public.books`) and favorites (`public.favorites`) tables, indexes, and RLS policies.
+2. `01_schema.sql` — `user_interactions` table, base indexes, and RLS policies.
+3. `02_phase3_migration.sql` — Unique `(user_id, book_id)` constraint, trigger `sync_favorites_to_interactions`, favorites backfill.
+4. `03_phase3_embeddings.sql` — `pgvector` extension and `book_embeddings` table (`vector(3072)`), halfvec HNSW index.
+5. `04_phase3_hybrid.sql` — Stored procedures for hybrid vector & semantic matching (`match_book_embeddings` with `vector(3072)` centroid).
+6. `05_phase3_performance.sql` — Optimized vector similarity RPC using halfvec HNSW indexing.
+7. `06_phase2_rag.sql` — Semantic query retrieval RPC (`match_query_embeddings` with `vector(3072)`).
+8. `07_phase3_collections.sql` — Expanded interaction type constraints (`like`, `dislike`, `want_to_read`, `reading`, `finished`, `favorite`).
+9. `08_user_profiles_and_activities.sql` — `user_profiles` and `user_activities` tables with RLS policies.
+
+### Catalog Data Seeding
+After executing schema migrations on a fresh database:
+```bash
+# 1. Ingest base catalog books (6,448 titles) from CSV to Supabase
+python backend/scripts/upload_books_to_supabase.py
+
+# 2. (Optional / Batch) Backfill 3072-dimensional Gemini embeddings for semantic search
+python backend/scripts/backfill_embeddings.py
+```
 
 ### Local Migration Testing (CI Parity)
 ```bash
 # Start test Postgres with pgvector
-docker run -d --name test-postgres -e POSTGRES_PASSWORD=postgrespassword -p 5432:5432 ankane/pgvector:v0.5.1
+docker run -d --name test-postgres -e POSTGRES_PASSWORD=postgrespassword -p 5432:5432 pgvector/pgvector:pg16
 
-# Apply CI stubs and migrations
-psql -h localhost -U postgres -d postgres -f backend/ci_stubs.sql
+# Apply CI stubs and migrations with strict failure on error
+psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f backend/ci_stubs.sql
 for sql in $(ls backend/scripts/*.sql | sort); do
-  psql -h localhost -U postgres -d postgres -f "$sql"
+  psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "$sql"
 done
 ```
 
@@ -168,8 +187,13 @@ Execute the following checks against the deployed staging or production endpoint
 
 ### Check 1: Service Readiness & Health
 ```bash
+# Liveness Probe (Public, non-blocking):
 curl -f https://<backend-host>/api/health
 # Expected: {"service":"book-ai-api","status":"healthy"}
+
+# Readiness Probe (Database connectivity check):
+curl -f https://<backend-host>/api/health/ready
+# Expected: {"service":"book-ai-api","status":"ready"}
 ```
 
 ### Check 2: Catalog Books & Pagination
@@ -212,13 +236,17 @@ If a critical issue is identified during or immediately after deployment:
      `vercel rollback <deployment-id>`
 2. **Backend (Render / Container)**:
    - Redeploy the previous known-good Docker image SHA or commit tag (`main` HEAD prior to the release merge).
-3. **Database Migrations**:
+3. **Database Migrations & Trigger Rollback Implications**:
    - Because all Batch 1–3 migrations in `backend/scripts/*.sql` are additive (indexes, non-destructive constraints, new tables), rollback of code does not require rolling back the Postgres schema.
+   - **Trigger Side-Effect Caveat**: `02_phase3_migration.sql` installs trigger `trg_sync_favorites` which synchronizes `favorites` modifications into `user_interactions`. If backend code is rolled back to an earlier version that did not expect interaction syncing, this trigger remains active in the database. To explicitly disable the trigger during a rollback, execute:
+     `DROP TRIGGER IF EXISTS trg_sync_favorites ON public.favorites; DROP FUNCTION IF EXISTS sync_favorites_to_interactions();`
 
 ---
 
 ## 7. Known Limitations & Production Caveats
 
-1. **In-Memory Rate Limiter**: The rate limiter in `backend/routes/routes.py` is in-memory. In multi-worker Gunicorn/WSGI environments or horizontally auto-scaled containers, limit tracking is process-local. For high-scale multi-instance production deployments, configure a centralized Redis cache.
-2. **RAG Vector Search Live Credentials**: RAG queries depend on Supabase vector RPC (`match_query_embeddings`) or an active LLM provider key (`gemini` / `openai`). When unconfigured, the application falls back safely to keyword recommendations and standard search without crashing.
-3. **Offline Recommendation Evaluation vs. Live User Feedback**: Offline evaluation metrics (NDCG@10, ILD, Dislike Suppression) validate algorithm mechanics against synthetic and deterministic cohorts. Live production click-through rate (CTR) and conversion improvements require real user engagement data collected over time.
+1. **In-Memory Rate Limiter & Reverse Proxy**: The rate limiter in `backend/routes/routes.py` is in-memory. In multi-worker environments, each worker maintains isolated buckets. Werkzeug `ProxyFix` is configured with `NUM_PROXIES=1` to reliably parse real client IPs behind cloud reverse proxies (e.g. Render / Railway / Cloudflare) while discarding client-spoofed headers. For multi-instance horizontal scaling, a distributed store (Redis) is required.
+2. **Database Backup & Restore Limitations**: Supabase Free Tier does not include Point-in-Time Recovery (PITR). Schedule routine backups via `pg_dump` to an off-site object store prior to manual production schema modifications.
+3. **ML Model Artifact Persistence**: `backend/saved_model/tfidf.pkl` (~10.3 MB) is tracked in Git and pre-loaded into the container. Persistent cloud services have ephemeral filesystems; if the model is retrained on-instance from live data, changes are lost on restart unless archived to cloud object storage (e.g., Supabase Storage bucket).
+4. **RAG Vector Search Live Credentials**: RAG queries depend on Supabase vector RPC (`match_query_embeddings`) and a Google Gemini API key (`gemini-2.5-flash` and 3072-dim `gemini-embedding-2`). When unconfigured, the application falls back safely to keyword recommendations and standard search without crashing.
+5. **Offline Recommendation Evaluation vs. Live User Feedback**: Offline evaluation metrics (NDCG@10, ILD, Dislike Suppression) validate algorithm mechanics against synthetic and deterministic cohorts. Live production click-through rate (CTR) and conversion improvements require real user engagement data collected over time.

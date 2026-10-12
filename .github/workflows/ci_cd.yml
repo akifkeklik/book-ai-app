@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: ankane/pgvector:v0.5.1
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgrespassword
@@ -45,10 +45,10 @@ jobs:
           PGPASSWORD: postgrespassword
         run: |
           echo "Applying CI Stubs..."
-          psql -h localhost -U postgres -d postgres -f "backend/ci_stubs.sql"
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/ci_stubs.sql"
           for sql in $(ls backend/scripts/*.sql | sort); do
             echo "Applying $sql..."
-            psql -h localhost -U postgres -d postgres -f "$sql"
+            psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "$sql"
           done
 
   #   Backend CI (Python/Flask) 
@@ -125,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: ankane/pgvector:v0.5.1
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgrespassword
@@ -145,10 +145,10 @@ jobs:
           PGPASSWORD: postgrespassword
         run: |
           echo "Applying CI Stubs..."
-          psql -h localhost -U postgres -d postgres -f "backend/ci_stubs.sql"
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/ci_stubs.sql"
           for sql in $(ls backend/scripts/*.sql | sort); do
             echo "Applying $sql..."
-            psql -h localhost -U postgres -d postgres -f "$sql"
+            psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "$sql"
           done
 
       - name: Set up Python 3.12

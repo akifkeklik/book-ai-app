@@ -157,7 +157,7 @@ def readiness_check():
     except Exception as exc:
         import logging
 
-        from .infrastructure.logging.structured_logger import log_event
+        from ..infrastructure.logging.structured_logger import log_event
 
         log_event(__name__, logging.ERROR, msg="Readiness check failed", error=str(exc))
         return jsonify({"status": "not_ready", "error": "Database unavailable"}), 503

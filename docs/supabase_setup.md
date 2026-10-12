@@ -23,13 +23,14 @@
 -- FAVORITES
 -- ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS favorites (
-  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id     uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  isbn13      text NOT NULL,
-  book_title  text NOT NULL DEFAULT '',
-  thumbnail   text NOT NULL DEFAULT '',
-  added_at    timestamptz DEFAULT now(),
-  UNIQUE(user_id, isbn13)
+  id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id         uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  book_id         text NOT NULL,
+  book_title      text NOT NULL DEFAULT '',
+  book_author     text NOT NULL DEFAULT '',
+  book_image_url  text NOT NULL DEFAULT '',
+  added_at        timestamptz DEFAULT now(),
+  UNIQUE(user_id, book_id)
 );
 
 -- ────────────────────────────────────────────────
@@ -116,9 +117,10 @@ SUPABASE_ANON_KEY=YOUR_ANON_PUBLIC_KEY
 |--------|------|-------------|
 | `id` | uuid | Primary key (auto) |
 | `user_id` | uuid | FK to `auth.users` |
-| `isbn13` | text | Book ISBN-13 identifier |
+| `book_id` | text | Book identifier (ISBN-13) |
 | `book_title` | text | Cached title for display |
-| `thumbnail` | text | Cached cover URL |
+| `book_author` | text | Cached author name |
+| `book_image_url` | text | Cached cover URL |
 | `added_at` | timestamptz | When saved |
 
 ### `user_activity`

@@ -19,8 +19,17 @@ class EmbeddingService:
         self._model = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-2")
         self._dimension = int(os.getenv("EMBEDDING_DIMENSION", "3072"))
 
-        # Sadece LLM_API_KEY varsa client'ı başlat.
-        self._api_key = os.getenv("LLM_API_KEY")
+        # In Libris V1, database vector embeddings are 3072-dimensional vectors produced
+        # by Google Gemini (models/gemini-embedding-2). We accept GEMINI_API_KEY or LLM_API_KEY (when provider is gemini).
+        provider = os.getenv("LLM_PROVIDER", "gemini").lower()
+        self._api_key = os.getenv("GEMINI_API_KEY") or (os.getenv("LLM_API_KEY") if provider == "gemini" else None)
+
+        if not self._api_key and os.getenv("LLM_API_KEY") and provider == "openai":
+            logger.warning(
+                "LLM_PROVIDER is set to 'openai' for text completions, but 3072-dim embeddings "
+                "require Google Gemini. Set GEMINI_API_KEY to enable semantic embeddings."
+            )
+
         if self._api_key:
             genai.configure(api_key=self._api_key)
             self._is_configured = True
