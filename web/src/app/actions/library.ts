@@ -238,7 +238,15 @@ export async function removeLibraryItem(bookId: string): Promise<{
       return { success: false, error: 'Unauthorized' };
     }
 
-    // Delete from user_interactions scoped strictly to auth.uid()
+    // Capture previous interaction to support compensating rollback on partial failure
+    const { data: previousInteraction } = await supabase
+      .from('user_interactions')
+      .select('interaction_type, created_at')
+      .eq('user_id', user.id)
+      .eq('book_id', bookId)
+      .maybeSingle();
+
+    // 1. Delete from user_interactions scoped strictly to auth.uid()
     const { error: deleteInteractionError } = await supabase
       .from('user_interactions')
       .delete()
@@ -249,12 +257,28 @@ export async function removeLibraryItem(bookId: string): Promise<{
       return { success: false, error: deleteInteractionError.message };
     }
 
-    // Also delete from mobile favorites table if present
-    await supabase
+    // 2. Also delete from mobile favorites table
+    const { error: deleteFavError } = await supabase
       .from('favorites')
       .delete()
       .eq('user_id', user.id)
       .eq('book_id', bookId);
+
+    if (deleteFavError) {
+      // Compensating rollback: restore user_interactions if favorites deletion failed
+      if (previousInteraction) {
+        await supabase.from('user_interactions').insert({
+          user_id: user.id,
+          book_id: bookId,
+          interaction_type: previousInteraction.interaction_type,
+          created_at: previousInteraction.created_at,
+        });
+      }
+      return {
+        success: false,
+        error: `Failed to remove from favorites table: ${deleteFavError.message}`,
+      };
+    }
 
     safeRevalidatePath('/favorites');
     safeRevalidatePath(`/book/${bookId}`);
@@ -296,7 +320,15 @@ export async function updateLibraryItemStatus(
       return { success: false, error: 'Unauthorized' };
     }
 
-    // Upsert into user_interactions
+    // Capture previous state for compensating rollback upon secondary sync failure
+    const { data: previousInteraction } = await supabase
+      .from('user_interactions')
+      .select('interaction_type, created_at')
+      .eq('user_id', user.id)
+      .eq('book_id', bookId)
+      .maybeSingle();
+
+    // 1. Upsert into user_interactions
     const { error: upsertError } = await supabase.from('user_interactions').upsert(
       {
         user_id: user.id,
@@ -311,37 +343,76 @@ export async function updateLibraryItemStatus(
       return { success: false, error: upsertError.message };
     }
 
-    // Synchronize favorites table for cross-platform consistency
+    // 2. Synchronize favorites table for cross-platform consistency
     if (newStatus === 'favorite') {
-      // Ensure mobile table has the entry
-      try {
-        const { data: bookData } = await supabase
-          .from('books')
-          .select('title, authors, thumbnail')
-          .eq('isbn13', bookId)
-          .maybeSingle();
+      const { data: bookData } = await supabase
+        .from('books')
+        .select('title, authors, thumbnail')
+        .eq('isbn13', bookId)
+        .maybeSingle();
 
-        await supabase.from('favorites').upsert(
-          {
-            user_id: user.id,
-            book_id: bookId,
-            book_title: bookData?.title || 'Book',
-            book_author: bookData?.authors || 'Unknown Author',
-            book_image_url: bookData?.thumbnail || '',
-            added_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_id,book_id' }
-        );
-      } catch {
-        // Non-fatal
+      const { error: favUpsertError } = await supabase.from('favorites').upsert(
+        {
+          user_id: user.id,
+          book_id: bookId,
+          book_title: bookData?.title || 'Book',
+          book_author: bookData?.authors || 'Unknown Author',
+          book_image_url: bookData?.thumbnail || '',
+          added_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,book_id' }
+      );
+
+      if (favUpsertError) {
+        // Compensating rollback: restore user_interactions to previous state
+        if (previousInteraction) {
+          await supabase.from('user_interactions').upsert(
+            {
+              user_id: user.id,
+              book_id: bookId,
+              interaction_type: previousInteraction.interaction_type,
+              created_at: previousInteraction.created_at,
+            },
+            { onConflict: 'user_id,book_id' }
+          );
+        } else {
+          await supabase
+            .from('user_interactions')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('book_id', bookId);
+        }
+        return {
+          success: false,
+          error: `Failed to synchronize favorites: ${favUpsertError.message}`,
+        };
       }
     } else {
-      // If changed to want_to_read or finished, remove from mobile favorites table
-      await supabase
+      // If changed to want_to_read, reading, or finished, remove from mobile favorites table
+      const { error: favDeleteError } = await supabase
         .from('favorites')
         .delete()
         .eq('user_id', user.id)
         .eq('book_id', bookId);
+
+      if (favDeleteError) {
+        // Compensating rollback: restore user_interactions to previous state
+        if (previousInteraction) {
+          await supabase.from('user_interactions').upsert(
+            {
+              user_id: user.id,
+              book_id: bookId,
+              interaction_type: previousInteraction.interaction_type,
+              created_at: previousInteraction.created_at,
+            },
+            { onConflict: 'user_id,book_id' }
+          );
+        }
+        return {
+          success: false,
+          error: `Failed to remove old favorite: ${favDeleteError.message}`,
+        };
+      }
     }
 
     safeRevalidatePath('/favorites');

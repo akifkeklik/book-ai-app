@@ -192,6 +192,16 @@ test('removeLibraryItem: deletes from user_interactions and favorites scoped to 
       }),
     },
     from: (table: string) => ({
+      select: () => ({
+        eq: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({
+              data: { interaction_type: 'favorite', created_at: '2026-01-01T00:00:00Z' },
+              error: null,
+            }),
+          }),
+        }),
+      }),
       delete: () => ({
         eq: (col1: string, val1: string) => ({
           eq: (col2: string, val2: string) => {
@@ -215,6 +225,67 @@ test('removeLibraryItem: deletes from user_interactions and favorites scoped to 
     assert.equal(res.success, true);
     assert.equal(deletedFromInteractions, true);
     assert.equal(deletedFromFavorites, true);
+  } finally {
+    setTestClient(null);
+  }
+});
+
+test('removeLibraryItem: executes compensating rollback when favorites deletion fails', async () => {
+  const userId = 'user-rollback-test';
+  let restored = false;
+
+  const fakeSupabase = {
+    auth: {
+      getUser: async () => ({
+        data: { user: { id: userId } },
+        error: null,
+      }),
+    },
+    from: (table: string) => {
+      if (table === 'user_interactions') {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { interaction_type: 'want_to_read', created_at: '2026-01-01T00:00:00Z' },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+          delete: () => ({
+            eq: () => ({
+              eq: () => ({ error: null }),
+            }),
+          }),
+          insert: (payload: Record<string, unknown>) => {
+            assert.equal(payload['user_id'], userId);
+            assert.equal(payload['interaction_type'], 'want_to_read');
+            restored = true;
+            return { error: null };
+          },
+        };
+      }
+      if (table === 'favorites') {
+        return {
+          delete: () => ({
+            eq: () => ({
+              eq: () => ({ error: { message: 'Database lock timeout' } }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    },
+  };
+
+  setTestClient(fakeSupabase);
+  try {
+    const res = await removeLibraryItem('9781234');
+    assert.equal(res.success, false);
+    assert.ok(res.error?.includes('Failed to remove from favorites table'));
+    assert.equal(restored, true); // Compensating rollback verified!
   } finally {
     setTestClient(null);
   }
@@ -255,6 +326,16 @@ test('updateLibraryItemStatus: validates statuses and updates collections', asyn
     from: (table: string) => {
       if (table === 'user_interactions') {
         return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { interaction_type: 'favorite', created_at: '2026-01-01T00:00:00Z' },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
           upsert: (payload: Record<string, unknown>, options: { onConflict: string }) => {
             upsertedInteraction = payload;
             assert.equal(options.onConflict, 'user_id,book_id');
@@ -297,3 +378,75 @@ test('updateLibraryItemStatus: validates statuses and updates collections', asyn
     setTestClient(null);
   }
 });
+
+test('updateLibraryItemStatus: executes compensating rollback when favorites sync fails', async () => {
+  const userId = 'user-sync-fail-test';
+  let rolledBackInteraction: Record<string, unknown> | null = null;
+  let firstUpsertDone = false;
+
+  const fakeSupabase = {
+    auth: {
+      getUser: async () => ({
+        data: { user: { id: userId } },
+        error: null,
+      }),
+    },
+    from: (table: string) => {
+      if (table === 'user_interactions') {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { interaction_type: 'want_to_read', created_at: '2026-01-01T00:00:00Z' },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+          upsert: (payload: Record<string, unknown>) => {
+            if (!firstUpsertDone) {
+              firstUpsertDone = true;
+              return { error: null };
+            }
+            // Second upsert is the compensating rollback!
+            rolledBackInteraction = payload;
+            return { error: null };
+          },
+        };
+      }
+      if (table === 'books') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: { title: 'Test Book', authors: 'Author', thumbnail: '' },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'favorites') {
+        return {
+          upsert: () => ({
+            error: { message: 'Favorites disk quota exceeded' },
+          }),
+        };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    },
+  };
+
+  setTestClient(fakeSupabase);
+  try {
+    const res = await updateLibraryItemStatus('9787777', 'favorite');
+    assert.equal(res.success, false);
+    assert.ok(res.error?.includes('Failed to synchronize favorites'));
+    assert.ok(rolledBackInteraction);
+    assert.equal(rolledBackInteraction['interaction_type'], 'want_to_read'); // Rolled back!
+  } finally {
+    setTestClient(null);
+  }
+});
+

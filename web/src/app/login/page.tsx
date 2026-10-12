@@ -5,6 +5,24 @@ import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
+export function sanitizeRedirect(url: string | null): string {
+  if (!url) return '/catalog';
+  const trimmed = url.trim();
+  // Reject protocol-relative slashes (//) or backslashes (/\)
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.startsWith('/\\')) {
+    return '/catalog';
+  }
+  try {
+    const parsed = new URL(trimmed, 'http://localhost');
+    if (parsed.origin === 'http://localhost' && parsed.pathname.startsWith('/')) {
+      return parsed.pathname + parsed.search;
+    }
+  } catch {
+    return '/catalog';
+  }
+  return '/catalog';
+}
+
 function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,11 +45,7 @@ function LoginForm() {
 
       if (authError) throw authError;
 
-      const redirectPath = searchParams.get('redirect') || '/catalog';
-      // Sanitize redirect path to prevent open redirect vulnerabilities
-      const safeRedirect = redirectPath.startsWith('/') && !redirectPath.startsWith('//')
-        ? redirectPath
-        : '/catalog';
+      const safeRedirect = sanitizeRedirect(searchParams.get('redirect'));
 
       router.push(safeRedirect);
       router.refresh();

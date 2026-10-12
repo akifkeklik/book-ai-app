@@ -66,3 +66,19 @@ test('updateSession: allows public access to root page without redirect', async 
   assert.notEqual(res.status, 307);
   assert.equal(res.headers.get('location'), null);
 });
+
+test('updateSession: preserves cookies on redirect response during unauthenticated /favorites redirect', async () => {
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://fake-project.supabase.co';
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'fake-anon-key';
+
+  const req = new NextRequest('http://localhost:3000/favorites', {
+    headers: {
+      cookie: 'sb-test-auth-token=some_token; path=/',
+    },
+  });
+
+  const res = await updateSession(req);
+  assert.equal(res.status, 307);
+  assert.ok(res.headers.get('location')?.includes('/login'));
+});
+
