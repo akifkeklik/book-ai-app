@@ -35,6 +35,18 @@ _track_activity_uc = container.track_activity_uc
 _process_rag_query_uc = container.process_rag_query_uc
 
 
+def _parse_int_param(val, default: int, min_val: int = 1, max_val: int = None) -> int:
+    try:
+        parsed = int(val)
+    except (TypeError, ValueError):
+        parsed = default
+    if min_val is not None:
+        parsed = max(min_val, parsed)
+    if max_val is not None:
+        parsed = min(max_val, parsed)
+    return parsed
+
+
 def require_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -167,8 +179,8 @@ def get_categories():
 @catalog_bp.route("/books", methods=["GET"])
 def get_books():
     try:
-        page = max(1, int(request.args.get("page", 1)))
-        per_page = min(max(1, int(request.args.get("per_page", 50))), 100)
+        page = _parse_int_param(request.args.get("page"), default=1, min_val=1)
+        per_page = _parse_int_param(request.args.get("per_page"), default=50, min_val=1, max_val=100)
 
         def safe_int(val):
             if val is not None and val.isdigit():
@@ -208,7 +220,7 @@ def get_books():
 def get_popular_books():
     try:
         # Senior Update: Increased limit for "All Books" section
-        limit = min(max(1, int(request.args.get("limit", 50))), 5000)
+        limit = _parse_int_param(request.args.get("limit"), default=50, min_val=1, max_val=5000)
         books = _get_popular_books_uc.execute(limit=limit)
         return jsonify({"books": books, "total": len(books)}), 200
     except Exception as exc:
@@ -257,7 +269,7 @@ def get_recommendations():
     if not book_title:
         return jsonify({"error": "Query parameter 'book' is required"}), 400
     try:
-        top_n = min(max(1, int(request.args.get("top_n", 10))), 50)
+        top_n = _parse_int_param(request.args.get("top_n"), default=10, min_val=1, max_val=50)
         use_hybrid = request.args.get("hybrid", "true").lower() != "false"
         recommendations = _get_recommendations_uc.execute(
             book_title=book_title,
@@ -289,7 +301,7 @@ def get_personalized():
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
     try:
-        limit = min(max(1, int(request.args.get("limit", 10))), 50)
+        limit = _parse_int_param(request.args.get("limit"), default=10, min_val=1, max_val=50)
         recommendations = _get_personalized_recs_uc.execute(user_id=user_id, limit=limit)
         return jsonify(
             {"user_id": user_id, "recommendations": recommendations, "total": len(recommendations)}
@@ -436,7 +448,11 @@ def ai_chat():
     if not data or "query" not in data:
         return jsonify({"error": "JSON body with 'query' is required"}), 400
 
-    query = data["query"].strip()
+    raw_query = data.get("query")
+    if not isinstance(raw_query, str):
+        return jsonify({"error": "Query must be a string"}), 400
+
+    query = raw_query.strip()
     if not query:
         return jsonify({"error": "Query cannot be empty"}), 400
 

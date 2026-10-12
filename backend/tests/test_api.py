@@ -641,3 +641,22 @@ class TestMutationEndpoints:
     def test_personalized_recs_unauthenticated(self, client):
         resp = client.get("/api/recommend/personalized")
         assert resp.status_code == 401
+
+    def test_invalid_query_params_graceful_handling(self, client):
+        # Invalid page and per_page should default gracefully and not 500
+        resp = client.get("/api/books?page=notanumber&per_page=invalid")
+        assert resp.status_code == 200
+
+        # Invalid popular limit should default gracefully and not 500
+        resp_pop = client.get("/api/books/popular?limit=badval")
+        assert resp_pop.status_code == 200
+
+    def test_ai_chat_non_string_query_returns_400(self, client):
+        resp = client.post(
+            "/api/ai/chat",
+            data=json.dumps({"query": 12345}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert "Query must be a string" in data.get("error", "")

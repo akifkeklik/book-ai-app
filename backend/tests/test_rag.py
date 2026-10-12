@@ -170,3 +170,100 @@ def test_process_rag_query_legacy_fallback():
 
     assert response["answer"] == "I am a plain text response."
     assert response["referenced_books"][0]["explanation"] is None
+
+
+@pytest.mark.unit
+def test_process_rag_query_llm_exception_fallback():
+    mock_embedding = MagicMock(spec=EmbeddingPort)
+    mock_data_port = MagicMock(spec=BookDataPort)
+    mock_recommender = MagicMock(spec=RecommenderPort)
+    mock_enrichment = MagicMock(spec=EnrichmentPort)
+    mock_llm = MagicMock(spec=LlmPort)
+
+    mock_embedding.generate_embedding.return_value = [0.1, 0.2]
+    mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
+    mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book", "authors": "Author"}]
+    mock_enrichment.enrich.side_effect = lambda books: books
+
+    # LLM throws a network timeout or API exception
+    mock_llm.generate_response.side_effect = TimeoutError("Upstream LLM provider timed out")
+
+    use_case = ProcessRagQueryUseCase(mock_embedding, mock_data_port, None, mock_recommender, mock_enrichment, mock_llm)
+    response = use_case.execute("fantasy")
+
+    assert response["status"] == "llm_fallback"
+    assert "couldn't generate a personalized response" in response["answer"]
+    assert len(response["referenced_books"]) == 1
+    assert response["referenced_books"][0]["isbn13"] == "123"
+
+
+@pytest.mark.unit
+def test_process_rag_query_malformed_json_types():
+    import json
+    mock_embedding = MagicMock(spec=EmbeddingPort)
+    mock_data_port = MagicMock(spec=BookDataPort)
+    mock_recommender = MagicMock(spec=RecommenderPort)
+    mock_enrichment = MagicMock(spec=EnrichmentPort)
+    mock_llm = MagicMock(spec=LlmPort)
+
+    mock_embedding.generate_embedding.return_value = [0.1]
+    mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
+    mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book", "authors": "Author"}]
+    mock_enrichment.enrich.side_effect = lambda books: books
+
+    # LLM returned valid JSON but top-level is a list instead of dict
+    mock_llm.generate_response.return_value = json.dumps(["an", "array", "of", "strings"])
+
+    use_case = ProcessRagQueryUseCase(mock_embedding, mock_data_port, None, mock_recommender, mock_enrichment, mock_llm)
+    response = use_case.execute("fantasy")
+
+    assert response["status"] == "success"
+    assert len(response["referenced_books"]) == 1
+    # Does not crash with AttributeError and keeps referenced books
+    assert response["referenced_books"][0]["isbn13"] == "123"
+
+
+@pytest.mark.unit
+def test_process_rag_query_user_signal_isolation_and_dislikes():
+    from backend.domain.ports import UserInteractionRepository
+
+    mock_embedding = MagicMock(spec=EmbeddingPort)
+    mock_data_port = MagicMock(spec=BookDataPort)
+    mock_recommender = MagicMock(spec=RecommenderPort)
+    mock_enrichment = MagicMock(spec=EnrichmentPort)
+    mock_llm = MagicMock(spec=LlmPort)
+    mock_repo = MagicMock(spec=UserInteractionRepository)
+
+    mock_embedding.generate_embedding.return_value = [0.1]
+    mock_data_port.match_query_embeddings.return_value = {"999": 0.8}
+    mock_enrichment.enrich.side_effect = lambda books: books
+    mock_llm.generate_response.return_value = "Grounding test answer."
+
+    # User interactions: 1 dislike, 1 like
+    mock_repo.get_user_interactions.return_value = [
+        {"book_id": "disliked-isbn", "interaction_type": "dislike"},
+        {"book_id": "liked-isbn", "interaction_type": "like"},
+    ]
+    mock_recommender.recommend.return_value = [{"isbn13": "999", "title": "Good Book", "authors": "Author"}]
+
+    use_case = ProcessRagQueryUseCase(
+        embedding_port=mock_embedding,
+        book_data_port=mock_data_port,
+        interaction_repo=mock_repo,
+        recommender=mock_recommender,
+        enrichment_service=mock_enrichment,
+        llm_port=mock_llm,
+    )
+
+    response = use_case.execute("query", user_id="user-123")
+
+    mock_repo.get_user_interactions.assert_called_once_with("user-123")
+    mock_recommender.recommend.assert_called_once_with(
+        seed_titles=["liked-isbn"],
+        top_n=5,
+        use_diversity=True,
+        semantic_scores={"999": 0.8},
+        dislikes=["disliked-isbn"],
+    )
+    assert response["status"] == "success"
+

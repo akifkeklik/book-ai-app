@@ -101,7 +101,14 @@ class ProcessRagQueryUseCase:
         user_prompt = f"<context>\n{context}\n</context>\n\n<user_query>\n{query}\n</user_query>"
 
         t2 = time.time()
-        raw_answer = self._llm_port.generate_response(system_prompt, user_prompt)
+        try:
+            raw_answer = self._llm_port.generate_response(system_prompt, user_prompt)
+        except Exception as llm_err:
+            logger.warning(
+                f"LLM generate_response raised an exception: {llm_err}",
+                extra={"extra_data": {"error": str(llm_err)}},
+            )
+            raw_answer = None
         llm_latency = round((time.time() - t2) * 1000, 2)
 
         metrics = {
@@ -129,27 +136,35 @@ class ProcessRagQueryUseCase:
         answer_text = raw_answer
         explanations = {}
         try:
-            # Strip markdown if LLM misbehaved
+            # Strip markdown code fences if LLM wrapped the response
             clean_json = raw_answer.strip()
             if clean_json.startswith("```json"):
                 clean_json = clean_json[7:]
+            elif clean_json.startswith("```"):
+                clean_json = clean_json[3:]
             if clean_json.endswith("```"):
                 clean_json = clean_json[:-3]
 
             parsed = json.loads(clean_json.strip())
-            answer_text = parsed.get("answer", raw_answer)
-            explanations = parsed.get("explanations", {})
+            if isinstance(parsed, dict):
+                answer_text = str(parsed.get("answer") or raw_answer)
+                raw_explanations = parsed.get("explanations")
+                if isinstance(raw_explanations, dict):
+                    explanations = raw_explanations
+            else:
+                answer_text = raw_answer
+                explanations = {}
 
             # Attach explanations to the books
             for book in retrieved_books:
                 isbn = str(book.get("isbn13"))
-                if isbn in explanations:
+                if isbn in explanations and isinstance(explanations[isbn], str):
                     book["explanation"] = explanations[isbn]
 
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, AttributeError, TypeError, ValueError) as parse_err:
             logger.warning(
-                "LLM output was not valid JSON, returning raw text",
-                extra={"extra_data": {"raw": raw_answer}},
+                "LLM output was not valid structured JSON, returning raw text",
+                extra={"extra_data": {"raw": raw_answer, "error": str(parse_err)}},
             )
             # Fallback to returning the raw output as answer
             pass

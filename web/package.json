@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx -y tsx --test \"src/__tests__/**/*.test.ts\""
+    "test": "npx -y tsx --test src/__tests__/*.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
