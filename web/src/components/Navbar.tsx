@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useAuth } from './AuthProvider';
-import { BookOpen, LogOut, Compass, Sparkles } from 'lucide-react';
+import { BookOpen, LogOut, Compass, Sparkles, Bookmark } from 'lucide-react';
 
 export function Navbar() {
   const { user, loading, signOut } = useAuth();
@@ -24,6 +24,17 @@ export function Navbar() {
             <Sparkles size={18} color="var(--accent)" />
             <span className="text-gradient">AI Discovery</span>
           </Link>
+
+          {!loading && user && (
+            <Link
+              href="/favorites"
+              id="nav-library-link"
+              className="text-muted flex items-center gap-2 hover:text-white transition-colors"
+            >
+              <Bookmark size={18} color="var(--primary)" />
+              <span>Library</span>
+            </Link>
+          )}
 
           {!loading && (
             <>

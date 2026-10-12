@@ -34,3 +34,13 @@ export interface AiChatResponse {
   recommendations?: Book[];
   status?: string;
 }
+
+export type LibraryCollectionStatus = 'favorite' | 'want_to_read' | 'reading' | 'finished';
+
+export interface LibraryItem {
+  id: string;
+  bookId: string;
+  status: LibraryCollectionStatus;
+  addedAt: string;
+  book: Book;
+}
