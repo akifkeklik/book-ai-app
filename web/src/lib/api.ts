@@ -1,5 +1,6 @@
 import { createClient } from './supabase/server';
-import type { Book, Category, PaginatedResponse } from '@/types';
+import type { Book, Category, PaginatedResponse, AiChatResponse } from '@/types';
+import { normalizeBook, normalizeBooks } from './normalizers';
 
 const API_URL = process.env.BACKEND_URL || 'http://localhost:5000';
 const API_KEY = process.env.LIBRIS_API_KEY || '';
@@ -18,8 +19,8 @@ export class ApiService {
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
       }
-    } catch (e) {
-      console.error('Failed to get session for API request:', e);
+    } catch {
+      // Ignore: session is optional and request store may be absent in testing/static generation
     }
 
     return headers;
@@ -63,7 +64,12 @@ export class ApiService {
     const res = await fetch(url.toString(), { headers });
     if (!res.ok) throw new Error('Failed to fetch books');
     
-    return res.json();
+    const data = await res.json();
+    return {
+      books: normalizeBooks(data?.books),
+      total: typeof data?.total === 'number' ? data.total : (Array.isArray(data?.books) ? data.books.length : 0),
+      total_pages: typeof data?.total_pages === 'number' ? data.total_pages : 1,
+    };
   }
 
   static async getBookByIsbn(isbn: string): Promise<Book | null> {
@@ -73,7 +79,7 @@ export class ApiService {
     if (!res.ok) throw new Error('Failed to fetch book details');
     
     const data = await res.json();
-    return data.book;
+    return data?.book ? normalizeBook(data.book) : null;
   }
 
   static async getRecommendations(bookTitle: string, topN: number = 20): Promise<Book[]> {
@@ -87,20 +93,45 @@ export class ApiService {
     if (!res.ok) throw new Error('Failed to fetch recommendations');
     
     const data = await res.json();
-    return data.recommendations || [];
+    return normalizeBooks(data?.recommendations);
   }
 
-  static async chatWithAI(query: string): Promise<{ answer: string; recommendations?: Book[] }> {
+  static async chatWithAI(query: string): Promise<AiChatResponse> {
     const headers = await this.getHeaders();
     const res = await fetch(`${API_URL}/api/ai/chat`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ query })
+      body: JSON.stringify({ query }),
     });
     
-    if (!res.ok) throw new Error('Failed to chat with AI');
+    if (!res.ok) {
+      let errorMessage = `Failed to chat with AI (${res.status})`;
+      try {
+        const errData = await res.json();
+        if (errData && typeof errData === 'object' && errData.error) {
+          errorMessage = String(errData.error);
+        }
+      } catch {
+        // Fall back to default message if response body is non-JSON
+      }
+      throw new Error(errorMessage);
+    }
     
-    return res.json();
+    const data = await res.json();
+    const rawList = Array.isArray(data?.referenced_books)
+      ? data.referenced_books
+      : (Array.isArray(data?.referencedBooks)
+        ? data.referencedBooks
+        : (Array.isArray(data?.recommendations) ? data.recommendations : []));
+
+    const normalizedBooks = normalizeBooks(rawList);
+
+    return {
+      answer: typeof data?.answer === 'string' ? data.answer : '',
+      referencedBooks: normalizedBooks,
+      recommendations: normalizedBooks,
+      status: typeof data?.status === 'string' ? data.status : 'success',
+    };
   }
 
   static async getPersonalizedRecommendations(limit: number = 10): Promise<Book[]> {
@@ -112,7 +143,7 @@ export class ApiService {
     if (!res.ok) throw new Error('Failed to fetch personalized recommendations');
     
     const data = await res.json();
-    return data.recommendations || [];
+    return normalizeBooks(data?.recommendations);
   }
 
   static async submitFeedback(

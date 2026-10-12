@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/search_provider.dart';
@@ -169,8 +170,7 @@ class _SearchScreenState extends State<SearchScreen> {
           GestureDetector(
             onTap: () {
               FocusScope.of(context).unfocus();
-              // Navigate to AI screen
-              Navigator.of(context).pushNamed('/ai');
+              context.push('/ai');
             },
             child: Container(
               width: double.infinity,

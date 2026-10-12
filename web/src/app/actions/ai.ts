@@ -3,11 +3,27 @@
 import { ApiService } from '@/lib/api';
 import type { Book } from '@/types';
 
-export async function askAI(query: string): Promise<{ answer: string; recommendations?: Book[], error?: string }> {
+export interface AskAiResult {
+  answer: string;
+  referencedBooks: Book[];
+  recommendations?: Book[];
+  error?: string;
+}
+
+export async function askAI(query: string): Promise<AskAiResult> {
   try {
     const res = await ApiService.chatWithAI(query);
-    return res;
+    return {
+      answer: res.answer,
+      referencedBooks: res.referencedBooks,
+      recommendations: res.referencedBooks,
+    };
   } catch (e: unknown) {
-    return { answer: '', error: e instanceof Error ? e.message : 'Failed to chat with AI' };
+    return {
+      answer: '',
+      referencedBooks: [],
+      recommendations: [],
+      error: e instanceof Error ? e.message : 'Failed to chat with AI',
+    };
   }
 }

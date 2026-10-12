@@ -27,3 +27,10 @@ export interface PaginatedResponse<T> {
   total: number;
   total_pages: number;
 }
+
+export interface AiChatResponse {
+  answer: string;
+  referencedBooks: Book[];
+  recommendations?: Book[];
+  status?: string;
+}

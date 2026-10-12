@@ -4,34 +4,40 @@ import { useState } from 'react';
 import { askAI } from '../actions/ai';
 import { BookCard } from '@/components/BookCard';
 import type { Book } from '@/types';
-import { Sparkles, Send } from 'lucide-react';
+import { Sparkles, Send, BookOpen } from 'lucide-react';
 
 export default function AIDiscoveryPage() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [hasQueried, setHasQueried] = useState(false);
+  const [lastQueryFailed, setLastQueryFailed] = useState(false);
   const [messages, setMessages] = useState<{role: 'user' | 'ai', content: string, error?: boolean}[]>([]);
-  const [recommendations, setRecommendations] = useState<Book[]>([]);
+  const [referencedBooks, setReferencedBooks] = useState<Book[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    if (!query.trim() || loading) return;
 
     const userMessage = query.trim();
     setQuery('');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setLoading(true);
-    setRecommendations([]);
+    setReferencedBooks([]);
+    setLastQueryFailed(false);
 
     const response = await askAI(userMessage);
     
     setLoading(false);
+    setHasQueried(true);
     if (response.error) {
+      setLastQueryFailed(true);
       setMessages(prev => [...prev, { role: 'ai', content: response.error!, error: true }]);
     } else {
-      setMessages(prev => [...prev, { role: 'ai', content: response.answer }]);
-      if (response.recommendations && response.recommendations.length > 0) {
-        setRecommendations(response.recommendations);
-      }
+      setMessages(prev => [...prev, { role: 'ai', content: response.answer || 'Here are the catalog matches for your query:' }]);
+      const books = Array.isArray(response.referencedBooks) && response.referencedBooks.length > 0
+        ? response.referencedBooks
+        : (Array.isArray(response.recommendations) ? response.recommendations : []);
+      setReferencedBooks(books);
     }
   };
 
@@ -132,17 +138,41 @@ export default function AIDiscoveryPage() {
         </form>
       </div>
 
-      {recommendations.length > 0 && (
-        <div style={{ marginTop: '3rem' }} className="animate-fade-in">
-          <h3 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            Recommended Books
-          </h3>
-          <div className="grid-books">
-            {recommendations.map(book => (
-              <BookCard key={book.isbn13} book={book} />
-            ))}
+      {hasQueried && !loading && !lastQueryFailed && (
+        referencedBooks.length > 0 ? (
+          <div style={{ marginTop: '3rem' }} className="animate-fade-in" data-testid="referenced-books-section">
+            <h3 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Sparkles className="text-gradient" size={22} />
+              <span>Referenced Books</span>
+            </h3>
+            <div className="grid-books">
+              {referencedBooks.map(book => (
+                <BookCard key={book.isbn13 || book.title} book={book} />
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div
+            style={{
+              marginTop: '3rem',
+              textAlign: 'center',
+              padding: '2.5rem 1.5rem',
+              background: 'rgba(255, 255, 255, 0.02)',
+              borderRadius: '16px',
+              border: '1px dashed rgba(255, 255, 255, 0.1)',
+            }}
+            className="animate-fade-in"
+            data-testid="no-referenced-books"
+          >
+            <BookOpen size={36} style={{ opacity: 0.3, margin: '0 auto 0.75rem', color: 'var(--muted)' }} />
+            <h4 style={{ fontSize: '1.1rem', marginBottom: '0.25rem', color: 'var(--foreground)' }}>
+              No Books Referenced
+            </h4>
+            <p className="text-muted" style={{ fontSize: '0.9rem', maxWidth: '460px', margin: '0 auto' }}>
+              The AI response did not cite any specific books from the catalog for this query. Try describing a genre, plot, or specific reading mood!
+            </p>
+          </div>
+        )
       )}
     </div>
   );
