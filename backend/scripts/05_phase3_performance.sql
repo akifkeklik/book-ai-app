@@ -13,7 +13,7 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  centroid vector(1536);
+  centroid vector(3072);
 BEGIN
   -- 1. Calculate centroid of seed books
   SELECT AVG(embedding) INTO centroid
@@ -31,10 +31,10 @@ BEGIN
   FROM (
     SELECT
       be.book_id,
-      1 - (be.embedding <=> centroid) AS similarity
+      1 - ((be.embedding::halfvec(3072)) <=> (centroid::halfvec(3072))) AS similarity
     FROM public.book_embeddings be
     WHERE NOT (be.book_id = ANY(seed_book_ids)) -- Exclude the seeds themselves
-    ORDER BY be.embedding <=> centroid
+    ORDER BY (be.embedding::halfvec(3072)) <=> (centroid::halfvec(3072))
     LIMIT match_count
   ) sub
   WHERE sub.similarity > match_threshold;

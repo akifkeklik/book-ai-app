@@ -12,12 +12,20 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS public.books (
-    isbn13 TEXT PRIMARY KEY
+    isbn13 TEXT PRIMARY KEY,
+    title TEXT DEFAULT '',
+    authors TEXT DEFAULT '',
+    categories TEXT DEFAULT '',
+    description TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS public.favorites (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id),
-    isbn13 TEXT REFERENCES public.books(isbn13),
+    book_id TEXT REFERENCES public.books(isbn13),
+    book_title TEXT DEFAULT '',
+    book_author TEXT DEFAULT '',
+    book_image_url TEXT DEFAULT '',
     added_at TIMESTAMPTZ DEFAULT now(),
-    PRIMARY KEY (user_id, isbn13)
+    UNIQUE(user_id, book_id)
 );

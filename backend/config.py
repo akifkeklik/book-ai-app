@@ -19,10 +19,28 @@ class Config:
     TESTING: bool = os.getenv("TESTING", "False").lower() == "true"
     # ── Security ─────────────────────────────────────────────────────────────
     # In production these must be set via environment variables.
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "")
+    SECRET_KEY: str = os.getenv(
+        "SECRET_KEY",
+        "dev-insecure-secret-key"
+        if (os.getenv("DEBUG", "False").lower() == "true" or os.getenv("TESTING", "False").lower() == "true")
+        else "",
+    )
     LIBRIS_API_KEY: str = os.getenv("LIBRIS_API_KEY", "")
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini") # gemini or openai
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini").lower() # gemini or openai
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", os.getenv("LLM_API_KEY", ""))
+
+    # ── Reverse Proxy ─────────────────────────────────────────────────────────
+    # Count of trusted reverse proxy headers (e.g. 1 for Render / Railway / Nginx).
+    # Default: 1 in production, 0 in dev/testing unless explicitly overridden.
+    NUM_PROXIES: int = int(
+        os.getenv(
+            "NUM_PROXIES",
+            "0"
+            if (os.getenv("DEBUG", "False").lower() == "true" or os.getenv("TESTING", "False").lower() == "true")
+            else "1",
+        )
+    )
 
     # ── Paths ─────────────────────────────────────────────────────────────────
     BASE_DIR: str = os.path.dirname(os.path.abspath(__file__))

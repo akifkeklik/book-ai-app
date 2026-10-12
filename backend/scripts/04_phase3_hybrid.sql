@@ -13,7 +13,7 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  centroid vector(1536);
+  centroid vector(3072);
 BEGIN
   -- 1. Calculate centroid of seed books
   SELECT AVG(embedding) INTO centroid

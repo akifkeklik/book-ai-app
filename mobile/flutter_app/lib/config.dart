@@ -18,11 +18,15 @@ class AppConfig {
   static String get backendUrl {
     if (_envBackendUrl.isNotEmpty) return _envBackendUrl;
 
-    const String defaultUrl = kReleaseMode
-        ? 'https://book-ai-app-libris-api.onrender.com'
-        : 'http://localhost:5000';
+    if (kReleaseMode) {
+      throw StateError(
+        'Missing required build-time configuration: BACKEND_URL must be specified via --dart-define=BACKEND_URL=https://your-api.domain.com in release builds.',
+      );
+    }
 
-    // Auto-detect Android Emulator
+    const String defaultUrl = 'http://localhost:5000';
+
+    // Auto-detect Android Emulator in local debug mode
     if (!kIsWeb &&
         defaultTargetPlatform == TargetPlatform.android &&
         (defaultUrl.contains('localhost') ||
@@ -38,12 +42,22 @@ class AppConfig {
 
   static String get supabaseUrl {
     if (_envSupabaseUrl.isNotEmpty) return _envSupabaseUrl;
-    return 'https://vnedgshbefpctjyzpqlm.supabase.co';
+    if (kReleaseMode) {
+      throw StateError(
+        'Missing required build-time configuration: SUPABASE_URL must be specified via --dart-define=SUPABASE_URL=https://your-project.supabase.co in release builds.',
+      );
+    }
+    return 'https://placeholder.supabase.co';
   }
 
   static String get supabaseAnonKey {
     if (_envSupabaseKey.isNotEmpty) return _envSupabaseKey;
-    return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZuZWRnc2hiZWZwY3RqeXpwcWxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MDU4MDksImV4cCI6MjA5MDI4MTgwOX0.dNbOM-n-HS4VQlI6Hkg6JE1XAhpgFBz5GoCo8o1MIYs';
+    if (kReleaseMode) {
+      throw StateError(
+        'Missing required build-time configuration: SUPABASE_ANON_KEY must be specified via --dart-define=SUPABASE_ANON_KEY=... in release builds.',
+      );
+    }
+    return 'placeholder-anon-key';
   }
 
   // ── API Paths ──────────────────────────────────────────────────────────────

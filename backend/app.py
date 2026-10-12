@@ -5,6 +5,7 @@ Flask factory application with CORS, error handlers, and blueprint registration.
 
 import hmac
 import logging
+import os
 import time
 import uuid
 
@@ -23,6 +24,39 @@ def create_app(config_class=Config) -> Flask:
     """Application factory."""
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    # ── Production Security Validation ────────────────────────────────────────
+    import sys
+    is_pytest = "pytest" in sys.modules or bool(os.getenv("PYTEST_CURRENT_TEST"))
+    enforce_prod_check = getattr(config_class, "IS_PRODUCTION", False) or (
+        (
+            os.getenv("FLASK_ENV", "").lower() == "production"
+            or os.getenv("ENVIRONMENT", "").lower() == "production"
+            or (not app.config.get("DEBUG") and not app.config.get("TESTING"))
+        )
+        and not is_pytest
+    )
+    if enforce_prod_check:
+        secret_key = str(app.config.get("SECRET_KEY", "")).strip()
+        if not secret_key or secret_key in ("replace-with-a-long-random-string", "dev-insecure-secret-key"):
+            raise ValueError(
+                "Critical Security Misconfiguration: SECRET_KEY environment variable must be set "
+                "to a secure random string when running in production mode."
+            )
+
+    # ── Reverse Proxy Middleware ──────────────────────────────────────────────
+    num_proxies = int(app.config.get("NUM_PROXIES", 0))
+    if num_proxies > 0:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=num_proxies,
+            x_proto=num_proxies,
+            x_host=num_proxies,
+            x_port=num_proxies,
+            x_prefix=num_proxies,
+        )
 
     # ── CORS ──────────────────────────────────────────────────────────────────
     # Allow Flutter Web / browsers to send API key, auth token, and request tracing headers.
@@ -55,7 +89,13 @@ def create_app(config_class=Config) -> Flask:
             return None
 
         # Allow root manifest, health checks, and docs without key
-        if request.path == "/" or request.path == "/api/health" or request.path.startswith("/api/docs") or request.path == "/health/ready":
+        if (
+            request.path == "/"
+            or request.path == "/api/health"
+            or request.path == "/api/health/ready"
+            or request.path == "/health/ready"
+            or request.path.startswith("/api/docs")
+        ):
             return None
 
         if request.path.startswith("/api/"):
