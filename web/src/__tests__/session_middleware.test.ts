@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { NextRequest } from 'next/server';
 import { updateSession } from '../lib/supabase/middleware';
 
+// Provide WebSocket mock if running on Node < 22 where native WebSocket is absent
+if (typeof (globalThis as Record<string, unknown>).WebSocket === 'undefined') {
+  (globalThis as Record<string, unknown>).WebSocket = class MockWebSocket {};
+}
+
 test('updateSession: safely passes through when Supabase env vars are missing', async () => {
   const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const originalKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
