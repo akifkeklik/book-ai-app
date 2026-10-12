@@ -12,6 +12,7 @@ export async function submitFeedbackAction(
     if (success) {
       revalidatePath('/');
       revalidatePath('/catalog');
+      revalidatePath('/favorites');
       revalidatePath(`/book/${bookId}`);
     }
     return { success };

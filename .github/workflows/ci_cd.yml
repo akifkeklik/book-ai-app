@@ -193,6 +193,11 @@ jobs:
           cd web
           npm run lint
 
+      - name: Test
+        run: |
+          cd web
+          npm test
+
       - name: Build
         run: |
           cd web
