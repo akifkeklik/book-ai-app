@@ -12,7 +12,10 @@
 --   3. Bir kitabın favorilere eklenmesi, mevcut okuma durumunu ('reading', 'finished', vb.) ASLA EZMEZ.
 --   4. Bir kitabın favorilerden çıkarılması, mevcut okuma durumunu ASLA SİLMEZ.
 --   5. Yinelenen favoriler 'favorites' tablosundaki UNIQUE(user_id, book_id) ile engellenir.
---   6. Canlıdaki mevcut veriler sıfır kayıpla korunur.
+--   6. Canlıdaki mevcut veriler sıfır kayıpla korunur: Olası mükerrer (duplicate) etkileşimler
+--      asla sessizce silinmez; '_archived_user_interactions_duplicate_backup' tablosuna
+--      arşivlenir, favori sinyalleri 'favorites' tablosuna aktarılır ve okuma durumları
+--      deterministik öncelikle ('finished' > 'reading' > 'want_to_read') korunur.
 -- =============================================================================
 
 BEGIN;
@@ -35,8 +38,143 @@ BEGIN
     END IF;
 END $$;
 
--- 2. UNIQUE KISIT GÜVENCESİ
--- user_interactions üzerinde (user_id, book_id) tekilliğini sağla
+
+-- 2. KAYIPSIZ MÜKERRER KAYIT ARŞİVLEME VE UNIQUE KISIT GÜVENCESİ
+-- Risk Önleme: Asla unarchived / rastgele DELETE (rastgele id karşılaştırmalı silme) yapılmaz.
+-- Tüm mükerrer satırlar önce arşivlenir, favori sinyalleri favorites tablosuna aktarılır.
+CREATE TABLE IF NOT EXISTS public._archived_user_interactions_duplicate_backup (
+    archive_id BIGSERIAL PRIMARY KEY,
+    archived_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    user_interaction_id UUID,
+    user_id UUID,
+    book_id TEXT,
+    interaction_type TEXT,
+    created_at TIMESTAMPTZ,
+    resolution_action TEXT NOT NULL,
+    full_row_snapshot JSONB NOT NULL
+);
+
+REVOKE ALL ON TABLE public._archived_user_interactions_duplicate_backup FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT ON TABLE public._archived_user_interactions_duplicate_backup TO service_role;
+ALTER TABLE public._archived_user_interactions_duplicate_backup ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres') THEN
+        ALTER TABLE public._archived_user_interactions_duplicate_backup OWNER TO postgres;
+    END IF;
+END $$;
+
+-- 2.1. Geçersiz (NULL veya boş) kimlik kontrolü ve arşivlenmesi
+INSERT INTO public._archived_user_interactions_duplicate_backup (
+    user_interaction_id, user_id, book_id, interaction_type, created_at, resolution_action, full_row_snapshot
+)
+SELECT id, user_id, book_id, interaction_type, created_at, 'ARCHIVED_NULL_OR_EMPTY_IDENTIFIER', to_jsonb(ui.*)
+FROM public.user_interactions ui
+WHERE user_id IS NULL OR book_id IS NULL OR trim(book_id) = '';
+
+DELETE FROM public.user_interactions
+WHERE user_id IS NULL OR book_id IS NULL OR trim(book_id) = '';
+
+-- 2.1.1. Uzlaştırma sırasında eski trigger'ın çakışmasını önlemek için kaldır
+DROP TRIGGER IF EXISTS trg_sync_favorites ON public.favorites;
+
+-- 2.2. Mükerrer kayıtların deterministik ve kayıpsız uzlaştırılması
+DO $$
+DECLARE
+    dup_count INTEGER;
+    irreconcilable_count INTEGER;
+BEGIN
+    SELECT count(*) INTO dup_count
+    FROM (
+        SELECT user_id, book_id
+        FROM public.user_interactions
+        GROUP BY user_id, book_id
+        HAVING count(*) > 1
+    ) sub;
+
+    IF dup_count > 0 THEN
+        RAISE NOTICE 'user_interactions tablosunda % adet mükerrer (user_id, book_id) çifti tespit edildi. Kayıpsız arşivleme başlatılıyor...', dup_count;
+
+        -- A. Tüm mükerrer kayıtları arşiv tablosuna eksiksiz snapshot al
+        INSERT INTO public._archived_user_interactions_duplicate_backup (
+            user_interaction_id, user_id, book_id, interaction_type, created_at, resolution_action, full_row_snapshot
+        )
+        SELECT 
+            ui.id, ui.user_id, ui.book_id, ui.interaction_type, ui.created_at,
+            'PRE_DEDUPLICATION_SNAPSHOT',
+            to_jsonb(ui.*)
+        FROM public.user_interactions ui
+        WHERE (ui.user_id, ui.book_id) IN (
+            SELECT user_id, book_id FROM public.user_interactions GROUP BY user_id, book_id HAVING count(*) > 1
+        );
+
+        -- B. Mükerrer satırlar arasında 'favorite' veya 'like' varsa bunu public.favorites tablosuna aktararak favori üyeliğini garantiye al
+        INSERT INTO public.favorites (user_id, book_id, book_title, added_at)
+        SELECT 
+            ui.user_id, 
+            ui.book_id, 
+            COALESCE((SELECT b.title FROM public.books b WHERE b.isbn13 = ui.book_id), 'Favori Kitap'),
+            ui.created_at
+        FROM public.user_interactions ui
+        WHERE (ui.user_id, ui.book_id) IN (
+            SELECT user_id, book_id FROM public.user_interactions GROUP BY user_id, book_id HAVING count(*) > 1
+        )
+        AND ui.interaction_type IN ('favorite', 'like')
+        ON CONFLICT (user_id, book_id) DO NOTHING;
+
+        -- C. Çözümlenemez çelişki kontrolü: Aynı kullanıcı ve kitap için hem 'like' hem 'dislike' varsa fail-closed dur
+        SELECT count(*) INTO irreconcilable_count
+        FROM (
+            SELECT user_id, book_id
+            FROM public.user_interactions
+            WHERE interaction_type IN ('like', 'dislike')
+            GROUP BY user_id, book_id
+            HAVING count(DISTINCT interaction_type) > 1
+        ) conflicts;
+
+        IF irreconcilable_count > 0 THEN
+            RAISE EXCEPTION 'Ön koşul başarısız: % adet kitapta çözümlenemeyen çelişkili etkileşim kaydı (like ve dislike aynı anda) tespit edildi. Veriler _archived_user_interactions_duplicate_backup tablosuna arşivlendi. Manuel operatör incelemesi gereklidir.', irreconcilable_count;
+        END IF;
+
+        -- D. user_interactions için deterministik öncelik uzlaştırması:
+        -- Öncelik: 1) finished (nihai okuma durumu), 2) reading (aktif okuma), 3) want_to_read, 4) dislike, 5) like, 6) favorite.
+        -- Eşitlik durumunda en güncel created_at (en son id) korunur.
+        WITH ranked_interactions AS (
+            SELECT 
+                id,
+                ROW_NUMBER() OVER (
+                    PARTITION BY user_id, book_id
+                    ORDER BY 
+                        CASE interaction_type
+                            WHEN 'finished' THEN 1
+                            WHEN 'reading' THEN 2
+                            WHEN 'want_to_read' THEN 3
+                            WHEN 'dislike' THEN 4
+                            WHEN 'like' THEN 5
+                            WHEN 'favorite' THEN 6
+                            ELSE 7
+                        END ASC,
+                        created_at DESC,
+                        id::text DESC
+                ) AS rank_num
+            FROM public.user_interactions
+            WHERE (user_id, book_id) IN (
+                SELECT user_id, book_id FROM public.user_interactions GROUP BY user_id, book_id HAVING count(*) > 1
+            )
+        )
+        DELETE FROM public.user_interactions
+        WHERE id IN (
+            SELECT id FROM ranked_interactions WHERE rank_num > 1
+        );
+
+        RAISE NOTICE 'Mükerrer kayıtlar kayıpsız olarak uzlaştırıldı: Okuma durumları korundu, favoriler favorites tablosuna taşındı, yedekler _archived_user_interactions_duplicate_backup tablosuna yazıldı.';
+    ELSE
+        RAISE NOTICE 'user_interactions tablosunda mükerrer kayıt bulunmadı (0 duplicate).';
+    END IF;
+END $$;
+
+-- 2.3. UNIQUE kısıtının eklenmesi
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -48,16 +186,11 @@ BEGIN
               OR conname = 'user_interactions_user_id_book_id_key'
           )
     ) THEN
-        -- Olası mükerrer kayıtları temizleyip kısıtı ekle
-        DELETE FROM public.user_interactions a USING public.user_interactions b
-        WHERE a.id < b.id 
-          AND a.user_id = b.user_id 
-          AND a.book_id = b.book_id;
-
         ALTER TABLE public.user_interactions 
         ADD CONSTRAINT unique_user_book_interaction UNIQUE (user_id, book_id);
     END IF;
 END $$;
+
 
 -- 3. CHECK CONSTRAINT GENİŞLETMESİ (Model A & Koleksiyon Raf Desteği)
 -- 'reading' ve 'favorite' durumlarını kabul ederek Web ve mobil etkileşimleri destekle
@@ -85,6 +218,7 @@ BEGIN
         RAISE NOTICE 'Forward-Recovery: Rollback arşivinden orijinal favorite/reading durumları başarıyla geri yüklendi.';
     END IF;
 END $$;
+
 
 -- 4. MODEL A KORUYUCU SENKRONİZASYON TRIGGER FONKSİYONU
 CREATE OR REPLACE FUNCTION public.sync_favorites_to_interactions()
@@ -129,6 +263,7 @@ DROP TRIGGER IF EXISTS trg_sync_favorites ON public.favorites;
 CREATE TRIGGER trg_sync_favorites
 AFTER INSERT OR DELETE ON public.favorites
 FOR EACH ROW EXECUTE FUNCTION public.sync_favorites_to_interactions();
+
 
 -- 6. GEÇMİŞ FAVORİ VERİLERİNİN SIFIR VERİ KAYBIYLA GERİYE DÖNÜK SENKRONİZASYONU
 -- favorites tablosunda olup henüz user_interactions tablosunda hiç kaydı bulunmayan kitapları aktar.

@@ -6,12 +6,19 @@
 -- Amaç: 03_DRAFT_reconcile_interactions_and_trigger.sql ile yapılan değişiklikleri
 --        önceki canlı durumuna geri getirmek.
 -- 
--- DİKKAT VE VERİ KAYBI UYARISI:
--- Eğer migration sonrasında 'user_interactions' tablosuna 'favorite' veya 'reading'
--- durumunda satırlar kaydedilmişse, eski dar kısıt ('like', 'dislike', 'want_to_read', 'finished')
--- doğrudan uygulanamaz (PostgreSQL constraint violation hatası verir). Bu nedenle
--- rollback betiği önce bu satırları 'like' ve 'want_to_read' değerlerine dönüştürmek
--- zorunda kalabilir. Bu işlem geri alınamaz bir veri dönüşümüdür.
+-- KRİTİK OPERASYONEL UYARI VE İSTEMCİ UYUMLULUK KISITI:
+-- 1. Bu rollback betiği 'user_interactions_interaction_type_check' kısıtını eski dar
+--    kapsamına ('like', 'dislike', 'want_to_read', 'finished') geri döndürür.
+-- 2. CANLI WEB UYGULAMASI (web/src/app/actions/library.ts line 336) doğrudan 'reading'
+--    ve 'favorite' durumlarını yazmaktadır.
+-- 3. BU ROLLBACK CANLIDA ÇALIŞTIRILIRSA, WEB KULLANICILARININ KİTAPLARI 'READING' VEYA
+--    'FAVORITE' OLARAK İŞARETLEMESİ ANINDA POSTGRESQL CHECK CONSTRAINT VIOLATION İLE ÇÖKER!
+-- 4. Bu nedenle bu rollback canlıda istemciler etkinken güvenli bir geri dönüş (zero-downtime)
+--    sağlamaz; yalnızca web uygulaması bakım moduna alındığında veya eski sürüme döndürüldüğünde
+--    uygulanabilir.
+-- 5. Geriye dönük 'favorite' ve 'reading' kayıtları '_archived_user_interactions_rollback_backup'
+--    tablosuna eksiksiz snapshot alınır; 03_DRAFT tekrar çalıştırıldığında Bölüm 3.1
+--    üzerinden kayıpsız olarak geri yüklenir (Forward-Recovery).
 -- =============================================================================
 
 BEGIN;
@@ -47,7 +54,12 @@ BEGIN
 END;
 $function$;
 
-ALTER FUNCTION public.sync_favorites_to_interactions() OWNER TO postgres;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres') THEN
+        ALTER FUNCTION public.sync_favorites_to_interactions() OWNER TO postgres;
+    END IF;
+END $$;
 
 -- 2. VERİ KAYBI KORUMASI: Geri alınamayacak 'favorite' ve 'reading' verilerini güvenle arşivle
 CREATE TABLE IF NOT EXISTS public._archived_user_interactions_rollback_backup (
@@ -59,6 +71,13 @@ CREATE TABLE IF NOT EXISTS public._archived_user_interactions_rollback_backup (
 REVOKE ALL ON TABLE public._archived_user_interactions_rollback_backup FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT ON TABLE public._archived_user_interactions_rollback_backup TO service_role;
 ALTER TABLE public._archived_user_interactions_rollback_backup ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres') THEN
+        ALTER TABLE public._archived_user_interactions_rollback_backup OWNER TO postgres;
+    END IF;
+END $$;
 
 DO $$
 BEGIN
