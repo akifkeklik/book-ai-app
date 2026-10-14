@@ -8,8 +8,10 @@
 -- ÖNEMLİ KULLANIM TALİMATI:
 -- Supabase SQL Editor, çoklu sorgu içeren bir betik tek seferde çalıştırıldığında
 -- yalnızca EN SONUNCU SELECT sorgusunun sonucunu ekranda görüntüler.
--- Bu nedenle aşağıdaki bölümleri TÜMÜNÜ BİRDEN DEĞİL, SIRAYLA VE TEK TEK
--- (her bloğu ayrı ayrı kopyalayıp çalıştırarak) çalıştırmanız gerekmektedir.
+-- Bu nedenle:
+--   - Tek tek detaylı inceleme için aşağıdaki bölümleri SIRAYLA VE AYRI AYRI çalıştırabilirsiniz.
+--   - VEYA dosyanın en sonundaki "BÖLÜM 12: TEK TIKLA ÇALIŞTIRILABİLİR KONSOLİDE ÖZET SORGUSU"nu
+--     doğrudan yapıştırarak tüm sistem sağlık durumunu tek bir tabloda görebilirsiniz.
 --
 -- KESİN KURAL: Bu betik kesinlikle DDL, DML, GRANT, REVOKE içermez.
 --              Sadece SELECT çalıştırır. Geçici tablo oluşturmaz, ayar değiştirmez.
@@ -19,47 +21,18 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SOKU 1 / 11: TABLOLAR, SATIR TAHMİNLERİ VE RLS ETKİNLİK DURUMU
 -- AMAÇ: 6 çekirdek tablonun tümünde RLS'in açık olup olmadığını denetlemek.
--- BEKLENTİ: rls_enabled = true ve rls_status = 'PASS: RLS Aktif' olmalıdır.
+-- FAIL-CLOSED: Beklenen tablolardan herhangi biri eksikse açıkça 'FAIL: TABLO EKSİK' üretir.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
-    c.relname AS table_name,
-    c.relrowsecurity AS rls_enabled,
-    c.relforcerowsecurity AS rls_forced,
+    exp.table_name,
+    COALESCE(c.relrowsecurity, false) AS rls_enabled,
+    COALESCE(c.relforcerowsecurity, false) AS rls_forced,
     COALESCE(s.n_live_tup, -1) AS estimated_rows,
     CASE 
+        WHEN c.relname IS NULL THEN 'FAIL: TABLO EKSİK (TABLE MISSING)'
         WHEN c.relrowsecurity = true THEN 'PASS: RLS Aktif'
         ELSE 'FAIL: RLS KAPALI (ACİL MÜDAHALE GEREKİR)'
     END AS rls_status
-FROM pg_class c
-JOIN pg_namespace n ON n.oid = c.relnamespace
-LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
-WHERE n.nspname = 'public' 
-  AND c.relname IN ('books', 'book_embeddings', 'favorites', 'user_activities', 'user_interactions', 'user_profiles')
-ORDER BY c.relname;
-
-
--- ─────────────────────────────────────────────────────────────────────────────
--- SOKU 2 / 11: TABLO DÜZEYİ İZİNLER (PUBLIC DAHİL TÜM ROLLER)
--- AMAÇ: public, anon, authenticated ve service_role rollerinin tablo izinlerini
---       ve özellikle tehlikeli TRUNCATE yetkisini denetlemek.
--- KRİTİK: 'anon', 'authenticated' veya 'public' rollerinde can_truncate = true ise
---         RLS tamamen baypas edilebilir (Kritik Güvenlik Açığı).
--- ─────────────────────────────────────────────────────────────────────────────
-SELECT 
-    t.table_name,
-    r.role_name,
-    has_table_privilege(r.role_name, 'public.' || t.table_name, 'SELECT') AS can_select,
-    has_table_privilege(r.role_name, 'public.' || t.table_name, 'INSERT') AS can_insert,
-    has_table_privilege(r.role_name, 'public.' || t.table_name, 'UPDATE') AS can_update,
-    has_table_privilege(r.role_name, 'public.' || t.table_name, 'DELETE') AS can_delete,
-    has_table_privilege(r.role_name, 'public.' || t.table_name, 'TRUNCATE') AS can_truncate,
-    CASE 
-        WHEN has_table_privilege(r.role_name, 'public.' || t.table_name, 'TRUNCATE') = true 
-            THEN 'FAIL: KRİTİK GÜVENLİK AÇIĞI (TRUNCATE açık, RLS baypas edilebilir)'
-        WHEN r.role_name IN ('anon', 'public') AND t.table_name = 'books' AND has_table_privilege(r.role_name, 'public.' || t.table_name, 'INSERT') = true
-            THEN 'WARNING: books tablosuna anon/public yazma izni açık'
-        ELSE 'PASS'
-    END AS security_verdict
 FROM (VALUES 
     ('books'), 
     ('book_embeddings'), 
@@ -67,13 +40,148 @@ FROM (VALUES
     ('user_activities'), 
     ('user_interactions'), 
     ('user_profiles')
-) AS t(table_name)
-CROSS JOIN (
-    SELECT role_name
-    FROM (VALUES ('public'), ('anon'), ('authenticated'), ('service_role')) AS v(role_name)
-    WHERE role_name = 'public' OR EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v.role_name)
-) AS r(role_name)
-ORDER BY t.table_name, r.role_name;
+) AS exp(table_name)
+LEFT JOIN (
+    SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity, c.oid
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+) c ON c.relname = exp.table_name
+LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
+ORDER BY exp.table_name;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SOKU 2 / 11: TABLO DÜZEYİ İZİNLER (KATALOG ACL VE ROL DENETİMİ)
+-- AMAÇ: PUBLIC sözde rolü (grantee=0), anon, authenticated ve service_role
+--       rollerinin izinlerini ve özellikle tehlikeli TRUNCATE yetkisini denetlemek.
+-- GÜVENLİK GÜVENCESİ:
+--   - PostgreSQL mimarisinde PUBLIC gerçek bir rol olmadığından has_table_privilege fonksiyonuna
+--     'public' veya 'PUBLIC' rol argümanı ASLA verilmez (böyle bir çağrı 'role "public" does not exist' hatası verir).
+--   - PUBLIC izinleri doğrudan c.relacl ve acldefault('r', c.relowner) üzerinden grantee=0 ile taranır.
+--   - anon, authenticated ve service_role için rolün pg_roles'da varlığı doğrulanır ve has_table_privilege
+--     ile hem doğrudan hem PUBLIC'ten miras alınan efektif izinler bağımsız raporlanır.
+-- ─────────────────────────────────────────────────────────────────────────────
+WITH target_tables AS (
+    SELECT c.oid, c.relname AS table_name, c.relowner, c.relacl
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relname IN ('books', 'book_embeddings', 'favorites', 'user_activities', 'user_interactions', 'user_profiles')
+),
+audit_entities AS (
+    SELECT 'PUBLIC' AS entity_name, 'PSEUDO_ROLE' AS entity_type, 0::oid AS role_oid, true AS role_exists
+    UNION ALL
+    SELECT r.rolname, 'ROLE', r.oid, true
+    FROM pg_roles r
+    WHERE r.rolname IN ('anon', 'authenticated', 'service_role')
+    UNION ALL
+    SELECT missing.rolname, 'ROLE', 0::oid, false
+    FROM (VALUES ('anon'), ('authenticated'), ('service_role')) AS missing(rolname)
+    WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = missing.rolname)
+),
+entity_table_privileges AS (
+    SELECT 
+        tt.table_name,
+        ae.entity_name,
+        ae.entity_type,
+        ae.role_exists,
+        -- SELECT
+        CASE 
+            WHEN NOT ae.role_exists THEN false
+            WHEN ae.entity_name = 'PUBLIC' THEN 
+                EXISTS (SELECT 1 FROM aclexplode(COALESCE(tt.relacl, acldefault('r', tt.relowner))) a WHERE a.grantee = 0 AND a.privilege_type = 'SELECT')
+            ELSE has_table_privilege(ae.entity_name, tt.oid, 'SELECT')
+        END AS can_select,
+        -- INSERT
+        CASE 
+            WHEN NOT ae.role_exists THEN false
+            WHEN ae.entity_name = 'PUBLIC' THEN 
+                EXISTS (SELECT 1 FROM aclexplode(COALESCE(tt.relacl, acldefault('r', tt.relowner))) a WHERE a.grantee = 0 AND a.privilege_type = 'INSERT')
+            ELSE has_table_privilege(ae.entity_name, tt.oid, 'INSERT')
+        END AS can_insert,
+        -- UPDATE
+        CASE 
+            WHEN NOT ae.role_exists THEN false
+            WHEN ae.entity_name = 'PUBLIC' THEN 
+                EXISTS (SELECT 1 FROM aclexplode(COALESCE(tt.relacl, acldefault('r', tt.relowner))) a WHERE a.grantee = 0 AND a.privilege_type = 'UPDATE')
+            ELSE has_table_privilege(ae.entity_name, tt.oid, 'UPDATE')
+        END AS can_update,
+        -- DELETE
+        CASE 
+            WHEN NOT ae.role_exists THEN false
+            WHEN ae.entity_name = 'PUBLIC' THEN 
+                EXISTS (SELECT 1 FROM aclexplode(COALESCE(tt.relacl, acldefault('r', tt.relowner))) a WHERE a.grantee = 0 AND a.privilege_type = 'DELETE')
+            ELSE has_table_privilege(ae.entity_name, tt.oid, 'DELETE')
+        END AS can_delete,
+        -- TRUNCATE
+        CASE 
+            WHEN NOT ae.role_exists THEN false
+            WHEN ae.entity_name = 'PUBLIC' THEN 
+                EXISTS (SELECT 1 FROM aclexplode(COALESCE(tt.relacl, acldefault('r', tt.relowner))) a WHERE a.grantee = 0 AND a.privilege_type = 'TRUNCATE')
+            ELSE has_table_privilege(ae.entity_name, tt.oid, 'TRUNCATE')
+        END AS can_truncate,
+        -- TRUNCATE yetkisi doğrudan PUBLIC hibesinden mi miras alındı?
+        CASE 
+            WHEN ae.entity_name = 'PUBLIC' THEN false
+            ELSE EXISTS (SELECT 1 FROM aclexplode(COALESCE(tt.relacl, acldefault('r', tt.relowner))) a WHERE a.grantee = 0 AND a.privilege_type = 'TRUNCATE')
+        END AS truncate_inherited_from_public
+    FROM target_tables tt
+    CROSS JOIN audit_entities ae
+)
+SELECT 
+    table_name,
+    entity_name,
+    entity_type,
+    role_exists,
+    can_select,
+    can_insert,
+    can_update,
+    can_delete,
+    can_truncate,
+    truncate_inherited_from_public,
+    CASE 
+        WHEN NOT role_exists THEN 'FAIL: Gerekli Supabase rolü veritabanında bulunamadı!'
+        WHEN can_truncate = true AND entity_name IN ('PUBLIC', 'anon', 'authenticated') THEN 
+            CASE 
+                WHEN truncate_inherited_from_public THEN 'FAIL: P0 - TRUNCATE PUBLIC hibesi üzerinden devralındı (RLS baypas edilebilir)'
+                ELSE 'FAIL: P0 - Doğrudan TRUNCATE açık (RLS baypas edilebilir)'
+            END
+        WHEN entity_name IN ('PUBLIC', 'anon') AND table_name IN ('books', 'book_embeddings') AND (can_insert OR can_update OR can_delete) THEN
+            'FAIL: Kitap veya embedding kataloğuna anonim/public yazma izni açık'
+        WHEN entity_name = 'authenticated' AND table_name IN ('books', 'book_embeddings') AND (can_insert OR can_update OR can_delete) THEN
+            'FAIL: Kitap kataloğuna authenticated yazma izni açık'
+        WHEN entity_name = 'authenticated' AND table_name = 'user_activities' AND (can_update OR can_delete) THEN
+            'FAIL: Etkinlik log tablosunda update/delete izni açık (İmmutable olmalı)'
+        ELSE 'PASS'
+    END AS security_verdict
+FROM entity_table_privileges
+ORDER BY table_name, entity_name;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SOKU 2.1 / 11: VARSAYILAN ŞEMA İZİNLERİ (ALTER DEFAULT PRIVILEGES DENETİMİ)
+-- AMAÇ: Gelecekte oluşturulacak tablolara TRUNCATE yetkisinin otomatik verilip
+--       verilmeyeceğini pg_default_acl kataloğundan doğrulamak.
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT 
+    rol.rolname AS target_owner,
+    COALESCE(n.nspname, 'ALL SCHEMAS') AS schema_name,
+    CASE acl.grantee WHEN 0 THEN 'PUBLIC' ELSE COALESCE(gr.rolname, 'UNKNOWN') END AS grantee_name,
+    acl.privilege_type,
+    CASE 
+        WHEN acl.privilege_type = 'TRUNCATE' AND (acl.grantee = 0 OR gr.rolname IN ('anon', 'authenticated', 'public'))
+            THEN 'FAIL: Gelecekteki tablolar için TRUNCATE varsayılan izni açık!'
+        ELSE 'PASS'
+    END AS default_privilege_verdict
+FROM pg_default_acl d
+JOIN pg_roles rol ON rol.oid = d.defaclrole
+LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
+CROSS JOIN LATERAL aclexplode(d.defaclacl) acl
+LEFT JOIN pg_roles gr ON gr.oid = acl.grantee
+WHERE d.defaclobjtype = 'r'
+  AND (n.nspname = 'public' OR d.defaclnamespace = 0)
+  AND acl.privilege_type = 'TRUNCATE';
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -101,9 +209,9 @@ ORDER BY tablename, policyname;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- SOKU 4 / 11: ŞEMA SÜTUN TANIMLARI VE NULL KURALLARI
--- AMAÇ: Sütun isimlerini ve tiplerini incelemek.
--- KRİTİK: user_profiles tablosunda 'id' mi yoksa 'user_id' mi var?
+-- SOKU 4 / 11: ŞEMA SÜTUN TANIMLARI VE KRİTİK ALANLAR
+-- AMAÇ: Sütun isimlerini, veri tiplerini ve null kurallarını incelemek.
+-- KRİTİK: user_profiles tablosunda 'id' ve 'user_id' kolonlarının mevcudiyeti.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
     table_name,
@@ -112,7 +220,13 @@ SELECT
     data_type,
     udt_name,
     is_nullable,
-    column_default
+    column_default,
+    CASE 
+        WHEN table_name = 'user_profiles' AND column_name = 'id' THEN 'INFO: Canlıdaki birincil kimlik kolonu'
+        WHEN table_name = 'user_profiles' AND column_name = 'user_id' THEN 'PASS: user_id kolonu mevcut (02_DRAFT uygulanmış)'
+        WHEN table_name = 'user_profiles' AND column_name IN ('preferred_authors', 'preferred_vibe') THEN 'PASS: İlgi alanı kolonları mevcut'
+        ELSE 'INFO'
+    END AS column_role_note
 FROM information_schema.columns
 WHERE table_schema = 'public' 
   AND table_name IN ('books', 'book_embeddings', 'favorites', 'user_activities', 'user_interactions', 'user_profiles')
@@ -120,10 +234,9 @@ ORDER BY table_name, ordinal_position;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- SOKU 5 / 11: KISITLAR (CONSTRAINTS), BİRİNCİL/YABANCI ANAHTARLAR VE CHECK
+-- SOKU 5 / 11: KISITLAR (CONSTRAINTS) VE MÜKERRER KAYIT ANALİZİ
 -- AMAÇ: PK, FK, UNIQUE ve CHECK kısıtlarını incelemek.
--- KRİTİK: user_interactions tablosunda CHECK kısıtı hangi türleri kabul ediyor?
---         UNIQUE(user_id, book_id) var mı?
+-- KRİTİK: user_interactions üzerinde UNIQUE(user_id, book_id) varlığı ve CHECK kapsamı.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
     c.relname AS table_name,
@@ -140,8 +253,8 @@ SELECT
         WHEN c.relname = 'user_interactions' AND con.contype = 'c' AND pg_get_constraintdef(con.oid) NOT LIKE '%favorite%'
             THEN 'FAIL: CHECK kısıtı dar kapsamlı (Web favorite/reading durumları hata verir)'
         WHEN c.relname = 'user_interactions' AND con.contype = 'u'
-            THEN 'INFO: UNIQUE(user_id, book_id) mevcut (Çift etkileşim çatışması riski)'
-        ELSE 'PASS'
+            THEN 'PASS: UNIQUE(user_id, book_id) kısıtı aktif'
+        ELSE 'INFO'
     END AS audit_note
 FROM pg_constraint con
 JOIN pg_class c ON c.oid = con.conrelid
@@ -152,18 +265,39 @@ ORDER BY c.relname, con.contype;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- SOKU 5.1 / 11: user_interactions MÜKERRER KAYIT (DUPLICATE) VE ÇELİŞKİ DENETİMİ
+-- AMAÇ: Migration 03 çalıştırılmadan önce duplicate kayıt sayısını ve like/dislike
+--       gibi çözümlenemez çelişkileri belirlemek.
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT 
+    'user_interactions' AS table_name,
+    count(*) AS total_duplicate_pairs,
+    COALESCE(sum(dup_rows), 0) AS total_affected_rows,
+    CASE 
+        WHEN count(*) = 0 THEN 'PASS: Mükerrer kayıt yok, 03_DRAFT doğrudan kısıt ekleyebilir'
+        ELSE 'WARNING: Mükerrer kayıtlar tespit edildi! 03_DRAFT güvenli arşivleme yapacaktır'
+    END AS duplicate_verdict
+FROM (
+    SELECT user_id, book_id, count(*) AS dup_rows
+    FROM public.user_interactions
+    GROUP BY user_id, book_id
+    HAVING count(*) > 1
+) sub;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- SOKU 6 / 11: İNDEKSLER (INDEXES)
--- AMAÇ: Tüm indeksleri ve özellikle vektör indeksini (ivfflat / hnsw) denetlemek.
+-- AMAÇ: Tüm indeksleri ve özellikle vektör indeksini (hnsw halfvec) denetlemek.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
     tablename,
     indexname,
     indexdef,
     CASE 
-        WHEN tablename = 'book_embeddings' AND (indexdef LIKE '%ivfflat%' OR indexdef LIKE '%hnsw%')
-            THEN 'PASS: Vektör indeksi mevcut'
-        WHEN tablename = 'book_embeddings' AND indexname LIKE '%embedding%'
-            THEN 'INFO: Standart embedding indeksi'
+        WHEN tablename = 'book_embeddings' AND (indexdef LIKE '%halfvec_cosine_ops%' OR indexdef LIKE '%hnsw%')
+            THEN 'PASS: HNSW halfvec vektör indeksi mevcut'
+        WHEN tablename = 'user_profiles' AND indexname = 'idx_user_profiles_user_id'
+            THEN 'PASS: user_profiles user_id indeks mevcut'
         ELSE 'INFO: Standart indeks'
     END AS index_note
 FROM pg_indexes
@@ -193,16 +327,19 @@ ORDER BY c.relname, t.tgname;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SOKU 8 / 11: PGVECTOR UZANTISI ŞEMASI VE VERSİYONU
--- AMAÇ: pgvector eklentisinin hangi şemada (public mi extensions mı?) kurulu olduğunu
---       ve versiyonunu doğrulamak.
+-- AMAÇ: pgvector eklentisinin kurulu olduğunu ve versiyonunu doğrulamak.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
-    e.extname AS extension_name,
+    exp.extname AS extension_name,
     e.extversion AS installed_version,
-    n.nspname AS extension_schema
-FROM pg_extension e
-JOIN pg_namespace n ON n.oid = e.extnamespace
-WHERE e.extname = 'vector';
+    n.nspname AS extension_schema,
+    CASE 
+        WHEN e.extname IS NULL THEN 'FAIL: pgvector eklentisi kurulu değil!'
+        ELSE 'PASS: pgvector kurulu'
+    END AS extension_status
+FROM (VALUES ('vector')) AS exp(extname)
+LEFT JOIN pg_extension e ON e.extname = exp.extname
+LEFT JOIN pg_namespace n ON n.oid = e.extnamespace;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -211,29 +348,35 @@ WHERE e.extname = 'vector';
 --       search_path güvenlik durumu ve anon/authenticated çalıştırma izinleri.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
-    p.proname AS function_name,
+    exp.function_name,
+    p.oid IS NOT NULL AS function_exists,
     pg_get_function_identity_arguments(p.oid) AS arguments,
     pg_get_function_result(p.oid) AS return_type,
     rol.rolname AS owner,
     p.prosecdef AS is_security_definer,
     p.proconfig AS configuration_settings,
-    CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN has_function_privilege('anon', p.oid, 'EXECUTE') ELSE false END AS anon_can_execute,
-    CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN has_function_privilege('authenticated', p.oid, 'EXECUTE') ELSE false END AS authenticated_can_execute,
-    CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN has_function_privilege('service_role', p.oid, 'EXECUTE') ELSE false END AS service_role_can_execute,
+    CASE WHEN p.oid IS NOT NULL AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN has_function_privilege('anon', p.oid, 'EXECUTE') ELSE false END AS anon_can_execute,
+    CASE WHEN p.oid IS NOT NULL AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN has_function_privilege('authenticated', p.oid, 'EXECUTE') ELSE false END AS authenticated_can_execute,
+    CASE WHEN p.oid IS NOT NULL AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN has_function_privilege('service_role', p.oid, 'EXECUTE') ELSE false END AS service_role_can_execute,
     CASE 
-        WHEN p.proconfig IS NULL THEN 'WARNING: search_path tanımsız (Search path hijacking riski)'
-        ELSE 'PASS: search_path yapılandırılmış'
-    END AS search_path_safety
-FROM pg_proc p
-JOIN pg_namespace n ON n.oid = p.pronamespace
-JOIN pg_roles rol ON rol.oid = p.proowner
-WHERE n.nspname = 'public' 
-  AND p.proname IN ('match_query_embeddings', 'match_book_embeddings')
-ORDER BY p.proname;
+        WHEN p.oid IS NULL AND exp.function_name = 'match_book_embeddings' THEN 'EXPECTED_WARNING: Canlıda henüz mevcut değil (04_DRAFT ile eklenecektir)'
+        WHEN p.oid IS NULL THEN 'FAIL: Fonksiyon bulunamadı'
+        WHEN p.proconfig IS NULL THEN 'WARNING: search_path tanımsız (Search path hijacking riski, 04 ile düzeltilecek)'
+        ELSE 'PASS: Fonksiyon tanımlı ve search_path yapılandırılmış'
+    END AS rpc_status
+FROM (VALUES ('match_query_embeddings'), ('match_book_embeddings')) AS exp(function_name)
+LEFT JOIN (
+    SELECT p.oid, p.proname, p.pronamespace, p.proowner, p.prosecdef, p.proconfig
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+) p ON p.proname = exp.function_name
+LEFT JOIN pg_roles rol ON rol.oid = p.proowner
+ORDER BY exp.function_name;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- SOKU 10 / 11: KİTAP VE EMBEDDING SAYILARI, YETİM KAYITLAR VE BOYUT ANALİZİ
+-- SOKU 10 / 11: KİTAP VE EMBEDDING SAYILARI, YETİM KAYITLAR
 -- AMAÇ: Kitap kataloğu ile embedding tablosu arasındaki veri bütünlüğü.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
@@ -246,40 +389,109 @@ SELECT
         SELECT 1 FROM public.books b WHERE b.isbn13 = be.book_id
     )) AS orphaned_embeddings;
 
--- (Not: Embedding boyut ve model sürüm detayını görmek için 10. sorgudan hemen sonra
--- aşağıdaki alt sorguyu çalıştırabilirsiniz):
-SELECT 
-    vector_dims(embedding) AS embedding_dimension,
-    model_version,
-    count(*) AS record_count,
-    count(*) FILTER (WHERE embedding IS NULL) AS null_embeddings,
-    count(*) FILTER (WHERE content_hash IS NULL OR content_hash = '') AS empty_hashes
-FROM public.book_embeddings
-GROUP BY vector_dims(embedding), model_version;
-
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SOKU 11 / 11: KULLANICI PROFİLLERİ, ETKİLEŞİMLER VE FAVORİLER VERİ SAYIMI
--- AMAÇ: Canlıdaki tek user_profiles kaydını, favorites sayısını ve interaction türlerini
+-- AMAÇ: Canlıdaki tek user_profiles kaydını, favorites sayısını ve etkileşim türlerini
 --       doğrulamak.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
-    'user_profiles' AS table_name,
-    count(*) AS total_rows,
-    count(DISTINCT id) AS distinct_keys,
-    'Canlıdaki tek profilin korunması gerekiyor' AS note
+    'user_profiles'::text AS table_name,
+    count(*)::bigint AS total_rows,
+    count(DISTINCT id)::bigint AS distinct_keys,
+    'Canlıdaki tek profilin korunması gerekiyor'::text AS note
 FROM public.user_profiles
 UNION ALL
 SELECT 
-    'favorites' AS table_name,
-    count(*) AS total_rows,
-    count(DISTINCT id) AS distinct_keys,
-    'Favori kayıtları' AS note
+    'favorites'::text AS table_name,
+    count(*)::bigint AS total_rows,
+    count(DISTINCT id)::bigint AS distinct_keys,
+    'Favori kayıtları'::text AS note
 FROM public.favorites
 UNION ALL
 SELECT 
-    'user_interactions' AS table_name,
-    count(*) AS total_rows,
-    count(DISTINCT id) AS distinct_keys,
-    'Toplam etkileşim satırı' AS note
+    'user_interactions'::text AS table_name,
+    count(*)::bigint AS total_rows,
+    count(DISTINCT id)::bigint AS distinct_keys,
+    'Toplam etkileşim satırı'::text AS note
 FROM public.user_interactions;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- BÖLÜM 12: TEK TIKLA ÇALIŞTIRILABİLİR KONSOLİDE PREFLIGHT ÖZET SORGUSU
+-- AMAÇ: Supabase SQL Editor'da tek sorgu ile tüm kritik kapıları kontrol etmek.
+--       Hiçbir UNION tip uyumsuzluğu içermez, tüm tipler açıkça text'e dökülmüştür.
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT 
+    '1. TRUNCATE_LEAKS'::text AS check_name,
+    count(*)::text AS actual_value,
+    CASE WHEN count(*) = 0 THEN 'PASS: Sıfır TRUNCATE Sızıntısı' ELSE 'FAIL: P0 - TRUNCATE İzni Açık!' END::text AS verdict
+FROM (
+    SELECT c.oid, c.relname, c.relowner, c.relacl
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' 
+      AND c.relname IN ('books', 'book_embeddings', 'favorites', 'user_activities', 'user_interactions', 'user_profiles')
+) c
+CROSS JOIN (
+    SELECT 'PUBLIC'::text AS entity_name
+    UNION ALL
+    SELECT r.rolname::text FROM pg_roles r WHERE r.rolname IN ('anon', 'authenticated')
+) e
+WHERE (
+    (e.entity_name = 'PUBLIC' AND EXISTS (SELECT 1 FROM aclexplode(COALESCE(c.relacl, acldefault('r', c.relowner))) a WHERE a.grantee = 0 AND a.privilege_type = 'TRUNCATE'))
+    OR
+    (e.entity_name <> 'PUBLIC' AND has_table_privilege(e.entity_name, c.oid, 'TRUNCATE') = true)
+)
+
+UNION ALL
+
+SELECT 
+    '2. USER_PROFILES_USER_ID_EXISTS'::text,
+    EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='user_profiles' AND column_name='user_id')::text,
+    CASE 
+        WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='user_profiles' AND column_name='user_id') 
+            THEN 'PASS: user_id kolonu mevcut' 
+        ELSE 'EXPECTED_PREFLIGHT: user_id eksik (02_DRAFT ile eklenecektir)' 
+    END::text
+
+UNION ALL
+
+SELECT 
+    '3. INTERACTIONS_DUPLICATE_PAIRS'::text,
+    (SELECT count(*)::text FROM (SELECT user_id, book_id FROM public.user_interactions GROUP BY user_id, book_id HAVING count(*) > 1) d),
+    CASE 
+        WHEN (SELECT count(*) FROM (SELECT user_id, book_id FROM public.user_interactions GROUP BY user_id, book_id HAVING count(*) > 1) d) = 0 
+            THEN 'PASS: Mükerrer kayıt yok' 
+        ELSE 'WARNING: Mükerrer kayıtlar var (03_DRAFT güvenli arşivleyecektir)' 
+    END::text
+
+UNION ALL
+
+SELECT 
+    '4. INTERACTIONS_CHECK_STATUS'::text,
+    COALESCE((
+        SELECT pg_get_constraintdef(con.oid) 
+        FROM pg_constraint con 
+        JOIN pg_class c ON c.oid = con.conrelid 
+        WHERE c.relname = 'user_interactions' AND con.contype = 'c'
+        LIMIT 1
+    ), 'EKSİK')::text,
+    CASE 
+        WHEN EXISTS (
+            SELECT 1 FROM pg_constraint con JOIN pg_class c ON c.oid = con.conrelid 
+            WHERE c.relname = 'user_interactions' AND con.contype = 'c' AND pg_get_constraintdef(con.oid) LIKE '%favorite%'
+        ) THEN 'PASS: Model A 6-Durumlu Kısıt Aktif'
+        ELSE 'EXPECTED_PREFLIGHT: Dar kısıt (03_DRAFT ile reading/favorite eklenecektir)'
+    END::text
+
+UNION ALL
+
+SELECT 
+    '5. VECTOR_RPC_MATCH_BOOK_EMBEDDINGS'::text,
+    EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'match_book_embeddings')::text,
+    CASE 
+        WHEN EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = 'match_book_embeddings')
+            THEN 'PASS: RPC Mevcut'
+        ELSE 'EXPECTED_PREFLIGHT: Canlıda eksik (04_DRAFT ile kurulacaktır)'
+    END::text;

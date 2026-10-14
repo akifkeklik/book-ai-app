@@ -328,7 +328,7 @@ def test_hardening_03_rollback_safety_and_search_path():
 
 
 def test_hardening_03_runtime_test_script_completeness():
-    """Verify test_03_interactions_and_trigger_runtime.sql covers all 8 Model A scenarios."""
+    """Verify test_03_interactions_and_trigger_runtime.sql covers all 10 Model A and deduplication scenarios."""
     runtime_03_sql = (SCRIPTS_DIR / "hardening" / "test_03_interactions_and_trigger_runtime.sql").read_text(encoding="utf-8")
 
     assert "SENARYO 1: Önceden etkileşimi olmayan kitabı favorileme" in runtime_03_sql
@@ -339,4 +339,107 @@ def test_hardening_03_runtime_test_script_completeness():
     assert "SENARYO 6: Saf favorinin silinmesi" in runtime_03_sql
     assert "SENARYO 7: Yinelenen favori engelleme" in runtime_03_sql
     assert "SENARYO 8: Backfill sırasında okuma durumlarına dokunulmaması" in runtime_03_sql
+    assert "SENARYO 9: Kayıpsız mükerrer kayıt uzlaştırması ve arşivleme" in runtime_03_sql
+    assert "SENARYO 10: Like ve Dislike çelişkisinde Fail-Closed denetimi" in runtime_03_sql
+
+
+def test_preflight_script_no_has_table_privilege_public():
+    """Verify preflight SQL never passes 'public' to has_table_privilege (which would fail in PostgreSQL)."""
+    preflight_sql = (SCRIPTS_DIR / "preflight_database_hardening.sql").read_text(encoding="utf-8")
+
+    assert "has_table_privilege('public'" not in preflight_sql
+    assert "has_table_privilege('PUBLIC'" not in preflight_sql
+    assert "has_table_privilege(\"public\"" not in preflight_sql
+    assert "has_table_privilege(\"PUBLIC\"" not in preflight_sql
+
+
+def test_preflight_script_uses_aclexplode_for_public_grantee_zero():
+    """Verify preflight SQL uses aclexplode and grantee = 0 for catalog-level PUBLIC privileges."""
+    preflight_sql = (SCRIPTS_DIR / "preflight_database_hardening.sql").read_text(encoding="utf-8")
+
+    assert "aclexplode(COALESCE(tt.relacl, acldefault('r', tt.relowner)))" in preflight_sql
+    assert "a.grantee = 0" in preflight_sql
+    assert "truncate_inherited_from_public" in preflight_sql
+    assert "pg_default_acl" in preflight_sql
+
+
+def test_preflight_script_fails_clearly_on_missing_objects():
+    """Verify preflight SQL has explicit fail-closed notices for missing tables, roles, and extensions."""
+    preflight_sql = (SCRIPTS_DIR / "preflight_database_hardening.sql").read_text(encoding="utf-8")
+
+    assert "FAIL: TABLO EKSİK (TABLE MISSING)" in preflight_sql
+    assert "FAIL: Gerekli Supabase rolü veritabanında bulunamadı!" in preflight_sql
+    assert "FAIL: pgvector eklentisi kurulu değil!" in preflight_sql
+    assert "EXPECTED_WARNING: Canlıda henüz mevcut değil (04_DRAFT ile eklenecektir)" in preflight_sql
+
+
+def test_preflight_script_consolidated_query_clean_union_types():
+    """Verify section 12 consolidated preflight query explicitly casts all union columns to text."""
+    preflight_sql = (SCRIPTS_DIR / "preflight_database_hardening.sql").read_text(encoding="utf-8")
+
+    assert "BÖLÜM 12: TEK TIKLA ÇALIŞTIRILABİLİR KONSOLİDE PREFLIGHT ÖZET SORGUSU" in preflight_sql
+    assert "'1. TRUNCATE_LEAKS'::text AS check_name" in preflight_sql
+    assert "'2. USER_PROFILES_USER_ID_EXISTS'::text" in preflight_sql
+    assert "'3. INTERACTIONS_DUPLICATE_PAIRS'::text" in preflight_sql
+    assert "'4. INTERACTIONS_CHECK_STATUS'::text" in preflight_sql
+    assert "'5. VECTOR_RPC_MATCH_BOOK_EMBEDDINGS'::text" in preflight_sql
+
+
+def test_03_lossless_duplicate_reconciliation_and_archiving():
+    """Verify 03 migration replaces silent delete with lossless archiving, favorite preservation, and fail-closed logic."""
+    hardening_dir = SCRIPTS_DIR / "hardening"
+    forward_03 = (hardening_dir / "03_DRAFT_reconcile_interactions_and_trigger.sql").read_text(encoding="utf-8")
+
+    # Must NOT have unarchived arbitrary delete (a.id < b.id)
+    assert "DELETE FROM public.user_interactions a USING public.user_interactions b\n        WHERE a.id < b.id" not in forward_03
+    assert "a.id < b.id" not in forward_03
+
+    # Must define dedicated duplicate archive table with security hardening
+    assert "CREATE TABLE IF NOT EXISTS public._archived_user_interactions_duplicate_backup" in forward_03
+    assert "full_row_snapshot JSONB NOT NULL" in forward_03
+    assert "REVOKE ALL ON TABLE public._archived_user_interactions_duplicate_backup FROM PUBLIC, anon, authenticated;" in forward_03
+    assert "GRANT SELECT, INSERT ON TABLE public._archived_user_interactions_duplicate_backup TO service_role;" in forward_03
+
+    # Must snapshot duplicates before deduplication
+    assert "PRE_DEDUPLICATION_SNAPSHOT" in forward_03
+
+    # Must preserve favorite relationship into public.favorites
+    assert "INSERT INTO public.favorites (user_id, book_id, book_title, added_at)" in forward_03
+
+    # Must fail closed on irreconcilable like + dislike conflicts
+    assert "Çözümlenemez çelişki kontrolü" in forward_03
+    assert "count(DISTINCT interaction_type) > 1" in forward_03
+    assert "çözümlenemeyen çelişkili etkileşim kaydı (like ve dislike aynı anda)" in forward_03
+
+    # Must rank interactions deterministically (finished > reading > want_to_read > ...)
+    assert "WHEN 'finished' THEN 1" in forward_03
+    assert "WHEN 'reading' THEN 2" in forward_03
+    assert "WHEN 'want_to_read' THEN 3" in forward_03
+
+
+def test_deployment_checklist_uses_service_role_key_and_procedure_a1():
+    """Verify deployment checklist requires SUPABASE_SERVICE_ROLE_KEY and references hardening Procedure A.1."""
+    docs_dir = Path(__file__).parent.parent.parent / "docs"
+    checklist_md = (docs_dir / "V1_DEPLOYMENT_EXECUTION_CHECKLIST.md").read_text(encoding="utf-8")
+
+    assert "SUPABASE_ANON_KEY=\"<SERVICE_ROLE_KEY>\"" not in checklist_md
+    assert "SUPABASE_SERVICE_ROLE_KEY=\"<SERVICE_ROLE_KEY>\"" in checklist_md
+    assert "$env:SUPABASE_SERVICE_ROLE_KEY=\"<SERVICE_ROLE_KEY>\"" in checklist_md
+    assert "Procedure A.1: Production Database Hardening & Reconciliation" in checklist_md
+    assert "01_DRAFT_revoke_dangerous_privileges.sql" in checklist_md
+    assert "02_DRAFT_reconcile_user_profiles.sql" in checklist_md
+    assert "03_DRAFT_reconcile_interactions_and_trigger.sql" in checklist_md
+    assert "04_DRAFT_harden_vector_rpcs.sql" in checklist_md
+
+
+def test_validation_checklist_group_3_model_a_not_blocked():
+    """Verify validation checklist does not mark Group 3 Model A as BLOKE."""
+    docs_dir = Path(__file__).parent.parent.parent / "docs"
+    validation_md = (docs_dir / "database" / "validation-checklist.md").read_text(encoding="utf-8")
+
+    assert "[ ] **BLOKE**" not in validation_md
+    assert "Grup 3 (user_interactions Model A / B) kararı verildi mi? | [ ]" not in validation_md
+    assert "Grup 3 (Model A Mimarisi & Kayıpsız Arşivleme) onaylandı mı? | [x] ONAYLANDI" in validation_md
+    assert "DÖRT AŞAMALI DOĞRULAMA MODELİ" in validation_md
+
 

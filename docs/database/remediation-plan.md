@@ -59,23 +59,22 @@ Doğrudan `ALTER TABLE user_profiles RENAME COLUMN id TO user_id;` çalıştırm
 
 ---
 
-### 3.2 `user_interactions` ve `favorites` Veri Modeli Çatışması (BLOKE DURUMDA)
+### 3.2 `user_interactions` ve `favorites` Veri Modeli Uzlaştırması (Model A Mimarisi - ONAYLANDI)
 
-#### Temel Mimari Çatışma:
-`public.user_interactions` tablosunda `UNIQUE(user_id, book_id)` kısıtı vardır. Yani bir kullanıcı için bir kitaba ait **yalnızca tek bir satır** var olabilir.
-- Eğer bir kullanıcı kitabı hem "Bitirdi" (`finished`) hem de "Favorilerine Ekledi" (`favorite`) ise:
-  Tek bir kolonda (`interaction_type`) her iki değer aynı anda tutulamaz!
-- Canlı trigger `ON CONFLICT DO UPDATE SET interaction_type = 'like'` yaptığında, okuma durumunu silip üzerine `'like'` yazmaktadır (Veri Kaybı).
-- `ON CONFLICT DO NOTHING` yapıldığında ise, kitap `finished` kalmakta ancak kullanıcının kitabı favorilediği bilgisi `user_interactions` tablosuna hiç yansımamaktadır (Tavsiye motoru favoriyi göremez).
-
-#### Operatör Kararı Gerektiren İki Model:
-- **Model A (Bağımsız Nitelikler — ONAYLANDI):**
-  `favorites` tablosu favorilerin bağımsız ve kanonik deposudur. `user_interactions` ise okuma durumları (`want_to_read`, `reading`, `finished`) ve ML beğeni sinyalleri (`like`, `dislike`, `favorite`) için kullanılır. Trigger, okuma durumlarını ezmez; kullanıcı favoriden çıkardığında okuma durumunu silmez.
-- **Model B (Karşılıklı Dışlayan Koleksiyon Rafları):**
-  Web UI'da olduğu gibi (`library.ts`), bir kitap aynı anda yalnızca tek bir rafta bulunabilir (`favorite` VEYA `reading` VEYA `finished`). Kullanıcı başka bir rafa taşıdığında önceki durumun ezilmesi ürün kuralı olarak kabul edilir.
+#### Temel Mimari Çatışma ve Model A Çözümü:
+`public.user_interactions` tablosunda `UNIQUE(user_id, book_id)` kısıtı varken bir kullanıcı için bir kitaba ait tek bir satır tutulabilmektedir.
+- **Model A İlkeleri (Onaylandı & Uygulandı):**
+  `favorites` tablosu favori üyeliğinin bağımsız ve kanonik deposudur. `user_interactions` ise okuma durumları (`want_to_read`, `reading`, `finished`) ve ML beğeni sinyalleri (`like`, `dislike`, `favorite`) için kullanılır.
+  Trigger okuma durumlarını ezmez; kullanıcı favoriden çıkardığında okuma durumu silinmez.
+- **Kayıpsız Mükerrer Kayıt (Duplicate) Uzlaştırma Stratejisi:**
+  `03_DRAFT_reconcile_interactions_and_trigger.sql` betiğinde olası mükerrer satırlar asla unarchived silinmez (`a.id < b.id` kaldırılmıştır):
+  1. Tüm mükerrer kayıtlar `_archived_user_interactions_duplicate_backup` tablosuna eksiksiz yedeklenir.
+  2. Mükerrer satırlardaki favori sinyalleri `public.favorites` tablosuna aktarılır.
+  3. `user_interactions` satırları deterministik öncelikle (`finished` > `reading` > `want_to_read` > `dislike` > `like` > `favorite`) korunur.
+  4. Çözümlenemez çelişkili durumlarda (aynı kitap için hem `like` hem `dislike`) sistem güvenle fail-closed durur.
 
 > [!NOTE]
-> **MODEL A ONAYLANDI:** Operatör tarafından Model A mimarisi onaylanmış, [`03_DRAFT_reconcile_interactions_and_trigger.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/03_DRAFT_reconcile_interactions_and_trigger.sql) betiği Model A kurallarına göre güncellenmiş ve [`test_03_interactions_and_trigger_runtime.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/test_03_interactions_and_trigger_runtime.sql) ile 8 runtime senaryosunda doğrulanmıştır.
+> **MODEL A DOĞRULANDI:** Operatör tarafından Model A mimarisi onaylanmış, [`03_DRAFT_reconcile_interactions_and_trigger.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/03_DRAFT_reconcile_interactions_and_trigger.sql) betiği Model A kurallarına ve kayıpsız arşivleme mimarisine göre güncellenmiş ve [`test_03_interactions_and_trigger_runtime.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/test_03_interactions_and_trigger_runtime.sql) ile 10 runtime senaryosunda tam doğrulanmıştır.
 
 ---
 
@@ -114,8 +113,8 @@ graph TD
 
 ### Grup 3 — Etkileşim Kısıtı ve Model A Trigger Kurulumu
 - **Dosya:** `backend/scripts/hardening/03_DRAFT_reconcile_interactions_and_trigger.sql`
-- **Durum:** **HAZIR / UYGULANABİLİR (Model A Onaylandı)**
-- **Etki:** `favorites` ile `user_interactions` bağımsız çalışır; okuma durumları ezilmez ve silinmez. Geriye dönük favoriler sıfır kayıpla senkronize edilir.
+- **Durum:** **HAZIR / UYGULANABİLİR (Model A Uygulandı & Kayıpsız Arşivleme)**
+- **Etki:** `favorites` ile `user_interactions` bağımsız çalışır; okuma durumları ezilmez ve silinmez. Mükerrer kayıtlar `_archived_user_interactions_duplicate_backup` tablosuna yedeklenerek kayıpsız uzlaştırılır.
 
 ### Grup 4 — Vektör RPC ve Güvenlik Güçlendirmesi
 - **Dosya:** `backend/scripts/hardening/04_DRAFT_harden_vector_rpcs.sql`
@@ -124,10 +123,17 @@ graph TD
 
 ---
 
-## 5. OPERATÖR ONAY GATES & İMZA LİSTESİ
+## 5. DÖRT AŞAMALI DOĞRULAMA MODELİ VE İMZA KONTROLÜ
 
-Canlı veritabanına geçilmeden önce operatörün şu 3 kapıyı onaylaması şarttır:
+Canlı veritabanına geçilmeden önce sistem güvenliği 4 bağımsız katmanda doğrulanmalıdır:
 
-- [ ] **Kapı 1 (Yedekleme):** Supabase konsolundan taze bir snapshot alındığı doğrulandı.
-- [ ] **Kapı 2 (Grup 1, 2, 4 İcrası):** Hazır olan 01, 02 ve 04 numaralı hardening script'lerinin çalıştırılması onaylandı.
-- [ ] **Kapı 3 (Grup 3 Mimari Kararı):** Favori ve Okuma Durumu için **Model A** (Bağımsız Nitelikler) mı yoksa **Model B** (Karşılıklı Dışlayan Raflar) mı seçileceği karara bağlandı.
+1. **Katman 1 (Kod ve CI Doğrulaması):** PR #18 merge (`a3a9145`), ruff, pytest (226 test passed) ve web CI testleri tamamlandı (**GEÇTİ**).
+2. **Katman 2 (İzole DB Doğrulaması):** GitHub Actions pgvector servis konteynerinde runtime testleri (`test_02`, `test_03`, `test_04`) tamamlandı (**GEÇTİ**).
+3. **Katman 3 (Canlı Şema Doğrulaması):** Operatör tarafından canlı Supabase üzerinde [`preflight_database_hardening.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/preflight_database_hardening.sql) Bölüm 12 konsolide sorgusu çalıştırılarak ön kanıtlar toplanmalıdır (**BEKLİYOR**).
+4. **Katman 4 (Yedek ve Kurtarma Güvencesi):** Canlı Supabase konsolundan son 1 saat içinde alınmış doğrulanmış bir tam snapshot ve aktif PITR noktası teyit edilmelidir (**BEKLİYOR**).
+
+### Operatör Onay Listesi:
+- [ ] **Kapı 1 (Yedekleme & PITR):** Supabase konsolundan taze bir snapshot (<1 saat) ve PITR durumu doğrulandı.
+- [ ] **Kapı 2 (Preflight Kanıtı):** Bölüm 12 tek tıkla konsolide preflight sorgusu çalıştırıldı ve sonuçlar kaydedildi.
+- [ ] **Kapı 3 (Kilit Güvenliği):** Bakım penceresi 30 dakika olarak planlandı ve script başında `SET LOCAL lock_timeout = '5s'` uygulandı.
+- [ ] **Kapı 4 (Sıralı İcra):** Hazır olan 01, 02, 03 ve 04 numaralı hardening script'lerinin sırayla çalıştırılması onaylandı.

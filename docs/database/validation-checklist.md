@@ -79,9 +79,9 @@
 
 ---
 
-### Senaryo 5: Favori ve Okuma Durumu Regresyonu (BLOKE GRUP 3)
+### Senaryo 5: Favori ve Okuma Durumu Regresyonu (Model A Doğrulaması)
 - **Amaç:** `user_interactions` tablosunda `reading` veya `finished` olarak işaretlenmiş bir kitabın durumunun ezilmemesi.
-- **Ön Koşul:** Bu test Grup 3 mimari modeli (Model A vs Model B) onaylanana kadar canlıda çalıştırılamaz.
+- **Ön Koşul:** Model A mimarisi onaylanmış, `03_DRAFT` betiğinde kayıpsız mükerrer kayıt arşivleme ve koruyucu trigger ile uygulanmış, `test_03_interactions_and_trigger_runtime.sql` (10 senaryo) ile doğrulanmıştır.
 - **Senaryo Mantığı:**
   1. Kullanıcı kitaba `interaction_type = 'reading'` kaydeder.
   2. Kullanıcı kitabı `favorites` tablosuna ekler (`INSERT`).
@@ -94,13 +94,13 @@
 ### Senaryo 6: Idempotency (Tekrarlanabilirlik)
 - **Amaç:** Migration dosyaları arka arkaya iki kez çalıştırıldığında hata üretmemesi ve durumu bozmaması.
 - **Doğrulama Adımı:**
-  `01_DRAFT_...`, `02_DRAFT_...` ve `04_DRAFT_...` dosyaları ikinci kez çalıştırılır.
+  `01_DRAFT_...`, `02_DRAFT_...`, `03_DRAFT_...` ve `04_DRAFT_...` dosyaları ikinci kez çalıştırılır.
 - **Beklenen Sonuç:** Tüm `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION` ve `DROP POLICY IF EXISTS` ifadeleri sorunsuz tamamlanır.
 
 ---
 
 ### Senaryo 7: Vektör Arama ve RPC Yetkileri (INVOKER Modeli)
-- **Amaç:** `match_query_embeddings` fonksiyonunun `SECURITY INVOKER` olarak güvenle çalışabilmesi.
+- **Amaç:** `match_query_embeddings` ve `match_book_embeddings` fonksiyonlarının `SECURITY INVOKER` olarak güvenle çalışabilmesi.
 - **Doğrulama Adımı:**
   ```sql
   SET ROLE anon;
@@ -115,11 +115,11 @@
 
 ---
 
-### Senaryo 8: Rollback Güvenliği ve Tersinirlik
-- **Amaç:** Geri dönüş betiklerinin tehlikeli yetkileri (`TRUNCATE`) geri vermeden güvenli duruma dönmesi.
+### Senaryo 8: Rollback Güvenliği ve Tersinirlik Sınırları
+- **Amaç:** Geri dönüş betiklerinin sınırlarının ve risklerinin bilinmesi.
 - **Doğrulama Adımı:**
-  Staging veritabanında `01_DRAFT_..._rollback.sql` çalıştırılır; `preflight_database_hardening.sql` Bölüm 2 ile TRUNCATE yetkisinin kapalı kaldığı teyit edilir.
-- **Beklenen Sonuç:** TRUNCATE kapalı kalır, DML izinleri önceki duruma döner.
+  Staging veritabanında test edilir; `preflight_database_hardening.sql` Bölüm 2 ile TRUNCATE yetkisinin kapalı kaldığı teyit edilir.
+- **Operatör Uyarısı:** Rollback 02 (user_id kaldırır) ve Rollback 03 (kısıtı daraltır) canlı istemcileri kırar; canlıda sorun çıkarsa rollback yerine forward-fix veya tam snapshot restore tercih edilmelidir.
 
 ---
 
@@ -129,19 +129,28 @@
   1. Backend testleri: `PYTHONPATH=backend python -m pytest backend/tests/ -v --tb=short`
   2. Web testleri: `cd web && npm test`
 - **Mevcut Sonuç:**
-  - Backend: **198 test PASSED** (0 failed).
+  - Backend: **226 test PASSED** (0 failed).
   - Web: **37 test PASSED** (0 failed).
 
 ---
 
-## 2. CANLI UYGULAMA İÇİN GO/NO-GO İMZA KONTROLÜ
+## 2. DÖRT AŞAMALI DOĞRULAMA MODELİ VE İMZA KONTROLÜ
+
+| Doğrulama Katmanı | Kapsam | Durum | Kanıt Kaynağı |
+|---|---|:---:|---|
+| **Katman 1: Kod ve CI Doğrulaması** | PR #18 merge (`a3a9145`), 6 CI işi, ruff, pytest, web testleri | **GEÇTİ** | GitHub Actions CI & git main HEAD |
+| **Katman 2: İzole DB Testleri** | pgvector konteynerinde runtime testleri (test_02, test_03, test_04) | **GEÇTİ** | `database-ci` servis konteyneri |
+| **Katman 3: Canlı Şema Doğrulaması** | Canlı Supabase üzerinde read-only preflight sorguları (Bölüm 12) | **OPERATÖR BEKLİYOR** | Supabase SQL Editor Preflight Çıktısı |
+| **Katman 4: Yedek ve Kurtarma Güvencesi** | PITR aktifliği, <1 saatlik snapshot timestamp'i, proje ref onayı | **OPERATÖR BEKLİYOR** | Supabase Dashboard Backups Paneli |
+
+### Canlı Çalıştırma Öncesi İmza Listesi
 
 | Kontrol Maddesi | Durum | Doğrulayan |
 |---|:---:|---|
-| Canlı veritabanı yedeği alındı mı? | [ ] BEKLİYOR | Kullanıcı Onayı |
-| Salt okunur preflight sorguları çalıştırıldı mı? | [ ] BEKLİYOR | Kullanıcı Onayı |
-| Grup 1 (Yetkiler) uygulanması onaylandı mı? | [ ] BEKLİYOR | Kullanıcı Onayı |
-| Grup 2 (user_profiles Aşamalı Uyumluluk) onaylandı mı? | [ ] BEKLİYOR | Kullanıcı Onayı |
-| Grup 3 (user_interactions Model A / B) kararı verildi mi? | [ ] **BLOKE** | Kullanıcı Onayı |
-| Grup 4 (Vektör RPC Güçlendirmesi) onaylandı mı? | [ ] BEKLİYOR | Kullanıcı Onayı |
+| Canlı veritabanı yedeği (<1 saat) alındı ve PITR doğrulandı mı? | [ ] BEKLİYOR | Yetkili Operatör |
+| Konsolide salt okunur preflight sorgusu (Bölüm 12) çalıştırıldı mı? | [ ] BEKLİYOR | Yetkili Operatör |
+| Grup 1 (Yetki Sıkılaştırma) uygulanması onaylandı mı? | [ ] BEKLİYOR | Yetkili Operatör |
+| Grup 2 (user_profiles Aşamalı Uyumluluk) onaylandı mı? | [ ] BEKLİYOR | Yetkili Operatör |
+| Grup 3 (Model A Mimarisi & Kayıpsız Arşivleme) onaylandı mı? | [x] ONAYLANDI (PR #18) | Yetkili Operatör |
+| Grup 4 (Vektör RPC Güçlendirmesi) onaylandı mı? | [ ] BEKLİYOR | Yetkili Operatör |
 | Sıfır canlı değişiklik kuralına uyuldu mu? | [x] TAMAMLANDI | Senior DB Engineer |

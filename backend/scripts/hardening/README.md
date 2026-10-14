@@ -12,7 +12,7 @@
 |---|:---:|---|---|---|:---:|
 | [`01_DRAFT_revoke_dangerous_privileges.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/01_DRAFT_revoke_dangerous_privileges.sql) | **HAZIR** | `TRUNCATE` yetkilerinin kaldırılması, `books` anonim yazma politikalarının silinmesi, en az yetki matrisinin uygulanması. | `01_DRAFT_revoke_dangerous_privileges_rollback.sql` | CI Automated | Düşük (Sıfır veri riski) |
 | [`02_DRAFT_reconcile_user_profiles.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/02_DRAFT_reconcile_user_profiles.sql) | **HAZIR** (Aşamalı) | Canlıdaki tek kayıt korunarak aşamalı çift-kolon (`user_id` + `id`) uyumluluğu ve eksik kolonların eklenmesi. | `02_DRAFT_reconcile_user_profiles_rollback.sql` | [`test_02_user_profiles_rollback_runtime.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/test_02_user_profiles_rollback_runtime.sql) (10 Senaryo) | Düşük (Geriye dönük uyumlu) |
-| [`03_DRAFT_reconcile_interactions_and_trigger.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/03_DRAFT_reconcile_interactions_and_trigger.sql) | **HAZIR** (Model A) | Model A mimarisi: `favorites` kanonik tablosu ile `user_interactions` okuma durumlarının tam ayrıştırılması; okuma durumlarını ezmeyen/silmeyen koruyucu trigger. | `03_DRAFT_reconcile_interactions_and_trigger_rollback.sql` | [`test_03_interactions_and_trigger_runtime.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/test_03_interactions_and_trigger_runtime.sql) (8 Senaryo) | Düşük (Sıfır veri kaybı, Model A) |
+| [`03_DRAFT_reconcile_interactions_and_trigger.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/03_DRAFT_reconcile_interactions_and_trigger.sql) | **HAZIR** (Model A) | Model A mimarisi: `favorites` kanonik tablosu ile `user_interactions` okuma durumlarının tam ayrıştırılması; okuma durumlarını ezmeyen/silmeyen koruyucu trigger; kayıpsız mükerrer kayıt arşivleme. | `03_DRAFT_reconcile_interactions_and_trigger_rollback.sql` | [`test_03_interactions_and_trigger_runtime.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/test_03_interactions_and_trigger_runtime.sql) (10 Senaryo) | Düşük (Kayıpsız uzlaştırma, Model A) |
 | [`04_DRAFT_harden_vector_rpcs.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/04_DRAFT_harden_vector_rpcs.sql) | **HAZIR** | `match_query_embeddings`'e sabit `search_path` ve limit eklenmesi (`SECURITY INVOKER` korunur); canlıda eksik `match_book_embeddings` RPC'sinin tanımlanması. | `04_DRAFT_harden_vector_rpcs_rollback.sql` | [`test_04_vector_rpc_catalog_lifecycle.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/test_04_vector_rpc_catalog_lifecycle.sql) | Düşük (Fonksiyon DDL) |
 
 ---
@@ -21,13 +21,28 @@
 
 1. **`01_DRAFT` Güvenliği:** Rollback betiği, RLS'i etkisiz kılan `TRUNCATE` yetkisini ASLA geri vermez (Fail-Safe Rollback).
 2. **`02_DRAFT` Aşamalı Uyumluluğu:** Doğrudan `ALTER RENAME` yerine `user_id` kolonu eklenmiş, mevcut `id` ile doldurulmuş ve çift yönlü senkronizasyon trigger'ı kurulmuştur. Böylece eski `id` sorgulayan ve yeni `user_id` sorgulayan tüm istemciler sıfır kesintiyle çalışır.
-3. **`03_DRAFT` Model A Mimarisi:** `favorites` tablosu favori üyeliğinin kanonik deposudur. `user_interactions` okuma durumlarını (`want_to_read`, `reading`, `finished`) ve ML sinyallerini (`like`, `dislike`) bağımsız yönetir. Favorileme veya favoriden çıkarma okuma durumunu asla ezmez ve silmez.
+3. **`03_DRAFT` Model A Mimarisi & Kayıpsız Arşivleme:**
+   - `favorites` tablosu favori üyeliğinin kanonik deposudur. `user_interactions` okuma durumlarını (`want_to_read`, `reading`, `finished`) ve ML sinyallerini (`like`, `dislike`) bağımsız yönetir.
+   - Olası mükerrer (duplicate) etkileşimler asla sessizce silinmez. Tüm mükerrer satırlar `_archived_user_interactions_duplicate_backup` tablosuna arşivlenir.
+   - Favori sinyalleri `favorites` tablosuna aktarılır ve okuma durumları deterministik öncelikle (`finished` > `reading` > `want_to_read`) korunur.
+   - Çözümlenemez çelişkili durumlarda (aynı kitap için hem `like` hem `dislike`) sistem fail-closed durarak veri kaybını önler.
 4. **`04_DRAFT` Invoker Tercihi:** `match_query_embeddings` superuser haklarıyla çalıştırılmaması için `SECURITY INVOKER` olarak korunmuş; arama yolu ve bellek güvenliği `SET search_path` ve girdi tavanı (`safe_limit <= 100`) ile sağlanmıştır.
 
 ---
 
-## 3. Uygulama Öncesi Zorunlu Kontroller (Gates)
+## 3. Rollback İstemci Uyumluluk Sınırlamaları (Operatör Uyarısı)
 
-1. **Yedekleme Kapısı:** Supabase Dashboard -> Database -> Backups üzerinden tam snapshot alınmalıdır.
-2. **Preflight Kapısı:** [`backend/scripts/preflight_database_hardening.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/preflight_database_hardening.sql) çalıştırılarak ön durum kanıtları kaydedilmelidir.
-3. **Sıralı Uygulama:** Dosyalar yetkilendirilmiş sırayla (01 -> 02 -> 03 -> 04) uygulanmalı ve her adım sonrası doğrulama sorguları çalıştırılmalıdır.
+> [!WARNING]
+> **ROLLBACK DOSYALARI CANLI İSTEMCİLERLE GERİYE DÖNÜK UYUMLU DEĞİLDİR:**
+> - **Rollback 02:** `user_id`, `preferred_authors` ve `preferred_vibe` kolonlarını tablodan siler. Bu durum, canlıda çalışan Flutter mobil uygulamasını (`supabase_service.dart`) ve backend profil sorgularını anında çökertir!
+> - **Rollback 03:** `user_interactions` kısıtını 4 duruma (`like`, `dislike`, `want_to_read`, `finished`) geri çeker. Canlıda çalışan Web uygulaması (`web/src/app/actions/library.ts:336`) doğrudan `'reading'` ve `'favorite'` yazdığı için web kullanıcıları anında PostgreSQL check constraint hatası alır!
+> - **Operasyonel İlke:** Canlıda sorun yaşandığında rastgele rollback çalıştırmak yerine **ileri onarım (forward-fix)** tercih edilmeli veya tam veritabanı yedeğinden kontrollü restore yapılmalıdır.
+
+---
+
+## 4. Uygulama Öncesi Zorunlu Kontroller (Gates)
+
+1. **Yedekleme Kapısı:** Supabase Dashboard -> Database -> Backups üzerinden tam snapshot alınmalı, PITR durumu doğrulanmalıdır.
+2. **Preflight Kapısı:** [`backend/scripts/preflight_database_hardening.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/preflight_database_hardening.sql) Bölüm 12'deki Tek Tıkla Konsolide Sorgu çalıştırılarak ön durum kanıtları kaydedilmelidir.
+3. **Kilit Güvenliği (Lock Timeout):** Her script başında `SET LOCAL lock_timeout = '5s';` kullanılarak lock queue tıkanmaları engellenmelidir.
+4. **Sıralı Uygulama:** Dosyalar yetkilendirilmiş sırayla (01 -> 02 -> 03 -> 04) uygulanmalı ve her adım sonrası doğrulama sorguları çalıştırılmalıdır.

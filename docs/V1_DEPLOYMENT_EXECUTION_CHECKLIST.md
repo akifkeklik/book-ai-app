@@ -217,6 +217,17 @@ Execute each file in the Supabase SQL Editor in exact order:
 
 ---
 
+### Procedure A.1: Production Database Hardening & Reconciliation (Live Deployment)
+
+For live production execution, the four audited hardening migrations in [`backend/scripts/hardening/`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening) supersede ad-hoc script execution:
+1. **Preflight Audit:** Execute [`backend/scripts/preflight_database_hardening.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/preflight_database_hardening.sql) (Section 12 single-shot summary query).
+2. **Grup 1 (Privilege Hardening):** [`01_DRAFT_revoke_dangerous_privileges.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/01_DRAFT_revoke_dangerous_privileges.sql).
+3. **Grup 2 (Profiles Staged Reconciliation):** [`02_DRAFT_reconcile_user_profiles.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/02_DRAFT_reconcile_user_profiles.sql).
+4. **Grup 3 (Model A Interactions & Lossless Deduplication):** [`03_DRAFT_reconcile_interactions_and_trigger.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/03_DRAFT_reconcile_interactions_and_trigger.sql).
+5. **Grup 4 (Vector RPC Hardening):** [`04_DRAFT_harden_vector_rpcs.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/04_DRAFT_harden_vector_rpcs.sql).
+
+---
+
 ### Procedure B: Fresh Database Setup & Catalog Seeding
 
 1. Execute SQL scripts [`00_init_books.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/00_init_books.sql) through [`08_user_profiles_and_activities.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/08_user_profiles_and_activities.sql) in numerical order.
@@ -224,14 +235,14 @@ Execute each file in the Supabase SQL Editor in exact order:
    - Script: [`backend/scripts/upload_books_to_supabase.py`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/upload_books_to_supabase.py)
    - *Code Behavior:* Reads [`backend/data/books.csv`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/data/books.csv) (6,448 titles) and performs `supabase.table("books").upsert(batch)` keyed on primary key `isbn13`.
    - *Rerun Safety:* **Safe on empty database.** On an existing database, it will NOT duplicate rows or delete records, but it **will overwrite any manually enriched book metadata** with raw CSV data.
-   - *RLS Prerequisite:* `public.books` only permits `SELECT` for anonymous users. The ingestion script **must** be executed with the `service_role` key to bypass RLS.
+   - *RLS Prerequisite:* `public.books` only permits `SELECT` for anonymous users. The ingestion script **must** be executed with `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS.
    - *Execution Hygiene:* Because `backend/config.py` loads `backend/.env` with `override=True`, never store `service_role` in `backend/.env`. Pass it as a one-time environment variable to the process:
    ```bash
    # Linux / macOS / Git Bash:
-   SUPABASE_URL="https://<ref>.supabase.co" SUPABASE_ANON_KEY="<SERVICE_ROLE_KEY>" python backend/scripts/upload_books_to_supabase.py
+   SUPABASE_URL="https://<ref>.supabase.co" SUPABASE_SERVICE_ROLE_KEY="<SERVICE_ROLE_KEY>" python backend/scripts/upload_books_to_supabase.py
 
    # Windows PowerShell:
-   $env:SUPABASE_URL="https://<ref>.supabase.co"; $env:SUPABASE_ANON_KEY="<SERVICE_ROLE_KEY>"; python backend/scripts/upload_books_to_supabase.py; Remove-Item env:SUPABASE_ANON_KEY
+   $env:SUPABASE_URL="https://<ref>.supabase.co"; $env:SUPABASE_SERVICE_ROLE_KEY="<SERVICE_ROLE_KEY>"; python backend/scripts/upload_books_to_supabase.py; Remove-Item env:SUPABASE_SERVICE_ROLE_KEY
 
    # Remove local execution log if generated
    rm -f upload_log.txt
