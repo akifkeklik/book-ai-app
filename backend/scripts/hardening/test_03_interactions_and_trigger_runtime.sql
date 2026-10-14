@@ -28,6 +28,16 @@ BEGIN
     -- auth.users stub satırlarını hazırla (foreign key kısıtı için)
     INSERT INTO auth.users (id) VALUES (v_user_1), (v_user_2) ON CONFLICT DO NOTHING;
 
+    -- public.books stub satırlarını hazırla (favorites tablosundaki book_id foreign key kısıtı için)
+    INSERT INTO public.books (isbn13, title) VALUES
+        ('BOOK_S1', 'Senaryo 1 Kitabı'),
+        ('BOOK_S2', 'Senaryo 2 Kitabı'),
+        ('BOOK_S4', 'Bitirilen Kitap'),
+        ('BOOK_S5', 'Dislike Edilen Kitap'),
+        ('BOOK_BF1', 'Backfill Kitap 1'),
+        ('BOOK_BF2', 'Backfill Kitap 2')
+    ON CONFLICT (isbn13) DO NOTHING;
+
     -- Test öncesi temiz izole veri hazırla (yalnızca test UUID'leri için)
     DELETE FROM public.favorites WHERE user_id IN (v_user_1, v_user_2);
     DELETE FROM public.user_interactions WHERE user_id IN (v_user_1, v_user_2);
@@ -188,6 +198,7 @@ BEGIN
     -- Test verilerini temizle
     DELETE FROM public.favorites WHERE user_id IN (v_user_1, v_user_2);
     DELETE FROM public.user_interactions WHERE user_id IN (v_user_1, v_user_2);
+    DELETE FROM public.books WHERE isbn13 IN ('BOOK_S1', 'BOOK_S2', 'BOOK_S4', 'BOOK_S5', 'BOOK_BF1', 'BOOK_BF2');
 
     RAISE NOTICE '=============================================================';
     RAISE NOTICE 'TÜM MODEL A SENARYOLARI (1-8) BAŞARIYLA TAMAMLANDI!';
