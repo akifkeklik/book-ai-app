@@ -25,6 +25,9 @@ BEGIN
     RAISE NOTICE 'BAŞLANGIÇ: GRUP 03 MODEL A RUNTIME DOĞRULAMA TESTLERİ';
     RAISE NOTICE '=============================================================';
 
+    -- auth.users stub satırlarını hazırla (foreign key kısıtı için)
+    INSERT INTO auth.users (id) VALUES (v_user_1), (v_user_2) ON CONFLICT DO NOTHING;
+
     -- Test öncesi temiz izole veri hazırla (yalnızca test UUID'leri için)
     DELETE FROM public.favorites WHERE user_id IN (v_user_1, v_user_2);
     DELETE FROM public.user_interactions WHERE user_id IN (v_user_1, v_user_2);
