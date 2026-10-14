@@ -15,23 +15,31 @@ def log(msg):
         f.write(str(msg) + "\n")
 
 
-def upload_to_supabase():
+def upload_to_supabase(csv_path=None):
     if os.path.exists("upload_log.txt"):
-        os.remove("upload_log.txt")
+        try:
+            os.remove("upload_log.txt")
+        except OSError:
+            pass
     log("Başladı...")
-    url: str = Config.SUPABASE_URL
-    key: str = Config.SUPABASE_ANON_KEY
-    if not url or not key:
-        log("HATA: SUPABASE_URL veya SUPABASE_ANON_KEY bulunamadı.")
-        return
+    url: str = os.getenv("SUPABASE_URL") or Config.SUPABASE_URL
+    service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
-    # Supabase isimli kütüphaneyi initialize ediyoruz
-    supabase: Client = create_client(url, key)
+    if not url:
+        log("HATA: SUPABASE_URL tanımlı değil.")
+        raise ValueError("SUPABASE_URL environment variable is required.")
 
-    data_path = Config.DATA_PATH
+    if not service_role_key:
+        log("HATA: SUPABASE_SERVICE_ROLE_KEY bulunamadı. Anonim anahtarla yükleme yapılamaz (Fail-closed).")
+        raise ValueError("SUPABASE_SERVICE_ROLE_KEY is required for administrative book catalog ingestion.")
+
+    # Ayrıcalıklı Supabase istemcisi yalnızca bu script kapsamında oluşturulur
+    supabase: Client = create_client(url, service_role_key)
+
+    data_path = csv_path or Config.DATA_PATH
     if not os.path.exists(data_path):
         log(f"HATA: {data_path} bulunamadı.")
-        return
+        raise FileNotFoundError(f"Data file not found: {data_path}")
 
     log("CSV dosyası okunuyor...")
     df = pd.read_csv(data_path)
@@ -62,9 +70,15 @@ def upload_to_supabase():
             supabase.table("books").upsert(batch).execute()
             log(f"Yüklendi: {i + len(batch)} / {total}")
         except Exception as e:
-            log(f"Hata oluştu ({i}. kayıtta): {e}")
+            # Secret sızıntısını önlemek için hata mesajından servis anahtarını maskele
+            err_msg = str(e)
+            if service_role_key and service_role_key in err_msg:
+                err_msg = err_msg.replace(service_role_key, "[REDACTED]")
+            log(f"Hata oluştu ({i}. kayıtta): {err_msg}")
+            raise
 
     log("Yükleme başarıyla tamamlandı!")
+    return total
 
 
 if __name__ == "__main__":

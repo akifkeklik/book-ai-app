@@ -99,7 +99,11 @@ class TrackUserActivityUseCase:
                 "favorite": "favorite",
                 "book_favorite": "favorite",
                 "want_to_read": "want_to_read",
+                "book_want_to_read": "want_to_read",
+                "reading": "reading",
+                "book_reading": "reading",
                 "finished": "finished",
+                "book_finished": "finished",
             }
             if (
                 action in interaction_mapping
