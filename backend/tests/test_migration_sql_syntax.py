@@ -341,6 +341,7 @@ def test_hardening_03_runtime_test_script_completeness():
     assert "SENARYO 8: Backfill sırasında okuma durumlarına dokunulmaması" in runtime_03_sql
     assert "SENARYO 9: Kayıpsız mükerrer kayıt uzlaştırması ve arşivleme" in runtime_03_sql
     assert "SENARYO 10: Like ve Dislike çelişkisinde Fail-Closed denetimi" in runtime_03_sql
+    assert "SENARYO 11: NULL veya boş book_id/user_id kayıtlarının kayıpsız arşivlenmesi" in runtime_03_sql
 
 
 def test_preflight_script_no_has_table_privilege_public():

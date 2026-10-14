@@ -318,6 +318,40 @@ BEGIN
         RAISE EXCEPTION 'SENARYO 10 BAŞARISIZ: Çelişkili durumda fail-closed devreye girmedi!';
     END IF;
 
+    -- -------------------------------------------------------------------------
+    -- SENARYO 11: NULL / Boş Kimlik (user_id/book_id) Kayıtlarının Arşivlenmesi
+    -- -------------------------------------------------------------------------
+    RAISE NOTICE '--- SENARYO 11: NULL veya boş book_id/user_id kayıtlarının kayıpsız arşivlenmesi ---';
+    -- Book ID boş olan bir test kaydı ekle
+    INSERT INTO public.user_interactions (user_id, book_id, interaction_type, created_at)
+    VALUES (v_user_3, '', 'want_to_read', NOW());
+
+    -- 03_DRAFT Bölüm 2.1 mantığını işlet
+    INSERT INTO public._archived_user_interactions_duplicate_backup (
+        user_interaction_id, user_id, book_id, interaction_type, created_at, resolution_action, full_row_snapshot
+    )
+    SELECT id, user_id, book_id, interaction_type, created_at, 'ARCHIVED_NULL_OR_EMPTY_IDENTIFIER', to_jsonb(ui.*)
+    FROM public.user_interactions ui
+    WHERE user_id IS NULL OR book_id IS NULL OR trim(book_id) = '';
+
+    DELETE FROM public.user_interactions
+    WHERE user_id IS NULL OR book_id IS NULL OR trim(book_id) = '';
+
+    -- Doğrulama 11.1: Arşivde ARCHIVED_NULL_OR_EMPTY_IDENTIFIER kaydı var mı?
+    IF NOT EXISTS (
+        SELECT 1 FROM public._archived_user_interactions_duplicate_backup 
+        WHERE user_id = v_user_3 AND resolution_action = 'ARCHIVED_NULL_OR_EMPTY_IDENTIFIER'
+    ) THEN
+        RAISE EXCEPTION 'SENARYO 11 BAŞARISIZ: Boş book_id kaydı arşive yedeklenemedi!';
+    END IF;
+
+    -- Doğrulama 11.2: user_interactions'da boş book_id kaldı mı?
+    IF EXISTS (SELECT 1 FROM public.user_interactions WHERE user_id = v_user_3 AND trim(book_id) = '') THEN
+        RAISE EXCEPTION 'SENARYO 11 BAŞARISIZ: Boş book_id kaydı user_interactions tablosundan temizlenemedi!';
+    END IF;
+
+    RAISE NOTICE 'SENARYO 11 BAŞARILI: Boş/NULL kimlikli kayıtlar güvenle arşivlendi ve tablodan temizlendi.';
+
     -- UNIQUE kısıtını tekrar tesis et
     DELETE FROM public.user_interactions WHERE user_id = v_user_3;
     ALTER TABLE public.user_interactions ADD CONSTRAINT unique_user_book_interaction UNIQUE (user_id, book_id);
@@ -328,6 +362,6 @@ BEGIN
     DELETE FROM public.books WHERE isbn13 IN ('BOOK_S1', 'BOOK_S2', 'BOOK_S4', 'BOOK_S5', 'BOOK_BF1', 'BOOK_BF2', 'BOOK_DUP1', 'BOOK_CONFLICT');
 
     RAISE NOTICE '=============================================================';
-    RAISE NOTICE 'TÜM MODEL A SENARYOLARI (1-10) BAŞARIYLA TAMAMLANDI!';
+    RAISE NOTICE 'TÜM MODEL A SENARYOLARI (1-11) BAŞARIYLA TAMAMLANDI!';
     RAISE NOTICE '=============================================================';
 END $$;
