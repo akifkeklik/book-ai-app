@@ -49,69 +49,76 @@ def backfill_embeddings(batch_size: int = 100, max_books: int = None, force_reco
     conn.autocommit = True
     cursor = conn.cursor()
 
-    cursor.execute("""
-        SELECT b.*, be.content_hash as current_hash
-        FROM books b
-        LEFT JOIN book_embeddings be ON b.isbn13 = be.book_id
-        ORDER BY b.isbn13
-    """)
-    columns = [desc[0] for desc in cursor.description]
-    books = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    try:
+        cursor.execute("""
+            SELECT b.*, be.content_hash as current_hash
+            FROM books b
+            LEFT JOIN book_embeddings be ON b.isbn13 = be.book_id
+            ORDER BY b.isbn13
+        """)
+        columns = [desc[0] for desc in cursor.description]
+        books = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-    for book in books:
-        if max_books and processed >= max_books:
-            break
+        for book in books:
+            if max_books and processed >= max_books:
+                break
 
-        book_id = book["isbn13"]
-        current_hash = book.pop("current_hash", None)
-        processed += 1
+            book_id = book["isbn13"]
+            current_hash = book.pop("current_hash", None)
+            processed += 1
 
-        canonical_text = embedding_service.generate_canonical_text(book)
-        if not canonical_text:
-            logger.warning(f"Book {book_id} has empty canonical text. Skipping.")
-            skipped += 1
-            continue
-
-        content_hash = embedding_service.generate_content_hash(canonical_text)
-
-        # Check staleness
-        if not force_recompute:
-            if current_hash == content_hash:
+            canonical_text = embedding_service.generate_canonical_text(book)
+            if not canonical_text:
+                logger.warning(f"Book {book_id} has empty canonical text. Skipping.")
                 skipped += 1
                 continue
 
-        logger.info(f"Generating embedding for book {book_id}...")
-        embedding = embedding_service.generate_embedding(canonical_text)
+            content_hash = embedding_service.generate_content_hash(canonical_text)
 
-        if embedding:
-            try:
-                embedding_str = "[" + ",".join(map(str, embedding)) + "]"
-                cursor.execute("""
-                    INSERT INTO book_embeddings (book_id, embedding, content_hash, model_version)
-                    VALUES (%s, %s, %s, %s)
-                    ON CONFLICT (book_id) DO UPDATE SET
-                        embedding = EXCLUDED.embedding,
-                        content_hash = EXCLUDED.content_hash,
-                        model_version = EXCLUDED.model_version
-                """, (book_id, embedding_str, content_hash, embedding_service._model))
-                success = True
-            except Exception as e:
-                logger.error(f"Error upserting embedding directly: {e}")
-                success = False
+            # Check staleness
+            if not force_recompute:
+                if current_hash == content_hash:
+                    skipped += 1
+                    continue
 
-            if success:
-                generated += 1
-                consecutive_failures = 0
+            logger.info(f"Generating embedding for book {book_id}...")
+            embedding = embedding_service.generate_embedding(canonical_text)
+
+            if embedding:
+                try:
+                    embedding_str = "[" + ",".join(map(str, embedding)) + "]"
+                    cursor.execute("""
+                        INSERT INTO book_embeddings (book_id, embedding, content_hash, model_version)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (book_id) DO UPDATE SET
+                            embedding = EXCLUDED.embedding,
+                            content_hash = EXCLUDED.content_hash,
+                            model_version = EXCLUDED.model_version
+                    """, (book_id, embedding_str, content_hash, embedding_service._model))
+                    success = True
+                except Exception as e:
+                    logger.error(f"Error upserting embedding directly: {e}")
+                    success = False
+
+                if success:
+                    generated += 1
+                    consecutive_failures = 0
+                else:
+                    logger.error(f"Failed to save embedding for {book_id}")
             else:
-                logger.error(f"Failed to save embedding for {book_id}")
-        else:
-            consecutive_failures += 1
-            logger.error(f"Failed to generate embedding for {book_id}")
-            if consecutive_failures >= 3:
-                logger.error("Too many consecutive failures. Aborting backfill due to possible quota limits.")
-                sys.exit(1)
+                consecutive_failures += 1
+                logger.error(f"Failed to generate embedding for {book_id}")
+                if consecutive_failures >= 3:
+                    logger.error("Too many consecutive failures. Aborting backfill due to possible quota limits.")
+                    break
 
-    logger.info(f"Backfill complete! Processed: {processed}, Generated: {generated}, Skipped: {skipped}")
+        logger.info(f"Backfill complete! Processed: {processed}, Generated: {generated}, Skipped: {skipped}")
+    finally:
+        cursor.close()
+        conn.close()
+
+    if consecutive_failures >= 3:
+        sys.exit(1)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Backfill book embeddings.")

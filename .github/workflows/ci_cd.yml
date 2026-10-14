@@ -46,10 +46,46 @@ jobs:
         run: |
           echo "Applying CI Stubs..."
           psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/ci_stubs.sql"
-          for sql in $(ls backend/scripts/*.sql | sort); do
+          for sql in $(ls backend/scripts/[0-9][0-9]_*.sql | sort); do
             echo "Applying $sql..."
             psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "$sql"
           done
+
+      - name: Validate Hardening Scripts (Forward & Rollback)
+        env:
+          PGPASSWORD: postgrespassword
+        run: |
+          echo "Setting up Supabase Roles for Hardening Testing..."
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -c "
+            DO \$\$ BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon; END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated; END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role; END IF;
+            END \$\$;
+          "
+          echo "Testing 01_DRAFT Forward & Rollback..."
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/01_DRAFT_revoke_dangerous_privileges.sql"
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/01_DRAFT_revoke_dangerous_privileges_rollback.sql"
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/01_DRAFT_revoke_dangerous_privileges.sql"
+
+          echo "Testing 02_DRAFT User Profiles Forward Reconcile Migration..."
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/02_DRAFT_reconcile_user_profiles.sql"
+
+          echo "Testing 02_DRAFT User Profiles Rollback Runtime 10 Scenarios..."
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/test_02_user_profiles_rollback_runtime.sql"
+
+          echo "Testing 03_DRAFT Model A Interactions & Trigger Forward Migration..."
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/03_DRAFT_reconcile_interactions_and_trigger.sql"
+
+          echo "Testing 03_DRAFT Model A Runtime Verification (8 Scenarios)..."
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/test_03_interactions_and_trigger_runtime.sql"
+
+          echo "Testing 03_DRAFT Model A Rollback & Re-Forward..."
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/03_DRAFT_reconcile_interactions_and_trigger_rollback.sql"
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/03_DRAFT_reconcile_interactions_and_trigger.sql"
+
+          echo "Testing 04_DRAFT Catalog Lifecycle (Baseline -> Forward -> Verify -> DepCheck -> Rollback -> VerifyBaseline -> Forward -> Re-Verify)..."
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/test_04_vector_rpc_catalog_lifecycle.sql"
 
   #   Backend CI (Python/Flask) 
   backend-ci:
@@ -146,7 +182,7 @@ jobs:
         run: |
           echo "Applying CI Stubs..."
           psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/ci_stubs.sql"
-          for sql in $(ls backend/scripts/*.sql | sort); do
+          for sql in $(ls backend/scripts/[0-9][0-9]_*.sql | sort); do
             echo "Applying $sql..."
             psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "$sql"
           done

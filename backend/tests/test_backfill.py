@@ -51,3 +51,48 @@ def test_backfill_loop(mock_embedding_service, mock_config, mock_create_client):
     mock_service_instance.generate_embedding.assert_called_once_with("text2")
     # cursor.execute should be called for SELECT and then INSERT/UPDATE for book2
     assert mock_cursor.execute.call_count == 2
+    # Ensure resources are closed cleanly
+    mock_cursor.close.assert_called_once()
+    mock_conn.close.assert_called_once()
+
+
+@patch.dict(sys.modules, {"psycopg2": MagicMock()})
+@patch("backend.scripts.backfill_embeddings.create_client")
+@patch("backend.scripts.backfill_embeddings.Config")
+@patch("backend.scripts.backfill_embeddings.EmbeddingService")
+def test_backfill_closes_resources_on_failure(mock_embedding_service, mock_config, mock_create_client):
+    """Verify that cursor and connection are closed even when aborting due to failures."""
+    import pytest
+
+    mock_psycopg2 = sys.modules["psycopg2"]
+    mock_config.SUPABASE_URL = "https://test.supabase.co"
+    mock_config.SUPABASE_ANON_KEY = "dummy.header.payload"
+
+    import os
+    os.environ["SUPABASE_DB_URL"] = "postgres://test"
+
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_psycopg2.connect.return_value = mock_conn
+    mock_conn.cursor.return_value = mock_cursor
+
+    mock_cursor.description = [("isbn13",), ("title",), ("current_hash",)]
+    mock_cursor.fetchall.return_value = [
+        ("book1", "Title 1", None),
+        ("book2", "Title 2", None),
+        ("book3", "Title 3", None),
+    ]
+
+    mock_service_instance = MagicMock()
+    mock_embedding_service.return_value = mock_service_instance
+    mock_service_instance.is_configured.return_value = True
+    mock_service_instance.generate_canonical_text.return_value = "valid text"
+    mock_service_instance.generate_content_hash.return_value = "hash-x"
+    # Cause 3 consecutive failures to trigger abort
+    mock_service_instance.generate_embedding.return_value = None
+
+    with pytest.raises(SystemExit):
+        backfill_embeddings(max_books=3)
+
+    mock_cursor.close.assert_called_once()
+    mock_conn.close.assert_called_once()
