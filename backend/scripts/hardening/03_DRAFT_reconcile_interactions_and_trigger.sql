@@ -76,6 +76,9 @@ WHERE user_id IS NULL OR book_id IS NULL OR trim(book_id) = '';
 DELETE FROM public.user_interactions
 WHERE user_id IS NULL OR book_id IS NULL OR trim(book_id) = '';
 
+-- 2.1.1. Uzlaştırma sırasında eski trigger'ın çakışmasını önlemek için kaldır
+DROP TRIGGER IF EXISTS trg_sync_favorites ON public.favorites;
+
 -- 2.2. Mükerrer kayıtların deterministik ve kayıpsız uzlaştırılması
 DO $$
 DECLARE

@@ -203,7 +203,8 @@ BEGIN
     -- SENARYO 9: KAYIPSIZ MÜKERRER KAYIT UZLAŞTIRMASI ('finished' + 'favorite')
     -- -------------------------------------------------------------------------
     RAISE NOTICE '--- SENARYO 9: Kayıpsız mükerrer kayıt uzlaştırması ve arşivleme ---';
-    -- Geçici olarak UNIQUE kısıtını kaldır ve v_user_3 için iki çelişkili satır ekle
+    -- Geçici olarak trigger'ı ve UNIQUE kısıtını kaldırarak v_user_3 için iki çelişkili satır ekle
+    ALTER TABLE public.favorites DISABLE TRIGGER trg_sync_favorites;
     ALTER TABLE public.user_interactions DROP CONSTRAINT IF EXISTS unique_user_book_interaction;
 
     INSERT INTO public.user_interactions (user_id, book_id, interaction_type, created_at)
@@ -352,9 +353,10 @@ BEGIN
 
     RAISE NOTICE 'SENARYO 11 BAŞARILI: Boş/NULL kimlikli kayıtlar güvenle arşivlendi ve tablodan temizlendi.';
 
-    -- UNIQUE kısıtını tekrar tesis et
+    -- UNIQUE kısıtını ve trigger'ı tekrar tesis et
     DELETE FROM public.user_interactions WHERE user_id = v_user_3;
     ALTER TABLE public.user_interactions ADD CONSTRAINT unique_user_book_interaction UNIQUE (user_id, book_id);
+    ALTER TABLE public.favorites ENABLE TRIGGER trg_sync_favorites;
 
     -- Test verilerini temizle
     DELETE FROM public.favorites WHERE user_id IN (v_user_1, v_user_2, v_user_3);
