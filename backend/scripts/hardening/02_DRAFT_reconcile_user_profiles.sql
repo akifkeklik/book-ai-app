@@ -52,18 +52,26 @@ END $$;
 -- Auth sisteminden silindiğinde PostgreSQL foreign key kısıt hatası (RESTRICT) verir ve kullanıcı silinemez.
 DO $$
 BEGIN
+    -- user_id kolonu yoksa ekle (Canlı Supabase uyumluluğu)
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_schema = 'public' AND table_name = 'user_profiles' AND column_name = 'user_id'
     ) THEN
         ALTER TABLE public.user_profiles ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
     END IF;
-END $$;
 
--- Mevcut 'id' değerlerini 'user_id'ye doldur (Backfill)
-UPDATE public.user_profiles 
-SET user_id = id 
-WHERE user_id IS NULL AND id IS NOT NULL;
+    -- id kolonu yoksa ekle (CI ve dual-column aşamalı uyumluluk güvencesi)
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'user_profiles' AND column_name = 'id'
+    ) THEN
+        ALTER TABLE public.user_profiles ADD COLUMN id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+    END IF;
+
+    -- Mevcut kayıtlar için karşılıklı backfill (id -> user_id ve user_id -> id)
+    EXECUTE 'UPDATE public.user_profiles SET user_id = id WHERE user_id IS NULL AND id IS NOT NULL';
+    EXECUTE 'UPDATE public.user_profiles SET id = user_id WHERE id IS NULL AND user_id IS NOT NULL';
+END $$;
 
 -- Flutter ve Flask upsert ('on_conflict=user_id') işlemleri için UNIQUE kısıtı/indeksi
 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_profiles_user_id ON public.user_profiles(user_id);
