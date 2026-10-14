@@ -68,6 +68,24 @@ ALTER TABLE public.user_interactions
 ADD CONSTRAINT user_interactions_interaction_type_check 
 CHECK (interaction_type IN ('like', 'dislike', 'want_to_read', 'reading', 'finished', 'favorite'));
 
+-- 3.1. FORWARD-RECOVERY: Önceki bir rollback arşivinden 'favorite' ve 'reading' kayıtlarını geri yükle
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = '_archived_user_interactions_rollback_backup'
+    ) THEN
+        UPDATE public.user_interactions ui
+        SET interaction_type = (arch.user_interaction_snapshot->>'interaction_type')::text
+        FROM public._archived_user_interactions_rollback_backup arch
+        WHERE ui.user_id = (arch.user_interaction_snapshot->>'user_id')::uuid
+          AND ui.book_id = (arch.user_interaction_snapshot->>'book_id')::text
+          AND (arch.user_interaction_snapshot->>'interaction_type') IN ('favorite', 'reading');
+
+        RAISE NOTICE 'Forward-Recovery: Rollback arşivinden orijinal favorite/reading durumları başarıyla geri yüklendi.';
+    END IF;
+END $$;
+
 -- 4. MODEL A KORUYUCU SENKRONİZASYON TRIGGER FONKSİYONU
 CREATE OR REPLACE FUNCTION public.sync_favorites_to_interactions()
 RETURNS trigger
