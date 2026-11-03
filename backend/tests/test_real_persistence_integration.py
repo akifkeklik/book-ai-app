@@ -1,6 +1,6 @@
 """
 Deterministic Integration Tests for Real Persistence Boundaries (Workstream B & C).
-Executes against an isolated, disposable local PostgreSQL cluster powered by pgserver.
+Executes against an isolated, disposable PostgreSQL database on the CI service.
 Tests all 8 Workstream B backend invariants and all 8 Workstream C cross-client consistency scenarios.
 """
 
