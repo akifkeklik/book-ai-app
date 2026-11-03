@@ -11,7 +11,6 @@ from uuid import uuid4
 
 import psycopg2
 import pytest
-
 from backend.app import create_app
 from backend.config import Config
 from backend.container import Container
