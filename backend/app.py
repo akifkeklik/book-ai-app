@@ -25,6 +25,15 @@ def create_app(config_class=Config) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    configured_origins = app.config.get("ALLOWED_ORIGINS") or []
+    if isinstance(configured_origins, str):
+        configured_origins = configured_origins.split(",")
+    allowed_origins = [
+        origin.strip().rstrip("/")
+        for origin in configured_origins
+        if isinstance(origin, str) and origin.strip()
+    ]
+
     # ── Production Security Validation ────────────────────────────────────────
     import sys
     is_pytest = "pytest" in sys.modules or bool(os.getenv("PYTEST_CURRENT_TEST"))
@@ -53,6 +62,13 @@ def create_app(config_class=Config) -> Flask:
                 "Critical Security Misconfiguration: LIBRIS_API_KEY environment variable must be set "
                 "to a secure random string when running in production mode."
             )
+        if not allowed_origins or "*" in allowed_origins:
+            raise ValueError(
+                "Critical Security Misconfiguration: ALLOWED_ORIGINS must contain explicit trusted "
+                "origins in production; wildcard origins are not permitted."
+            )
+
+    app.config["ALLOWED_ORIGINS"] = allowed_origins
 
     # ── Reverse Proxy Middleware ──────────────────────────────────────────────
     num_proxies = int(app.config.get("NUM_PROXIES", 0))
@@ -72,7 +88,7 @@ def create_app(config_class=Config) -> Flask:
     # Allow Flutter Web / browsers to send API key, auth token, and request tracing headers.
     CORS(
         app,
-        origins=config_class.ALLOWED_ORIGINS,
+        origins=allowed_origins,
         supports_credentials=True,
         allow_headers=["Content-Type", "X-Api-Key", "Authorization", "X-Request-Id"],
     )
