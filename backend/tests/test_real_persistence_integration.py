@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 import psycopg2
-from psycopg2 import extras, sql
 import pytest
 
 from backend.app import create_app
@@ -21,6 +20,7 @@ from backend.infrastructure.persistence.postgres_adapters import (
     PostgresInteractionRepository,
 )
 from backend.routes.routes import rebind_container
+from psycopg2 import extras, sql
 
 
 
@@ -272,7 +272,7 @@ def test_b3_reading_statuses_remain_distinct_from_favorites(real_pg_uri: str):
     ])
 
     conn = psycopg2.connect(real_pg_uri)
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+    with conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
         cur.execute("SELECT book_id FROM public.favorites WHERE user_id = %s;", (user_id,))
         fav_rows = [r["book_id"] for r in cur.fetchall()]
         assert book_fav in fav_rows
