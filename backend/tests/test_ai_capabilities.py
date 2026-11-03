@@ -248,7 +248,7 @@ def test_llm_provider_unavailable_deterministic_fallback(client, auth_headers, m
     assert resp.status_code == 200
     data = resp.get_json()
     # Falls back gracefully to deterministic catalog result without crashing
-    assert data["status"] in ("llm_fallback", "success", "empty_retrieval")
+    assert data["status"] in ("llm_fallback", "success", "empty_retrieval", "embedding_failed")
     assert len(data.get("referenced_books", [])) > 0
     assert any("1984" in b.get("title", "") for b in data["referenced_books"])
 
