@@ -119,6 +119,23 @@ def real_pg_uri():
                 created_at TIMESTAMPTZ DEFAULT now()
             );
         """)
+        # Test users are synthetic text IDs in this fixture. The production
+        # migration defines UUID-backed auth IDs and is checked separately.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS public.user_notes (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id TEXT NOT NULL,
+                book_id TEXT NOT NULL,
+                note_type TEXT NOT NULL CHECK (note_type IN ('personal_note', 'key_takeaway', 'question')),
+                content TEXT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now()
+            );
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_test_user_notes_user_created
+            ON public.user_notes(user_id, created_at DESC);
+        """)
         # Seed test catalog
         cur.execute("""
             INSERT INTO public.books (isbn13, title, authors, thumbnail, average_rating) VALUES
