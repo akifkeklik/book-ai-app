@@ -68,8 +68,8 @@ Libris is built upon four non-negotiable engineering principles:
    Personal shelves (`want_to_read`, `reading`, `finished`) and `favorites` operate with strict lifecycle independence. Changing a reading status never mutates, overwrites, or inadvertently destroys a user's favorite record.
 2. **Causal Attribution & Grounding Truth:**
    Recommendations and AI answers are never hallucinated or falsely attributed. Grounding badges (`✓ Catalog Verified`) are rendered strictly when actual verified catalog evidence was retrieved; ungrounded fallback states are honestly surfaced to the reader.
-3. **Zero-Overflow Responsive Discipline:**
-   Every interface across Web and Mobile is designed with elastic constraints, aiming for robust layouts, graceful text handling, and accessibility across supported screen sizes. Visual QA currently captures selected routes at 390px and 1280px; it is not an exhaustive 320px–1440px overflow proof.
+3. **Responsive Design Discipline:**
+   Interfaces use adaptive layout constraints and text handling. Visual QA currently captures selected routes at 390px and 1280px; this is a targeted smoke check, not an exhaustive 320px–1440px overflow proof.
 4. **Isolated & Reproducible Verification:**
    All test suites run deterministically in isolated environments without mandatory external cloud connections, using embedded PostgreSQL (`pgserver`), in-memory repositories, and mock authorization adapters.
 
@@ -99,7 +99,7 @@ Libris is built upon four non-negotiable engineering principles:
 - Real-time milestone progress tracking, status transitions, and drag-and-drop book reordering.
 
 ### 5. Spaced Repetition Smart Reviews
-- Leitner / SuperMemo (SM-2)-inspired active recall flashcards derived directly from reader highlights and notes.
+- Leitner-inspired active recall reviews derived from reader highlights and notes, using deterministic review stages and fixed intervals (1, 3, 7, and 30 days). This is not a SuperMemo SM-2 implementation.
 - Categorized note types: `personal_note`, `key_takeaway`, and `question`.
 - Clean Markdown export with guaranteed preservation of Turkish and multi-byte UTF-8 characters.
 
@@ -123,7 +123,7 @@ Libris is built upon four non-negotiable engineering principles:
 ```mermaid
 flowchart TD
     subgraph Clients["Presentation Layer"]
-        Mobile["Flutter 3.24 Mobile App<br/>(iOS / Android / PWA)<br/>• Provider State • Hive Outbox • GoRouter"]
+        Mobile["Flutter 3.24 Mobile App<br/>(iOS / Android)<br/>• Provider State • Hive Outbox • GoRouter"]
         Web["Next.js 16 Web App<br/>(React 19 / Turbopack)<br/>• Server Actions • SSE Client • CSS Tokens"]
     end
 
@@ -241,7 +241,7 @@ The mobile application is crafted with Flutter 3.24, targeting Android, iOS, and
 The web frontend is engineered with Next.js 16, React 19, and TypeScript, utilizing Turbopack for near-instant compilation and Server Actions for mutation workflows.
 
 ### Highlights:
-- **Zero ESLint Warnings:** Strict React Hook concurrency compliance (`useCallback`, `useTransition`, `useMemo`) with zero exhaustive-deps violations.
+- **Linting:** The Batch 3 report recorded a clean ESLint run. Re-run lint on the target commit before release; a clean lint result does not replace runtime or accessibility testing.
 - **Streaming SSE Client:** Robust reader in `web/src/lib/ai_stream.ts` handling network frame fragmentation, multi-byte UTF-8 sequences, and client cancellation.
 - **Server/Client Boundary Security:** Upstream credentials (`LIBRIS_API_KEY`) reside exclusively in server runtime and are never leaked to browser bundles.
 - **Design System:** Six palettes and Dark/Light themes with dedicated skeleton loaders; formal contrast compliance should be verified with automated and manual accessibility checks.
@@ -504,7 +504,7 @@ Automated verification is governed by GitHub Actions (`.github/workflows/ci_cd.y
 4. **`frontend-ci`:** Runs `flutter analyze --no-fatal-infos` and `flutter test` across all mobile modules.
 5. **`backend-integration-ci`:** Executes real persistence integration tests against PostgreSQL service containers.
 6. **`web-ci`:** Runs `npm run lint`, `npm test`, and `npm run build` with Turbopack.
-7. **`visual-qa-ci`:** Validates responsive rendering and screenshot matrix across device viewports.
+7. **`visual-qa-ci`:** Runs a targeted screenshot/DOM smoke check for configured routes and viewports. It does not prove universal responsive correctness or automatically detect every overflow.
 
 ---
 
