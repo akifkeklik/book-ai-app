@@ -6,20 +6,13 @@ Tests all 8 Workstream B backend invariants and all 8 Workstream C cross-client 
 
 import json
 import os
-import tempfile
-from pathlib import Path
-from typing import Generator
+from urllib.parse import urlparse
+from uuid import uuid4
 
 import psycopg2
 import pytest
+from psycopg2 import sql
 from psycopg2.extras import RealDictCursor
-
-# Ensure C locale for Windows PostgreSQL initdb
-os.environ["LC_ALL"] = "C"
-os.environ["LANG"] = "C"
-
-import pgserver
-import pgserver._commands
 from backend.app import create_app
 from backend.config import Config
 from backend.container import Container
@@ -40,19 +33,30 @@ class RealPgTestConfig(Config):
 
 
 @pytest.fixture(scope="module")
-def real_pg_uri() -> Generator[str, None, None]:
-    """Boots an ephemeral local PostgreSQL cluster with canonical Model A schema."""
-    tmp_dir = Path(tempfile.mkdtemp(prefix="pg_integ_libris_"))
-    pgserver._commands.initdb(
-        ["--locale=C", "--auth=trust", "--auth-local=trust", "--encoding=utf8", "-U", "postgres"],
-        pgdata=tmp_dir,
-    )
-    srv = pgserver.PostgresServer(tmp_dir)
-    uri = srv.get_uri()
+def real_pg_uri():
+    """Creates an isolated disposable database on the CI PostgreSQL service."""
+    base_uri = os.getenv("LIBRIS_TEST_DATABASE_URL")
+    if not base_uri:
+        pytest.skip("Set LIBRIS_TEST_DATABASE_URL to run real-persistence integration tests")
 
-    conn = psycopg2.connect(uri)
-    conn.autocommit = True
-    with conn.cursor() as cur:
+    database_name = f"libris_integration_{uuid4().hex[:12]}"
+    admin_connection = psycopg2.connect(base_uri)
+    admin_connection.autocommit = True
+
+    try:
+        with admin_connection.cursor() as cursor:
+            cursor.execute(
+                sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name))
+            )
+    finally:
+        admin_connection.close()
+
+    parsed_uri = urlparse(base_uri)
+    uri = parsed_uri._replace(path=f"/{database_name}").geturl()
+
+    connection = psycopg2.connect(uri)
+    connection.autocommit = True
+    with connection.cursor() as cur:
         cur.execute("CREATE SCHEMA IF NOT EXISTS auth;")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS auth.users (
@@ -121,15 +125,24 @@ def real_pg_uri() -> Generator[str, None, None]:
             ('9780547928227', 'The Hobbit', 'J.R.R. Tolkien', 'https://example.com/hobbit.jpg', 4.7)
             ON CONFLICT (isbn13) DO NOTHING;
         """)
-    conn.close()
+    connection.close()
 
     yield uri
 
+    cleanup_connection = psycopg2.connect(base_uri)
+    cleanup_connection.autocommit = True
     try:
-        srv.cleanup()
-    except Exception:
-        pass
-
+        with cleanup_connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = %s AND pid <> pg_backend_pid()",
+                (database_name,),
+            )
+            cursor.execute(
+                sql.SQL("DROP DATABASE IF EXISTS {}").format(sql.Identifier(database_name))
+            )
+    finally:
+        cleanup_connection.close()
 
 @pytest.fixture
 def pg_repo(real_pg_uri: str) -> PostgresInteractionRepository:
