@@ -214,14 +214,22 @@ test('Knowledge Graph i18n: all keys exist in EN, TR, and DE dictionaries', () =
 
 
 test('KnowledgeGraph: selectedNode state resolution preserves selected node across graph refreshes or resets gracefully', () => {
-  const resolveSelectedNode = <T extends { id: string }>(prev: T | null, freshNodes: T[]): T | null => {
+  type GraphTestNode = {
+    id: string;
+    label: string;
+    type: 'book' | 'concept';
+    degree: number;
+    data: Record<string, unknown>;
+  };
+
+  const resolveSelectedNode = (prev: GraphTestNode | null, freshNodes: GraphTestNode[]): GraphTestNode | null => {
     if (!prev) return null;
     return freshNodes.find((n) => n.id === prev.id) || null;
   };
 
-  const nodeA = { id: 'node-a', label: 'Node A', type: 'book' as const, degree: 2, data: {} };
-  const nodeB = { id: 'node-b', label: 'Node B', type: 'concept' as const, degree: 1, data: {} };
-  const nodeAUpdated = { id: 'node-a', label: 'Node A Updated', type: 'book' as const, degree: 5, data: {} };
+  const nodeA: GraphTestNode = { id: 'node-a', label: 'Node A', type: 'book', degree: 2, data: {} };
+  const nodeB: GraphTestNode = { id: 'node-b', label: 'Node B', type: 'concept', degree: 1, data: {} };
+  const nodeAUpdated: GraphTestNode = { id: 'node-a', label: 'Node A Updated', type: 'book', degree: 5, data: {} };
 
   // 1. When no node selected, remains null
   assert.equal(resolveSelectedNode(null, [nodeA, nodeB]), null);
