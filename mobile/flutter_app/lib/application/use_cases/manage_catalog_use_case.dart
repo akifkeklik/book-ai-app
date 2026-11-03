@@ -55,4 +55,12 @@ class ManageCatalogUseCase {
   List<Book> getCachedPopularBooks() {
     return _repository.getCachedPopularBooks();
   }
+
+  List<Book> getCachedCategoryBooks(String category) {
+    return _repository.getCachedCategoryBooks(category);
+  }
+
+  void saveCategoryBooksToCache(String category, List<Book> books, {int? total, int? totalPages}) {
+    _repository.saveCategoryBooksToCache(category, books, total: total, totalPages: totalPages);
+  }
 }

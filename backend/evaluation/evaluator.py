@@ -15,10 +15,13 @@ from .dataset import EvaluationUser
 from .metrics import (
     catalog_coverage,
     dislike_suppression_rate,
+    disliked_violation_rate,
+    duplicate_result_rate,
     intra_list_diversity,
     ndcg_at_k,
     precision_at_k,
     recall_at_k,
+    seed_leakage_rate,
 )
 
 
@@ -38,6 +41,10 @@ class EvaluationReport:
     diversity_ild_at_10: float
     catalog_coverage: float
     dislike_suppression_rate: float
+    disliked_violation_rate_at_10: float
+    duplicate_result_rate_at_10: float
+    seed_leakage_rate_at_10: float
+    fallback_frequency: float
     category_alignment_at_5: float
     category_alignment_at_10: float
     per_user_results: List[Dict[str, Any]] = field(default_factory=list)
@@ -56,6 +63,10 @@ class EvaluationReport:
             "diversity_ild@10": round(self.diversity_ild_at_10, 4),
             "catalog_coverage": round(self.catalog_coverage, 4),
             "dislike_suppression_rate": round(self.dislike_suppression_rate, 4),
+            "disliked_violation_rate@10": round(self.disliked_violation_rate_at_10, 4),
+            "duplicate_result_rate@10": round(self.duplicate_result_rate_at_10, 4),
+            "seed_leakage_rate@10": round(self.seed_leakage_rate_at_10, 4),
+            "fallback_frequency": round(self.fallback_frequency, 4),
             "category_alignment@5": round(self.category_alignment_at_5, 4),
             "category_alignment@10": round(self.category_alignment_at_10, 4),
         }
@@ -78,6 +89,10 @@ def evaluate_cohort(
     ndcg5_list, ndcg10_list = [], []
     ild5_list, ild10_list = [], []
     suppression_list = []
+    violation_list = []
+    dup_rate_list = []
+    leakage_list = []
+    fallback_count = 0
     cat_align5_list, cat_align10_list = [], []
 
     all_recommended_isbns: Set[str] = set()
@@ -85,6 +100,11 @@ def evaluate_cohort(
     per_user_results = []
 
     for user in cohort:
+        # Prepare all input seeds for leakage tracking
+        user_input_seeds = set(user.seed_likes).union(set(user.seed_favorites))
+        for rh in user.reading_history:
+            user_input_seeds.add(rh.get("book_id", ""))
+
         # Prepare inputs
         if use_case and mock_repo:
             # Seed mock_repo with this user's interactions and profile
@@ -93,6 +113,8 @@ def evaluate_cohort(
                 interactions.append({"book_id": b, "interaction_type": "like"})
             for b in user.seed_favorites:
                 interactions.append({"book_id": b, "interaction_type": "favorite"})
+            for rh in user.reading_history:
+                interactions.append({"book_id": rh["book_id"], "interaction_type": rh.get("status", "reading")})
             for b in user.dislikes:
                 interactions.append({"book_id": b, "interaction_type": "dislike"})
 
@@ -106,7 +128,7 @@ def evaluate_cohort(
             recs_data = use_case.execute(user.user_id, limit=10)
         else:
             # Direct recommender call
-            seeds = list(user.seed_likes) + list(user.seed_favorites)
+            seeds = list(user_input_seeds)
             recs_data = recommender.recommend(
                 seed_titles=seeds,
                 top_n=10,
@@ -127,6 +149,12 @@ def evaluate_cohort(
             else:
                 rec_indices.append(None)
 
+        # Check for fallback usage
+        is_fallback = False
+        if any("trending" in str(r.get("recommendation_reason", "")).lower() for r in recs_data):
+            is_fallback = True
+            fallback_count += 1
+
         # Metrics for users with holdout ground truth
         if user.holdout_ground_truth:
             p5 = precision_at_k(recommended_isbns, user.holdout_ground_truth, k=5)
@@ -143,9 +171,17 @@ def evaluate_cohort(
             ndcg5_list.append(ndcg5)
             ndcg10_list.append(ndcg10)
 
-        # Dislike suppression rate
+        # Dislike suppression and violation rates
         suppression = dislike_suppression_rate(recommended_isbns, set(user.dislikes), k=10)
         suppression_list.append(suppression)
+        violation = disliked_violation_rate(recommended_isbns, set(user.dislikes), k=10)
+        violation_list.append(violation)
+
+        # Duplicate rate and seed leakage rate
+        dup_rate = duplicate_result_rate(recommended_isbns, k=10)
+        dup_rate_list.append(dup_rate)
+        leakage = seed_leakage_rate(recommended_isbns, user_input_seeds, k=10)
+        leakage_list.append(leakage)
 
         # Intra-list diversity
         tfidf_mat = getattr(recommender, "tfidf_matrix", None)
@@ -173,11 +209,15 @@ def evaluate_cohort(
                 "persona": user.persona_name,
                 "recommended_count": len(recommended_isbns),
                 "dislike_suppression": suppression,
+                "duplicate_rate": dup_rate,
+                "seed_leakage": leakage,
+                "is_fallback": is_fallback,
                 "ild@10": round(ild10, 4),
             }
         )
 
     coverage = catalog_coverage(all_recommended_isbns, total_catalog_size)
+    num_cohort = len(cohort) if cohort else 1
 
     return EvaluationReport(
         model_name=model_name,
@@ -192,6 +232,10 @@ def evaluate_cohort(
         diversity_ild_at_10=float(np.mean(ild10_list)) if ild10_list else 0.0,
         catalog_coverage=coverage,
         dislike_suppression_rate=float(np.mean(suppression_list)) if suppression_list else 1.0,
+        disliked_violation_rate_at_10=float(np.mean(violation_list)) if violation_list else 0.0,
+        duplicate_result_rate_at_10=float(np.mean(dup_rate_list)) if dup_rate_list else 0.0,
+        seed_leakage_rate_at_10=float(np.mean(leakage_list)) if leakage_list else 0.0,
+        fallback_frequency=float(fallback_count) / float(num_cohort),
         category_alignment_at_5=float(np.mean(cat_align5_list)) if cat_align5_list else 0.0,
         category_alignment_at_10=float(np.mean(cat_align10_list)) if cat_align10_list else 0.0,
         per_user_results=per_user_results,

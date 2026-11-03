@@ -5,6 +5,16 @@ __pycache__/
 venv/
 .venv/
 .env
+.env.*
+*.env
+backend/.env
+backend/.env.*
+web/.env.local
+web/.env.*.local
+!.env.example
+!backend/env.example
+!backend/.env.example
+!web/.env.example
 
 # Models / Data
 backend/saved_model/*.pkl
@@ -28,3 +38,8 @@ checks.json
 ci_logs.txt
 ruff.zip
 ruff_bin/
+.logs/
+.libris_pids.json
+scratch/
+artifacts/
+emulator_*.png

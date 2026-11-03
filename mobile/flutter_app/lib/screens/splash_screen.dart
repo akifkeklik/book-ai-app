@@ -48,7 +48,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     
     // Routing logic
     if (mounted) {
-      context.go('/');
+      try {
+        GoRouter.maybeOf(context)?.go('/');
+      } catch (_) {}
     }
   }
 

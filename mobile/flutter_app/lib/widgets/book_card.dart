@@ -64,16 +64,218 @@ class NetworkCoverWithFallback extends StatelessWidget {
 }
 
 class BookCard extends StatelessWidget {
-  const BookCard({super.key, required this.book});
+  const BookCard({
+    super.key,
+    required this.book,
+    this.heroTag,
+    this.width = 150,
+    this.margin,
+  });
   final Book book;
+  final Object? heroTag;
+  final double? width;
+  final EdgeInsetsGeometry? margin;
 
   String get _detailRouteIsbn =>
       book.isbn13.trim().isEmpty ? '_' : book.isbn13.trim();
+
+  static String localizeReason(BuildContext context, String reason) {
+    final lower = reason.toLowerCase().trim();
+    if (lower.contains('trending on libris')) {
+      return context.tr('trending_on_libris');
+    }
+    if (lower.contains('personalized taste') ||
+        lower.contains('based on your taste') ||
+        lower.contains('curated based on your taste profile')) {
+      return context.tr('based_on_your_taste');
+    }
+    // Pattern: Recommended for learning path 'Title'
+    final pathMatch = RegExp(r"(?:for learning path|for your learning path)\s*'([^']+)'", caseSensitive: false).firstMatch(reason);
+    if (pathMatch != null) {
+      return context.tr('reason_learning_path', args: {'title': pathMatch.group(1)!});
+    }
+    // Pattern: Deepens takeaways from 'Title'
+    final takeawayMatch = RegExp(r"deepens (?:takeaways|topics) from (?:your key takeaways on )?'([^']+)'", caseSensitive: false).firstMatch(reason);
+    if (takeawayMatch != null) {
+      return context.tr('reason_takeaway', args: {'title': takeawayMatch.group(1)!});
+    }
+    // Pattern: Because you liked 'Title'
+    final likeMatch = RegExp(r"because you liked '([^']+)'", caseSensitive: false).firstMatch(reason);
+    if (likeMatch != null) {
+      return context.tr('reason_because_you_liked', args: {'title': likeMatch.group(1)!});
+    }
+    // Pattern: Because you read 'Title'
+    final readMatch = RegExp(r"because you read '([^']+)'", caseSensitive: false).firstMatch(reason);
+    if (readMatch != null) {
+      return context.tr('reason_because_you_read', args: {'title': readMatch.group(1)!});
+    }
+    // Pattern: Because you're reading 'Title'
+    final readingMatch = RegExp(r"because you're reading '([^']+)'", caseSensitive: false).firstMatch(reason);
+    if (readingMatch != null) {
+      return context.tr('reason_currently_reading', args: {'title': readingMatch.group(1)!});
+    }
+    // Pattern: Because you favorited 'Title'
+    final favMatch = RegExp(r"because you favorited '([^']+)'", caseSensitive: false).firstMatch(reason);
+    if (favMatch != null) {
+      return context.tr('reason_favorited', args: {'title': favMatch.group(1)!});
+    }
+    // Pattern: From your reading list: 'Title'
+    final listMatch = RegExp(r"from your reading list:\s*'([^']+)'", caseSensitive: false).firstMatch(reason);
+    if (listMatch != null) {
+      return context.tr('reason_from_reading_list', args: {'title': listMatch.group(1)!});
+    }
+    // Pattern: Similar to 'Title'
+    final simMatch = RegExp(r"similar to '([^']+)'", caseSensitive: false).firstMatch(reason);
+    if (simMatch != null) {
+      return context.tr('reason_similar_to', args: {'title': simMatch.group(1)!});
+    }
+    // Pattern: Because you enjoy Genre
+    final enjoyMatch = RegExp(r"because you enjoy (.+)", caseSensitive: false).firstMatch(reason);
+    if (enjoyMatch != null) {
+      return context.tr('reason_enjoy_genre', args: {'genre': enjoyMatch.group(1)!});
+    }
+    // Pattern: By your preferred author Author
+    final authorMatch = RegExp(r"by your preferred author (.+)", caseSensitive: false).firstMatch(reason);
+    if (authorMatch != null) {
+      return context.tr('reason_author', args: {'author': authorMatch.group(1)!});
+    }
+
+    if (reason.contains('_')) {
+      return context.tr(reason);
+    }
+    return reason;
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final bool hasSimilarity = book.similarityScore != null;
+    final bool hasPersonalization =
+        book.explanation != null || (book.recommendationReason != null && book.recommendationReason!.isNotEmpty);
+
+    Widget coverContent = Stack(
+      children: [
+        ClipRRect(
+          borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(DesignSystem.radiusLarge)),
+          child: AspectRatio(
+            aspectRatio: 2 / 3,
+            child: NetworkCoverWithFallback(
+                book: book, width: double.infinity, height: double.infinity),
+          ),
+        ),
+        if (hasSimilarity || hasPersonalization)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 130),
+              child: ClipRRect(
+                borderRadius: DesignSystem.borderRadiusPill,
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: colors.primary.withOpacity(0.9),
+                      borderRadius: DesignSystem.borderRadiusPill,
+                      boxShadow: DesignSystem.shadowSm(true),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          hasSimilarity ? Icons.auto_awesome : Icons.star_rounded,
+                          size: 10,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            hasSimilarity
+                                ? '%${(book.similarityScore! * 100).round()}'
+                                : context.tr('for_you').toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+
+    final Widget textDetails = Padding(
+      padding: const EdgeInsets.all(DesignSystem.spacing12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            book.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  height: 1.2,
+                  letterSpacing: -0.2,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            book.authorsFormatted,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colors.onSurface.withOpacity(0.6),
+                ),
+          ),
+          if (book.averageRating > 0) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.star_rounded, size: 14, color: DesignSystem.rating),
+                const SizedBox(width: 3),
+                Text(
+                  book.averageRating.toStringAsFixed(1),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: DesignSystem.rating,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (book.recommendationReason != null &&
+              book.recommendationReason!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              localizeReason(context, book.recommendationReason!),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10,
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w600,
+                color: colors.primary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
 
     return GestureDetector(
       onTap: () {
@@ -81,9 +283,10 @@ class BookCard extends StatelessWidget {
         context.push('/book/$_detailRouteIsbn', extra: book);
       },
       child: Container(
-        width: 150,
-        margin: const EdgeInsets.only(
-            bottom: DesignSystem.spacing16, top: DesignSystem.spacing4),
+        width: width,
+        margin: margin ??
+            const EdgeInsets.only(
+                bottom: DesignSystem.spacing16, top: DesignSystem.spacing4),
         decoration: BoxDecoration(
           color: Theme.of(context).cardTheme.color,
           borderRadius: DesignSystem.borderRadiusLarge,
@@ -91,89 +294,20 @@ class BookCard extends StatelessWidget {
               color: isDark ? Colors.white12 : Colors.black.withOpacity(0.05)),
           boxShadow: DesignSystem.shadowMd(isDark),
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Hero(
-              tag: 'cover_${book.isbn13}',
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(DesignSystem.radiusLarge)),
-                    child: AspectRatio(
-                      aspectRatio: 2 / 3,
-                      child: NetworkCoverWithFallback(
-                          book: book, width: double.infinity, height: double.infinity),
+            heroTag != null ? Hero(tag: heroTag!, child: coverContent) : coverContent,
+            width == null
+                ? Flexible(
+                    child: SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: textDetails,
                     ),
-                  ),
-                  if (book.explanation != null)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: ClipRRect(
-                        borderRadius: DesignSystem.borderRadiusPill,
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: colors.primary.withOpacity(0.8),
-                              borderRadius: DesignSystem.borderRadiusPill,
-                              boxShadow: DesignSystem.shadowSm(true),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.auto_awesome,
-                                    size: 10, color: Colors.white),
-                                const SizedBox(width: 4),
-                                Text(
-                                  context.tr('for_you').toUpperCase(),
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w900),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(DesignSystem.spacing12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    book.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style:
-                        Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              height: 1.2,
-                              letterSpacing: -0.2,
-                            ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    book.authorsFormatted,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style:
-                        Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colors.onSurface.withOpacity(0.6),
-                            ),
-                  ),
-                ],
-              ),
-            ),
+                  )
+                : textDetails,
           ],
         ),
       ),
@@ -182,9 +316,10 @@ class BookCard extends StatelessWidget {
 }
 
 class BookListTile extends StatelessWidget {
-  const BookListTile({super.key, required this.book, this.trailing});
+  const BookListTile({super.key, required this.book, this.trailing, this.heroTag});
   final Book book;
   final Widget? trailing;
+  final Object? heroTag;
 
   String get _detailRouteIsbn =>
       book.isbn13.trim().isEmpty ? '_' : book.isbn13.trim();
@@ -193,6 +328,13 @@ class BookListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    Widget coverWidget = ClipRRect(
+      borderRadius: const BorderRadius.horizontal(
+          left: Radius.circular(DesignSystem.radiusLarge)),
+      child: NetworkCoverWithFallback(
+          book: book, width: 90, height: 130),
+    );
 
     return GestureDetector(
       onTap: () => context.push('/book/$_detailRouteIsbn', extra: book),
@@ -207,15 +349,7 @@ class BookListTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Hero(
-              tag: 'cover_${book.isbn13}',
-              child: ClipRRect(
-                borderRadius: const BorderRadius.horizontal(
-                    left: Radius.circular(DesignSystem.radiusLarge)),
-                child: NetworkCoverWithFallback(
-                    book: book, width: 90, height: 130),
-              ),
-            ),
+            heroTag != null ? Hero(tag: heroTag!, child: coverWidget) : coverWidget,
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -243,7 +377,8 @@ class BookListTile extends StatelessWidget {
                           ),
                     ),
                     const SizedBox(height: 8),
-                    if (book.explanation != null) ...[
+                    if ((book.recommendationReason ?? book.explanation) != null &&
+                        (book.recommendationReason ?? book.explanation)!.isNotEmpty) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
@@ -259,7 +394,10 @@ class BookListTile extends StatelessWidget {
                             const SizedBox(width: 6),
                             Flexible(
                               child: Text(
-                                book.explanation!,
+                                BookCard.localizeReason(
+                                    context,
+                                    book.recommendationReason ?? book.explanation!,
+                                  ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(

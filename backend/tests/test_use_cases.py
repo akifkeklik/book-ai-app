@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional
 
+import pytest
 from backend.application.use_cases.ai_rag import ProcessRagQueryUseCase
 from backend.application.use_cases.catalog import GetBooksUseCase
 from backend.application.use_cases.recommendations import GetPersonalizedRecommendationsUseCase
@@ -363,4 +364,46 @@ def test_track_activity_want_to_read_and_finished_sync():
     res2 = uc.execute("u1", "finished", "9780002", "Book 2")
     assert res2["status"] == "tracked"
     assert repo.upserted_interactions[-1]["interaction_type"] == "finished"
+
+
+def test_get_user_preferences_usecase():
+    from backend.application.use_cases.interactions import GetUserPreferencesUseCase
+
+    # With profile
+    repo = FakeInteractionRepo(profile={"preferred_genres": ["Sci-Fi", "Mystery"], "updated_at": "2026-10-22T00:00:00Z"})
+    uc = GetUserPreferencesUseCase(repo)
+    res = uc.execute("u_test")
+    assert res["user_id"] == "u_test"
+    assert res["preferred_genres"] == ["Sci-Fi", "Mystery"]
+
+    # Without profile
+    repo_empty = FakeInteractionRepo(profile=None)
+    uc_empty = GetUserPreferencesUseCase(repo_empty)
+    res_empty = uc_empty.execute("u_empty")
+    assert res_empty["preferred_genres"] == []
+
+    # Missing user_id raises ValueError
+    with pytest.raises(ValueError):
+        uc.execute("")
+
+
+def test_update_user_preferences_usecase():
+    from backend.application.use_cases.interactions import UpdateUserPreferencesUseCase
+
+    repo = FakeInteractionRepo()
+    saved = {}
+
+    def mock_upsert_profile(user_id, genres, updated_at):
+        saved["user_id"] = user_id
+        saved["genres"] = genres
+        saved["updated_at"] = updated_at
+
+    repo.upsert_profile = mock_upsert_profile
+
+    uc = UpdateUserPreferencesUseCase(repo)
+    res = uc.execute("u_test", genres=["Fantasy", "History", "  ", "Romance"])
+    assert res["status"] == "success"
+    assert res["preferred_genres"] == ["Fantasy", "History", "Romance"]
+    assert saved["user_id"] == "u_test"
+    assert saved["genres"] == ["Fantasy", "History", "Romance"]
 

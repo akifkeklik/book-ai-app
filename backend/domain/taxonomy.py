@@ -17,9 +17,16 @@ CANONICAL_CATEGORY_MAP: Dict[str, str] = {
     "historical fiction": "Fiction",
     "country life": "Fiction",
     "adventure stories": "Fiction",
+    "adventure fiction": "Fiction",
     "literary criticism": "Fiction",
     "american literature": "Fiction",
+    "literature": "Fiction",
+    "novel": "Fiction",
+    "novels": "Fiction",
     "christmas stories": "Fiction",
+    "folklore": "Fiction",
+    "aubrey, jack (fictitious character)": "Fiction",
+    "london (england)": "Fiction",  # Setting tag for London-set novels (Orwell's 1984, Faber, Banks, Mosse, Binchy)
     # Fantasy
     "fantasy": "Fantasy",
     "fantasy fiction": "Fantasy",
@@ -28,19 +35,32 @@ CANONICAL_CATEGORY_MAP: Dict[str, str] = {
     "baggins, frodo (fictitious character)": "Fantasy",
     "discworld (imaginary place)": "Fantasy",
     "epic fantasy": "Fantasy",  # Google Books enrichment key
+    "magic": "Fantasy",
     # Science Fiction
     "science fiction": "Science Fiction",
+    "sci-fi": "Science Fiction",
     "science fiction, american": "Science Fiction",
     "life on other planets": "Science Fiction",
     "space opera": "Science Fiction",  # Google Books enrichment key
+    "dent, arthur (fictitious character)": "Science Fiction",
+    "hyland, morn (fictitious character)": "Science Fiction",
     # Mystery & Thriller
+    "mystery & thriller": "Mystery & Thriller",
+    "mystery": "Mystery & Thriller",
+    "crime": "Mystery & Thriller",
+    "detective": "Mystery & Thriller",
     "detective and mystery stories": "Mystery & Thriller",
     "detective and mystery stories, english": "Mystery & Thriller",
     "true crime": "Mystery & Thriller",
     "continental op (fictitious character)": "Mystery & Thriller",
     "crime fiction": "Mystery & Thriller",  # Google Books enrichment key
     "thriller": "Mystery & Thriller",  # Google Books enrichment key
+    "bond, james (fictitious character)": "Mystery & Thriller",
+    "poirot, hercule (fictitious character)": "Mystery & Thriller",
+    "marple, jane (fictitious character)": "Mystery & Thriller",
+    "beresford, tommy (fictitious character)": "Mystery & Thriller",
     # Horror
+    "horror": "Horror",
     "horror tales": "Horror",
     "horror tales, american": "Horror",
     "horror fiction": "Horror",  # Google Books enrichment key
@@ -53,18 +73,22 @@ CANONICAL_CATEGORY_MAP: Dict[str, str] = {
     # Biography & Memoir
     "biography": "Biography & Memoir",
     "autobiography": "Biography & Memoir",
+    "biography & memoir": "Biography & Memoir",
+    "memoir": "Biography & Memoir",
+    "memoirs": "Biography & Memoir",
     "authors, american": "Biography & Memoir",
     "authors, english": "Biography & Memoir",
     "authors": "Biography & Memoir",
     "biography & autobiography": "Biography & Memoir",
     "african americans": "Biography & Memoir",
+    "novelists, english": "Biography & Memoir",
+    "novelists, american": "Biography & Memoir",
     # History
     "history": "History",
     "africa, east": "History",
     "united states": "History",
     "great britain": "History",
     "england": "History",
-    "london (england)": "History",
     "boston (mass.)": "History",
     "china": "History",
     "japan": "History",
@@ -74,10 +98,13 @@ CANONICAL_CATEGORY_MAP: Dict[str, str] = {
     "british": "History",
     "belgians": "History",
     "botswana": "History",
+    "crusades": "History",
     # Philosophy
     "philosophy": "Philosophy",
     # Religion & Spirituality
     "religion": "Religion & Spirituality",
+    "religion & spirituality": "Religion & Spirituality",
+    "spirituality": "Religion & Spirituality",
     "christian life": "Religion & Spirituality",
     "bible": "Religion & Spirituality",
     "bibles": "Religion & Spirituality",
@@ -94,6 +121,7 @@ CANONICAL_CATEGORY_MAP: Dict[str, str] = {
     "adultery": "Psychology",
     # Self-Development
     "self-help": "Self-Development",
+    "self-development": "Self-Development",
     "conduct of life": "Self-Development",
     "finance, personal": "Self-Development",
     # Business
@@ -110,6 +138,8 @@ CANONICAL_CATEGORY_MAP: Dict[str, str] = {
     "animals": "Science",
     "cats": "Science",
     "pets": "Science",
+    "agriculture": "Science",
+    "arithmetic": "Science",
     # Technology
     "computers": "Technology",
     "technology": "Technology",
@@ -123,18 +153,26 @@ CANONICAL_CATEGORY_MAP: Dict[str, str] = {
     "comics & graphic novels": "Comics & Graphic Novels",
     # Drama & Plays
     "drama": "Drama & Plays",
+    "drama & plays": "Drama & Plays",
+    "plays": "Drama & Plays",
     "english drama": "Drama & Plays",
     "performing arts": "Drama & Plays",
     # Poetry
     "poetry": "Poetry",
     "literary collections": "Poetry",
     "american poetry": "Poetry",
+    "american essays": "Poetry",
     # Social Sciences
     "social science": "Social Sciences",
+    "social sciences": "Social Sciences",
     "political science": "Social Sciences",
     "law": "Social Sciences",
     "city and town life": "Social Sciences",
     # Young Adult & Children
+    "young adult & children": "Young Adult & Children",
+    "young adult": "Young Adult & Children",
+    "children": "Young Adult & Children",
+    "children's": "Young Adult & Children",
     "juvenile fiction": "Young Adult & Children",
     "juvenile nonfiction": "Young Adult & Children",
     "children's stories": "Young Adult & Children",
@@ -142,8 +180,11 @@ CANONICAL_CATEGORY_MAP: Dict[str, str] = {
     "young adult fiction": "Young Adult & Children",
     "fairy tales": "Young Adult & Children",
     "boys": "Young Adult & Children",
+    "children's poetry": "Young Adult & Children",
+    "children's poetry, american": "Young Adult & Children",
     # Art & Design
     "art": "Art & Design",
+    "art & design": "Art & Design",
     "architecture": "Art & Design",
     "photography": "Art & Design",
     "design": "Art & Design",
@@ -151,20 +192,29 @@ CANONICAL_CATEGORY_MAP: Dict[str, str] = {
     "antiques & collectibles": "Art & Design",
     # Food & Cooking
     "cooking": "Food & Cooking",
+    "food & cooking": "Food & Cooking",
+    "food": "Food & Cooking",
     "cookery": "Food & Cooking",
     # Travel
     "travel": "Travel",
     # Health & Wellness
     "health": "Health & Wellness",
+    "health & wellness": "Health & Wellness",
+    "wellness": "Health & Wellness",
     "fitness": "Health & Wellness",
     "medical": "Health & Wellness",
     "health & fitness": "Health & Wellness",
     "blind": "Health & Wellness",
     # Humor & Satire
     "humor": "Humor & Satire",
+    "humor & satire": "Humor & Satire",
+    "satire": "Humor & Satire",
+    "wit and humor": "Humor & Satire",
     "humorous stories, english": "Humor & Satire",
+    "american wit and humor, pictorial": "Humor & Satire",
     # Education & Reference
     "education": "Education & Reference",
+    "education & reference": "Education & Reference",
     "language arts & disciplines": "Education & Reference",
     "foreign language study": "Education & Reference",
     "reference": "Education & Reference",
@@ -172,11 +222,15 @@ CANONICAL_CATEGORY_MAP: Dict[str, str] = {
     "english language": "Education & Reference",
     "college teachers": "Education & Reference",
     # Sports & Games
+    "sports & games": "Sports & Games",
+    "sports": "Sports & Games",
     "games": "Sports & Games",
     "games & activities": "Sports & Games",
     "sports & recreation": "Sports & Games",
     # Crafts & Hobbies
     "crafts & hobbies": "Crafts & Hobbies",
+    "crafts": "Crafts & Hobbies",
+    "hobbies": "Crafts & Hobbies",
     "gardening": "Crafts & Hobbies",
     "house & home": "Crafts & Hobbies",
 }

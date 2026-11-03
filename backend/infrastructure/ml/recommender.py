@@ -146,50 +146,52 @@ class RecommenderEngine:
         self.cosine_sim = None
         self.is_fitted = True
 
-    def find_index(self, book_identifier: str) -> Optional[int]:
-        """Find the DataFrame index for a book by its title or ISBN."""
+    def find_all_indices(self, book_identifier: str) -> List[int]:
+        """Find all DataFrame indices for a book by its title or ISBN (handling duplicates)."""
         if not isinstance(book_identifier, str):
             if isinstance(book_identifier, (int, float)):
                 book_identifier = str(int(book_identifier))
             else:
-                return None
+                return []
 
         clean_id = book_identifier.strip()
         if not clean_id or self.df.empty:
-            return None
+            return []
 
         # Normalize hyphens and float strings (e.g. '9780441013593.0')
         norm_id = clean_id.replace("-", "")
         if norm_id.endswith(".0"):
             norm_id = norm_id[:-2]
 
+        matched = set()
         # Prioritize exact ISBN matching
-        matches = self.df.index[self.df["isbn13"] == clean_id].tolist()
-        if matches:
-            return matches[0]
-
-        matches = self.df.index[self.df["isbn13"] == norm_id].tolist()
-        if matches:
-            return matches[0]
+        if "isbn13" in self.df.columns:
+            for idx in self.df.index[self.df["isbn13"] == clean_id].tolist():
+                matched.add(idx)
+            if norm_id != clean_id:
+                for idx in self.df.index[self.df["isbn13"] == norm_id].tolist():
+                    matched.add(idx)
 
         if "isbn10" in self.df.columns:
-            matches = self.df.index[self.df["isbn10"] == norm_id].tolist()
-            if matches:
-                return matches[0]
+            for idx in self.df.index[self.df["isbn10"] == norm_id].tolist():
+                matched.add(idx)
 
         # Fallback to title matching
-        matches = self.df.index[self.df["title"].str.lower() == clean_id.lower()].tolist()
-        if matches:
-            return matches[0]
+        if "title" in self.df.columns:
+            for idx in self.df.index[self.df["title"].astype(str).str.lower() == clean_id.lower()].tolist():
+                matched.add(idx)
 
-        # Strip surrounding quotes or extra whitespace in title fallback
-        unquoted = clean_id.strip("'\"")
-        if unquoted != clean_id:
-            matches = self.df.index[self.df["title"].str.lower() == unquoted.lower()].tolist()
-            if matches:
-                return matches[0]
+            unquoted = clean_id.strip("'\"")
+            if unquoted != clean_id:
+                for idx in self.df.index[self.df["title"].astype(str).str.lower() == unquoted.lower()].tolist():
+                    matched.add(idx)
 
-        return None
+        return sorted(matched)
+
+    def find_index(self, book_identifier: str) -> Optional[int]:
+        """Find the primary DataFrame index for a book by its title or ISBN."""
+        indices = self.find_all_indices(book_identifier)
+        return indices[0] if indices else None
 
 
 # ── Orchestrator Class ────────────────────────────────────────────────────────
@@ -315,6 +317,7 @@ class BookRecommender:
         seed_weights: Optional[Dict[str, float]] = None,
         preferred_genres: Optional[List[str]] = None,
         preferred_authors: Optional[List[str]] = None,
+        seed_sources: Optional[Dict[str, str]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Generate personalized book recommendations with Rocchio relevance feedback,
@@ -332,28 +335,39 @@ class BookRecommender:
         elif seed_titles is None:
             seed_titles = []
 
-        # Find valid indices for seeds
+        # Find all valid indices for seeds (handling duplicates and editions)
         seed_indices = []
+        all_seed_indices = set()
         weights_by_idx: Dict[int, float] = {}
         for title in seed_titles:
-            idx = self.engine.find_index(title)
-            if idx is not None:
-                seed_indices.append(idx)
-                w = 1.0
-                if seed_weights and title in seed_weights:
-                    w = float(seed_weights[title])
-                weights_by_idx[idx] = w
+            indices = self.engine.find_all_indices(title)
+            if not indices:
+                continue
+            primary_idx = indices[0]
+            w = 1.0
+            if seed_weights and title in seed_weights:
+                w = float(seed_weights[title])
+            if primary_idx not in weights_by_idx:
+                seed_indices.append(primary_idx)
+                weights_by_idx[primary_idx] = w
+            else:
+                # Deduplicate and preserve the highest confidence weight
+                weights_by_idx[primary_idx] = max(weights_by_idx[primary_idx], w)
+            all_seed_indices.update(indices)
 
-        # Dislikes indices and authors
+        # Dislikes indices (all occurrences) and authors
         disliked_indices = []
+        all_disliked_indices = set()
         disliked_authors = set()
         if dislikes:
-            for isbn in dislikes:
-                d_idx = self.engine.find_index(isbn)
-                if d_idx is not None:
-                    disliked_indices.append(d_idx)
+            for d in dislikes:
+                indices = self.engine.find_all_indices(d)
+                for d_idx in indices:
+                    all_disliked_indices.add(d_idx)
+                    if d_idx not in disliked_indices:
+                        disliked_indices.append(d_idx)
                     d_auth = str(self.df.iloc[d_idx].get("authors", "")).strip().lower()
-                    if d_auth and d_auth != "unknown author":
+                    if d_auth and d_auth not in ("unknown author", "nan", "none"):
                         disliked_authors.add(d_auth)
 
         # Calculate user taste profile vector
@@ -367,9 +381,10 @@ class BookRecommender:
             pos_centroid = np.sum(weighted_vecs, axis=0) / max(1e-6, sum_w)
 
             # Negative feedback shift from dislikes
-            if disliked_indices:
+            if all_disliked_indices:
+                neg_indices = sorted(all_disliked_indices)
                 neg_vecs = [
-                    np.asarray(self.tfidf_matrix[i].todense()).flatten() for i in disliked_indices
+                    np.asarray(self.tfidf_matrix[i].todense()).flatten() for i in neg_indices
                 ]
                 neg_centroid = np.mean(neg_vecs, axis=0)
                 user_vec = pos_centroid - 0.5 * neg_centroid
@@ -379,7 +394,9 @@ class BookRecommender:
             norm = np.linalg.norm(user_vec)
             if norm > 1e-6:
                 user_vec = user_vec / norm
-            raw_scores = cosine_similarity(user_vec.reshape(1, -1), self.tfidf_matrix).flatten()
+                raw_scores = cosine_similarity(user_vec.reshape(1, -1), self.tfidf_matrix).flatten()
+            else:
+                raw_scores = np.zeros(len(self.df))
 
         elif preferred_genres or preferred_authors:
             # Cold-start profile query vector
@@ -400,13 +417,13 @@ class BookRecommender:
         else:
             # Zero positive signals: fallback to popular books filtering dislikes
             logger.info("No positive seeds or profile signals provided. Returning popular books.")
-            extra = len(disliked_indices) + 10 if disliked_indices else 0
+            extra = len(all_disliked_indices) + 10 if all_disliked_indices else 0
             pop_books = self.get_popular_books(limit=top_n + extra)
-            if disliked_indices or dislikes:
+            if all_disliked_indices or dislikes:
                 dislike_clean_set = set(
                     str(d).strip().replace("-", "").lower() for d in (dislikes or [])
                 )
-                for d_idx in disliked_indices:
+                for d_idx in all_disliked_indices:
                     dislike_clean_set.add(
                         str(self.df.iloc[d_idx].get("isbn13", "")).strip().replace("-", "").lower()
                     )
@@ -427,8 +444,8 @@ class BookRecommender:
         semantic_vec = np.zeros(len(self.df))
         if semantic_scores:
             for isbn, score in semantic_scores.items():
-                idx = self.engine.find_index(isbn)
-                if idx is not None:
+                indices = self.engine.find_all_indices(isbn)
+                for idx in indices:
                     semantic_vec[idx] = score
 
         # Compute Profile Affinity Bonuses
@@ -461,8 +478,15 @@ class BookRecommender:
                 mask = self.df["authors"].astype(str).str.lower().str.contains(d_auth, regex=False)
                 affinity_scores[mask.to_numpy()] -= 0.35
 
+        # Nan/inf guards for all input vectors
+        raw_scores = np.nan_to_num(raw_scores, nan=0.0, posinf=0.0, neginf=0.0)
+        popularity_scores = np.nan_to_num(
+            self.df["popularity_score"].to_numpy(dtype=float), nan=0.0, posinf=0.0, neginf=0.0
+        )
+        semantic_vec = np.nan_to_num(semantic_vec, nan=0.0, posinf=0.0, neginf=0.0)
+        affinity_scores = np.nan_to_num(affinity_scores, nan=0.0, posinf=0.0, neginf=0.0)
+
         # Hybrid Scoring
-        popularity_scores = self.df["popularity_score"].to_numpy()
         if semantic_scores:
             final_scores = (
                 self.config.weight_tfidf * raw_scores
@@ -473,38 +497,89 @@ class BookRecommender:
         else:
             final_scores = 0.60 * raw_scores + 0.25 * popularity_scores + 0.15 * affinity_scores
 
-        # Set scores of seed books to a very low value to exclude them
-        final_scores[seed_indices] = -1.0
+        final_scores = np.nan_to_num(final_scores, nan=-1.0, posinf=0.0, neginf=-1.0)
 
-        # Strict hard filter for dislikes
-        if disliked_indices:
-            final_scores[disliked_indices] = -1.0
+        # Set scores of ALL seed books to a very low value to exclude them
+        if all_seed_indices:
+            final_scores[list(all_seed_indices)] = -1.0
+
+        # Strict hard filter for ALL dislikes
+        if all_disliked_indices:
+            final_scores[list(all_disliked_indices)] = -1.0
 
         if use_diversity:
             # Maximal Marginal Relevance (MMR) for diversity
             recs = self._get_diverse_recommendations(final_scores, top_n)
         else:
-            # Deterministic top-N recommendations
-            top_indices = sorted(
-                range(len(final_scores)),
+            # Deterministic top-N recommendations excluding suppressed candidates
+            suppressed = all_seed_indices.union(all_disliked_indices)
+            valid_indices = [
+                i
+                for i in range(len(final_scores))
+                if i not in suppressed and final_scores[i] > -0.5
+            ]
+            sorted_indices = sorted(
+                valid_indices,
                 key=lambda i: (
-                    final_scores[i],
-                    popularity_scores[i],
-                    self.df.iloc[i]["average_rating"],
+                    float(final_scores[i]),
+                    float(popularity_scores[i]),
+                    float(self.df.iloc[i].get("average_rating") or 0.0),
+                    -i,  # Stable deterministic tie-breaker
                 ),
                 reverse=True,
-            )[:top_n]
+            )
+            top_indices = []
+            seen_isbns = set()
+            seen_titles = set()
+            for idx in sorted_indices:
+                row = self.df.iloc[idx]
+                isbn = str(row.get("isbn13", "")).strip().replace("-", "").lower()
+                title = str(row.get("title", "")).strip().lower()
+                if isbn and isbn in seen_isbns:
+                    continue
+                if title and title in seen_titles:
+                    continue
+                if isbn:
+                    seen_isbns.add(isbn)
+                if title:
+                    seen_titles.add(title)
+                top_indices.append(idx)
+                if len(top_indices) >= top_n:
+                    break
+
             recs = self.df.iloc[top_indices].to_dict(orient="records")
             for i, rec in enumerate(recs):
                 rec["final_score"] = float(final_scores[top_indices[i]])
 
-        # Strict post-filter safeguard against dislikes
-        if dislikes:
-            dislike_set = set(str(d).strip().replace("-", "") for d in dislikes)
+        # Strict post-filter safeguard against dislikes and seeds
+        dislike_clean_set = set()
+        if dislikes or all_disliked_indices:
+            for d in (dislikes or []):
+                dislike_clean_set.add(str(d).strip().replace("-", "").lower())
+            for d_idx in all_disliked_indices:
+                dislike_clean_set.add(
+                    str(self.df.iloc[d_idx].get("isbn13", "")).strip().replace("-", "").lower()
+                )
+                dislike_clean_set.add(str(self.df.iloc[d_idx].get("title", "")).strip().lower())
+
+        seed_clean_set = set()
+        if seed_titles or all_seed_indices:
+            for s in seed_titles:
+                seed_clean_set.add(str(s).strip().replace("-", "").lower())
+            for s_idx in all_seed_indices:
+                seed_clean_set.add(
+                    str(self.df.iloc[s_idx].get("isbn13", "")).strip().replace("-", "").lower()
+                )
+                seed_clean_set.add(str(self.df.iloc[s_idx].get("title", "")).strip().lower())
+
+        if dislike_clean_set or seed_clean_set:
             recs = [
                 r
                 for r in recs
-                if str(r.get("isbn13", "")).strip().replace("-", "") not in dislike_set
+                if str(r.get("isbn13", "")).strip().replace("-", "").lower() not in dislike_clean_set
+                and str(r.get("title", "")).strip().lower() not in dislike_clean_set
+                and str(r.get("isbn13", "")).strip().replace("-", "").lower() not in seed_clean_set
+                and str(r.get("title", "")).strip().lower() not in seed_clean_set
             ]
 
         # Add explanations
@@ -518,14 +593,14 @@ class BookRecommender:
                     semantic_scores,
                     preferred_genres=preferred_genres,
                     preferred_authors=preferred_authors,
+                    seed_sources=seed_sources,
                 )
             )
 
-        return recs
+        return recs[:top_n]
 
     def _get_diverse_recommendations(self, scores: np.ndarray, top_n: int) -> List[Dict[str, Any]]:
-        """Select diverse recommendations using Maximal Marginal Relevance (MMR)."""
-        selected_indices = []
+        """Select diverse recommendations using Maximal Marginal Relevance (MMR) with candidate deduplication."""
         # Exclude suppressed/negative items from candidate pool
         valid_indices = [int(i) for i in np.argsort(scores)[::-1] if scores[i] > -0.5]
         candidate_indices = valid_indices[: max(100, top_n * 10)]
@@ -534,14 +609,44 @@ class BookRecommender:
         if not candidate_indices:
             return []
 
-        best_idx = candidate_indices.pop(0)
-        selected_indices.append(best_idx)
+        selected_indices = []
+        seen_isbns = set()
+        seen_titles = set()
+
+        def _is_duplicate_book(idx: int) -> bool:
+            row = self.df.iloc[idx]
+            isbn = str(row.get("isbn13", "")).strip().replace("-", "").lower()
+            title = str(row.get("title", "")).strip().lower()
+            if isbn and isbn in seen_isbns:
+                return True
+            if title and title in seen_titles:
+                return True
+            return False
+
+        def _record_book(idx: int) -> None:
+            row = self.df.iloc[idx]
+            isbn = str(row.get("isbn13", "")).strip().replace("-", "").lower()
+            title = str(row.get("title", "")).strip().lower()
+            if isbn:
+                seen_isbns.add(isbn)
+            if title:
+                seen_titles.add(title)
+
+        for idx in list(candidate_indices):
+            if not _is_duplicate_book(idx):
+                selected_indices.append(idx)
+                _record_book(idx)
+                candidate_indices.remove(idx)
+                break
 
         while len(selected_indices) < top_n and candidate_indices:
             max_mmr = -np.inf
             best_candidate_idx = -1
 
             for cand_idx in candidate_indices:
+                if _is_duplicate_book(cand_idx):
+                    continue
+
                 if selected_indices:
                     sim_scores = cosine_similarity(
                         self.tfidf_matrix[cand_idx], self.tfidf_matrix[selected_indices]
@@ -559,6 +664,7 @@ class BookRecommender:
 
             if best_candidate_idx != -1:
                 selected_indices.append(best_candidate_idx)
+                _record_book(best_candidate_idx)
                 candidate_indices.remove(best_candidate_idx)
             else:
                 break  # No more candidates to add
@@ -579,7 +685,7 @@ class BookRecommender:
                 rec["diversity_penalty"] = float(
                     (1 - self.config.diversity_lambda) * sim_to_selected
                 )
-        return recs
+        return recs[:top_n]
 
     def _explain_recommendation(
         self,
@@ -588,6 +694,7 @@ class BookRecommender:
         semantic_scores: Optional[Dict[str, float]] = None,
         preferred_genres: Optional[List[str]] = None,
         preferred_authors: Optional[List[str]] = None,
+        seed_sources: Optional[Dict[str, str]] = None,
     ) -> Dict[str, str]:
         """Generate an explainability payload and natural reasoning for a recommendation."""
         rec_idx = self.engine.find_index(recommended_book["isbn13"])
@@ -609,6 +716,9 @@ class BookRecommender:
                             "explanation": f"Bu kitap, ilgi duyduğunuz {g} kategorisiyle eşleştiği için önerildi.",
                             "explanation_source_book": "",
                             "recommendation_reason": f"Because you enjoy {g}",
+                            "explanation_type": "category_affinity",
+                            "confidence": "medium",
+                            "is_cold_start": False,
                         }
             if preferred_authors:
                 for a in preferred_authors:
@@ -617,6 +727,9 @@ class BookRecommender:
                             "explanation": f"Bu kitap, tercih ettiğiniz yazar {a} tarafından yazıldığı için önerildi.",
                             "explanation_source_book": "",
                             "recommendation_reason": f"By your preferred author {a}",
+                            "explanation_type": "author_affinity",
+                            "confidence": "medium",
+                            "is_cold_start": False,
                         }
             # Pure semantic search case
             if cat_list:
@@ -627,39 +740,162 @@ class BookRecommender:
                 "explanation": explanation,
                 "explanation_source_book": "",
                 "recommendation_reason": "Trending on Libris right now",
+                "explanation_type": "trending_catalog",
+                "confidence": "cold_start",
+                "is_cold_start": True,
             }
 
-        # Hybrid case: we have both likes (seed_indices) and possibly semantic matches
+        # Hybrid case: we have both likes/status seeds (seed_indices) and possibly semantic matches
         sim_scores = cosine_similarity(self.tfidf_matrix[rec_idx], self.tfidf_matrix[seed_indices])[
             0
         ]
         if sim_scores.size == 0:
             return {}
 
+        max_sim = float(np.max(sim_scores))
+        if max_sim < 0.05:
+            # Low similarity to specific seeds - attribute to profile or general taste rather than false seed causation
+            if preferred_genres:
+                for g in preferred_genres:
+                    if g.strip().lower() in str(recommended_book.get("categories", "")).lower():
+                        return {
+                            "explanation": f"Bu kitap, ilgi duyduğunuz {g} kategorisiyle eşleştiği için önerildi.",
+                            "explanation_source_book": "",
+                            "recommendation_reason": f"Because you enjoy {g}",
+                            "explanation_type": "category_affinity",
+                            "confidence": "medium",
+                            "is_cold_start": False,
+                        }
+            if preferred_authors:
+                for a in preferred_authors:
+                    if a.strip().lower() in str(recommended_book.get("authors", "")).lower():
+                        return {
+                            "explanation": f"Bu kitap, tercih ettiğiniz yazar {a} tarafından yazıldığı için önerildi.",
+                            "explanation_source_book": "",
+                            "recommendation_reason": f"By your preferred author {a}",
+                            "explanation_type": "author_affinity",
+                            "confidence": "medium",
+                            "is_cold_start": False,
+                        }
+            return {
+                "explanation": "Bu kitap, genel okuma profiliniz ve beğenileriniz doğrultusunda önerildi.",
+                "explanation_source_book": "",
+                "recommendation_reason": "Curated based on your taste profile",
+                "explanation_type": "category_affinity",
+                "confidence": "medium",
+                "is_cold_start": False,
+            }
+
         most_similar_seed_idx = seed_indices[np.argmax(sim_scores)]
         source_book = self.df.iloc[most_similar_seed_idx]
         source_cats = set(re.split(r"\s*[,|]\s*", str(source_book.get("categories", "")).lower()))
         common_genres = rec_cats.intersection(source_cats)
 
-        if has_semantic_match:
-            # Acknowledge both user preference and semantic query
-            if common_genres:
-                explanation = f"Aramanızla eşleşmesinin yanı sıra, '{source_book['title']}' kitabını sevdiğiniz için (ortak tür: {list(common_genres)[0]}) önerildi."
-            else:
-                explanation = f"Aramanızla güçlü bir eşleşme sağladı ve okuma geçmişinizdeki '{source_book['title']}' kitabına benzer bir atmosfere sahip."
+        # Determine source interaction type for personalized attribution
+        src_clean_isbn = str(source_book.get("isbn13", "")).strip().replace("-", "").lower()
+        src_raw_isbn = str(source_book.get("isbn13", "")).strip()
+        src_title = str(source_book.get("title", "")).strip().lower()
+        src_type = None
+        if seed_sources:
+            src_type = (
+                seed_sources.get(src_clean_isbn)
+                or seed_sources.get(src_raw_isbn)
+                or seed_sources.get(src_title)
+                or seed_sources.get(str(source_book.get("title", "")).strip())
+            )
+
+        explanation_type = "liked_book"
+        confidence = "high"
+
+        if src_type == "favorite":
+            rec_reason = f"Because you favorited '{source_book['title']}'"
+            verb_tr = "favorilerinize eklediğiniz"
+            explanation_type = "favorite_book"
+            confidence = "high"
+        elif src_type == "finished":
+            rec_reason = f"Because you read '{source_book['title']}'"
+            verb_tr = "okuduğunuz"
+            explanation_type = "finished_book"
+            confidence = "high"
+        elif src_type == "reading":
+            rec_reason = f"Because you're reading '{source_book['title']}'"
+            verb_tr = "şu an okumakta olduğunuz"
+            explanation_type = "reading_journey"
+            confidence = "medium"
+        elif src_type == "want_to_read":
+            rec_reason = f"From your reading list: '{source_book['title']}'"
+            verb_tr = "okuma listenize eklediğiniz"
+            explanation_type = "reading_journey"
+            confidence = "medium"
+        elif src_type == "like":
+            rec_reason = f"Because you liked '{source_book['title']}'"
+            verb_tr = "beğendiğiniz"
+            explanation_type = "liked_book"
+            confidence = "high"
+        elif src_type == "notes":
+            rec_reason = f"Based on your notes for '{source_book['title']}'"
+            verb_tr = "öğrenme notları aldığınız"
+            explanation_type = "reading_journey"
+            confidence = "medium"
+        elif src_type == "takeaway":
+            rec_reason = f"Deepens takeaways from '{source_book['title']}'"
+            verb_tr = "çıkarımlar kaydettiğiniz"
+            explanation_type = "takeaway_affinity"
+            confidence = "high"
+        elif src_type == "learning_path":
+            rec_reason = "Suggested for your learning path"
+            verb_tr = "öğrenme yolunuzdaki"
+            explanation_type = "learning_path_continuity"
+            confidence = "high"
         else:
-            # Standard personalized recommendation
-            if common_genres:
-                explanation = f"'{source_book['title']}' kitabını sevdiğiniz için, ortak {', '.join(list(common_genres)[:2])} türündeki bu kitabı önerdik."
+            # Evidence-based attribution: distinguish user profile from content-similarity
+            has_profile = bool(preferred_genres or preferred_authors)
+            if has_profile:
+                rec_reason = "Curated based on your taste profile"
+                verb_tr = "ilgilendiğiniz"
+                explanation_type = "category_affinity"
+                confidence = "medium"
             else:
-                explanation = (
-                    f"'{source_book['title']}' kitabına benzer bir atmosferi olduğu için önerdik."
-                )
+                rec_reason = f"Similar to '{source_book['title']}'"
+                verb_tr = "incelediğiniz"
+                explanation_type = "liked_book"
+                confidence = "medium"
+
+        if src_type:
+            if has_semantic_match:
+                # Acknowledge both user preference and semantic query
+                if common_genres:
+                    explanation = f"Aramanızla eşleşmesinin yanı sıra, {verb_tr} '{source_book['title']}' kitabıyla ortak ({list(common_genres)[0]}) türünde olduğu için önerildi."
+                else:
+                    explanation = f"Aramanızla güçlü bir eşleşme sağladı ve okuma geçmişinizdeki '{source_book['title']}' kitabına benzer bir atmosfere sahip."
+            else:
+                # Standard personalized recommendation
+                if common_genres:
+                    explanation = f"'{source_book['title']}' kitabını {verb_tr} için, ortak {', '.join(list(common_genres)[:2])} türündeki bu kitabı önerdik."
+                else:
+                    explanation = (
+                        f"'{source_book['title']}' kitabına benzer bir atmosferi olduğu için önerdik."
+                    )
+        else:
+            has_profile = bool(preferred_genres or preferred_authors)
+            if has_profile:
+                if common_genres:
+                    explanation = f"İlgi duyduğunuz {', '.join(list(common_genres)[:2])} türündeki okuma zevkinize özel seçildi."
+                else:
+                    explanation = "Okuma zevkinize ve kütüphanenize özel olarak seçildi."
+            else:
+                if common_genres:
+                    explanation = f"'{source_book['title']}' kitabıyla ortak ({', '.join(list(common_genres)[:2])}) türünde olduğu için önerildi."
+                else:
+                    explanation = f"'{source_book['title']}' kitabına benzer tematik ve anlamsal özellikleri nedeniyle önerildi."
 
         return {
             "explanation": explanation,
             "explanation_source_book": source_book["title"],
-            "recommendation_reason": f"Because you liked '{source_book['title']}'",
+            "recommendation_reason": rec_reason,
+            "explanation_type": explanation_type,
+            "confidence": confidence,
+            "is_cold_start": False,
         }
 
     def search_books(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
@@ -674,11 +910,27 @@ class BookRecommender:
         return results.to_dict(orient="records")
 
     def get_popular_books(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get the most popular books based on the pre-calculated popularity score."""
+        """Get the most popular books based on the pre-calculated popularity score with deduplication."""
         if self.df.empty:
             return []
         sorted_df = self.df.sort_values(by="popularity_score", ascending=False)
-        return sorted_df.head(limit).to_dict(orient="records")
+        if "isbn13" in sorted_df.columns:
+            sorted_df = sorted_df.drop_duplicates(subset=["isbn13"])
+        if "title" in sorted_df.columns:
+            sorted_df = sorted_df.drop_duplicates(subset=["title"])
+        books = sorted_df.head(limit).to_dict(orient="records")
+        for b in books:
+            if "recommendation_reason" not in b or not b.get("recommendation_reason"):
+                b["recommendation_reason"] = "Trending on Libris right now"
+            if "explanation" not in b or not b.get("explanation"):
+                b["explanation"] = "Bu kitap, Libris genelindeki popüler ve yüksek puanlı eserler arasından seçildi."
+            if "explanation_type" not in b or not b.get("explanation_type"):
+                b["explanation_type"] = "trending_catalog"
+            if "confidence" not in b or not b.get("confidence"):
+                b["confidence"] = "cold_start"
+            if "is_cold_start" not in b:
+                b["is_cold_start"] = True
+        return books
 
     def get_all_books(
         self,
@@ -712,7 +964,17 @@ class BookRecommender:
                     if "description" in df.columns
                     else False
                 )
-                df = df[title_mask | author_mask | desc_mask]
+                isbn13_mask = (
+                    df["isbn13"].astype(str).str.contains(q_clean, case=False, na=False, regex=False)
+                    if "isbn13" in df.columns
+                    else False
+                )
+                isbn10_mask = (
+                    df["isbn10"].astype(str).str.contains(q_clean, case=False, na=False, regex=False)
+                    if "isbn10" in df.columns
+                    else False
+                )
+                df = df[title_mask | author_mask | desc_mask | isbn13_mask | isbn10_mask]
 
         if category:
             cat = category.strip()
@@ -761,9 +1023,6 @@ class BookRecommender:
 
         if published_from is not None or published_to is not None:
             if "published_date" in df.columns:
-                # published_date is often a string like '2005-09-01' or just '2005'
-                # We can do a string comparison if we assume YYYY format, or convert to numeric year.
-                # Let's extract the year robustly.
                 years = df["published_date"].astype(str).str.extract(r"(\d{4})")[0].astype(float)
                 if published_from is not None:
                     df = df[years >= published_from]
@@ -773,16 +1032,19 @@ class BookRecommender:
         if sort:
             ascending = order.lower() == "asc"
             if sort == "rating" and "average_rating" in df.columns:
-                df = df.sort_values(by="average_rating", ascending=ascending)
+                df = df.sort_values(by="average_rating", ascending=ascending, na_position="last")
             elif sort == "popularity" and "popularity_score" in df.columns:
-                df = df.sort_values(by="popularity_score", ascending=ascending)
+                df = df.sort_values(by="popularity_score", ascending=ascending, na_position="last")
             elif sort == "newest" or sort == "oldest":
                 if "published_date" in df.columns:
-                    # ascending=False for newest, ascending=True for oldest
-                    asc = sort == "oldest"
-                    df = df.sort_values(by="published_date", ascending=asc)
+                    sort_years = df["published_date"].astype(str).str.extract(r"(\d{4})")[0].astype(float)
+                    df = (
+                        df.assign(_sort_year=sort_years)
+                        .sort_values(by="_sort_year", ascending=(sort == "oldest"), na_position="last")
+                        .drop(columns=["_sort_year"])
+                    )
             elif sort == "title" and "title" in df.columns:
-                df = df.sort_values(by="title", ascending=ascending)
+                df = df.sort_values(by="title", ascending=ascending, na_position="last")
 
         start = (page - 1) * per_page
         end = start + per_page
@@ -804,16 +1066,41 @@ class BookRecommender:
     def _get_canonical_for_raw(cls, raw_category: str) -> Optional[str]:
         """Return canonical category name for a raw category string, or None."""
         key = raw_category.strip().lower()
-        return CANONICAL_CATEGORY_MAP.get(key)
+        if not key:
+            return None
+        if key in CANONICAL_CATEGORY_MAP:
+            return CANONICAL_CATEGORY_MAP[key]
+        for canonical in CANONICAL_CATEGORIES_ORDERED:
+            if canonical.lower() == key:
+                return canonical
+        return None
 
     @classmethod
     def _book_matches_canonical(cls, raw_categories_str: str, canonical: str) -> bool:
         """Check if a book's raw categories string contains the given canonical category."""
-        parts = re.split(r"[,|;/&]", str(raw_categories_str or ""))
+        clean_raw = str(raw_categories_str or "").strip()
+        if not clean_raw:
+            return False
+
+        # 1. Direct check on the whole un-split string (preserves compound categories with '&')
+        direct_match = cls._get_canonical_for_raw(clean_raw)
+        if direct_match and direct_match.lower() == canonical.lower():
+            return True
+
+        # 2. Check parts split on delimiters (commas, semicolons, pipes)
+        parts = re.split(r"[,|;/]", clean_raw)
         for part in parts:
-            mapped = cls._get_canonical_for_raw(part.strip())
-            if mapped == canonical:
+            p_strip = part.strip()
+            mapped = cls._get_canonical_for_raw(p_strip)
+            if mapped and mapped.lower() == canonical.lower():
                 return True
+            # Also sub-split on '&' if not already matching a compound category
+            if "&" in p_strip:
+                subparts = [sp.strip() for sp in p_strip.split("&")]
+                for sp in subparts:
+                    sp_mapped = cls._get_canonical_for_raw(sp)
+                    if sp_mapped and sp_mapped.lower() == canonical.lower():
+                        return True
         return False
 
     def get_unique_categories(self) -> List[Dict[str, Any]]:
@@ -821,16 +1108,22 @@ class BookRecommender:
         if self.df.empty:
             return []
 
-        # Find which canonical categories actually have books and count them
         counts = {}
         for raw in self.df["categories"].dropna().astype(str):
-            parts = re.split(r"[,|;/&]", raw)
-            for part in parts:
-                canonical = self._get_canonical_for_raw(part.strip())
-                if canonical:
-                    counts[canonical] = counts.get(canonical, 0) + 1
+            clean_raw = raw.strip()
+            if not clean_raw:
+                continue
+            matched_for_book = set()
+            whole_mapped = self._get_canonical_for_raw(clean_raw)
+            if whole_mapped:
+                matched_for_book.add(whole_mapped)
+            for part in re.split(r"[,|;/]", clean_raw):
+                p_mapped = self._get_canonical_for_raw(part.strip())
+                if p_mapped:
+                    matched_for_book.add(p_mapped)
+            for c in matched_for_book:
+                counts[c] = counts.get(c, 0) + 1
 
-        # Return in canonical order, only those present
         return [
             {"name": c, "count": counts[c]} for c in CANONICAL_CATEGORIES_ORDERED if c in counts
         ]

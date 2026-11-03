@@ -3,12 +3,15 @@
 import { useEffect, useState, useTransition, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthProvider';
+import { usePreferences } from '@/components/PreferencesProvider';
 import {
   getLibraryBooks,
   removeLibraryItem,
   updateLibraryItemStatus,
 } from '@/app/actions/library';
-import type { LibraryCollectionStatus, LibraryItem } from '@/types';
+import type { LibraryCollectionStatus, LibraryItem, LearningNote, NoteType } from '@/types';
+import { getAllUserNotes, deleteNote, updateNote } from '@/app/actions/notes';
+import { PenTool } from 'lucide-react';
 import {
   Heart,
   Bookmark,
@@ -24,12 +27,14 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { BookCoverFallback } from '@/components/BookCoverFallback';
+import { ReadingJourneyDashboard } from '@/components/ReadingJourneyDashboard';
 
-type FilterTab = 'all' | LibraryCollectionStatus;
+type FilterTab = 'all' | LibraryCollectionStatus | 'notes';
 type SortOption = 'recent' | 'title' | 'rating';
 
 export default function FavoritesPage() {
   const { user, loading: authLoading } = useAuth();
+  const { t } = usePreferences();
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +42,10 @@ export default function FavoritesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [notes, setNotes] = useState<LearningNote[]>([]);
+  const [noteTypeFilter, setNoteTypeFilter] = useState<'all' | NoteType>('all');
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editNoteContent, setEditNoteContent] = useState('');
   const [, startTransition] = useTransition();
 
   const handleRefresh = async () => {
@@ -44,6 +53,7 @@ export default function FavoritesPage() {
     setError(null);
     try {
       const res = await getLibraryBooks();
+      getAllUserNotes().then(nRes => { if (nRes.success) setNotes(nRes.notes); }).catch(() => {});
       if (res.success) {
         setItems(res.items);
       } else {
@@ -60,6 +70,7 @@ export default function FavoritesPage() {
     let ignore = false;
 
     if (!authLoading && user) {
+      getAllUserNotes().then(nRes => { if (!ignore && nRes.success) setNotes(nRes.notes); }).catch(() => {});
       getLibraryBooks()
         .then((res) => {
           if (!ignore) {
@@ -87,7 +98,7 @@ export default function FavoritesPage() {
   // Counts per status
   const counts = useMemo(() => {
     const total = items.length;
-    const favorites = items.filter((i) => i.status === 'favorite').length;
+    const favorites = items.filter((i) => i.status === 'favorite' || i.isFavorite).length;
     const wantToRead = items.filter((i) => i.status === 'want_to_read').length;
     const finished = items.filter((i) => i.status === 'finished').length;
     const reading = items.filter((i) => i.status === 'reading').length;
@@ -99,6 +110,9 @@ export default function FavoritesPage() {
     return items
       .filter((item) => {
         // Tab filter
+        if (activeTab === 'favorite') {
+          return item.status === 'favorite' || Boolean(item.isFavorite);
+        }
         if (activeTab !== 'all' && item.status !== activeTab) {
           return false;
         }
@@ -193,16 +207,16 @@ export default function FavoritesPage() {
           >
             <Lock size={32} color="var(--primary)" />
           </div>
-          <h1 style={{ fontSize: '1.85rem', marginBottom: '0.75rem' }}>Sign In to Your Library</h1>
+          <h1 style={{ fontSize: '1.85rem', marginBottom: '0.75rem' }}>{t('unauthenticated_library_title')}</h1>
           <p className="text-muted" style={{ marginBottom: '2rem', fontSize: '0.95rem', lineHeight: '1.6' }}>
-            Your personal library synchronizes your favorites, reading list, and reading history across all your devices. Sign in to access your curated collection.
+            {t('unauthenticated_library_desc')}
           </p>
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
             <Link href="/login?redirect=/favorites" className="btn btn-primary" id="library-login-btn">
-              Log In to Libris
+              {t('login_to_libris')}
             </Link>
             <Link href="/signup" className="btn btn-outline">
-              Create an Account
+              {t('create_account')}
             </Link>
           </div>
         </div>
@@ -215,9 +229,9 @@ export default function FavoritesPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
         <div>
-          <h1 style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>My Library</h1>
+          <h1 style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>{t('library_title')}</h1>
           <p className="text-muted" style={{ fontSize: '1rem' }}>
-            Manage your personal sanctuary of books, reading lists, and favorites.
+            {t('library_subtitle')}
           </p>
         </div>
         <button
@@ -225,11 +239,11 @@ export default function FavoritesPage() {
           disabled={loading}
           className="btn btn-outline"
           style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-          title="Refresh Library"
-          aria-label="Refresh library"
+          title={t('refresh')}
+          aria-label={t('refresh')}
         >
           <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-          <span>Refresh</span>
+          <span>{t('refresh')}</span>
         </button>
       </div>
 
@@ -264,6 +278,9 @@ export default function FavoritesPage() {
         </div>
       )}
 
+      {/* Reading Journey & Progress Dashboard */}
+      <ReadingJourneyDashboard items={items} />
+
       {/* Collection Tabs & Filter Bar */}
       <div
         className="glass-panel"
@@ -285,7 +302,7 @@ export default function FavoritesPage() {
             id="tab-all"
           >
             <BookOpen size={16} />
-            <span>All Saved</span>
+            <span>{t('tab_all')}</span>
             <span style={{ fontSize: '0.75rem', opacity: 0.75 }}>({counts.total})</span>
           </button>
 
@@ -297,7 +314,7 @@ export default function FavoritesPage() {
             id="tab-favorite"
           >
             <Heart size={16} color="#f472b6" fill={activeTab === 'favorite' ? '#f472b6' : 'none'} />
-            <span>Favorites</span>
+            <span>{t('tab_favorites')}</span>
             <span style={{ fontSize: '0.75rem', opacity: 0.75 }}>({counts.favorites})</span>
           </button>
 
@@ -309,7 +326,7 @@ export default function FavoritesPage() {
             id="tab-want-to-read"
           >
             <Bookmark size={16} color="var(--primary)" fill={activeTab === 'want_to_read' ? 'currentColor' : 'none'} />
-            <span>Want to Read</span>
+            <span>{t('tab_want_to_read')}</span>
             <span style={{ fontSize: '0.75rem', opacity: 0.75 }}>({counts.wantToRead})</span>
           </button>
 
@@ -321,7 +338,7 @@ export default function FavoritesPage() {
             id="tab-finished"
           >
             <CheckCircle size={16} color="var(--success)" />
-            <span>Finished</span>
+            <span>{t('tab_finished')}</span>
             <span style={{ fontSize: '0.75rem', opacity: 0.75 }}>({counts.finished})</span>
           </button>
 
@@ -334,10 +351,22 @@ export default function FavoritesPage() {
               id="tab-reading"
             >
               <BookOpen size={16} color="#fbbf24" />
-              <span>Reading</span>
+              <span>{t('tab_reading')}</span>
               <span style={{ fontSize: '0.75rem', opacity: 0.75 }}>({counts.reading})</span>
             </button>
           )}
+
+          <button
+            role="tab"
+            aria-selected={activeTab === 'notes'}
+            onClick={() => setActiveTab('notes')}
+            className={`library-tab-btn ${activeTab === 'notes' ? 'active' : ''}`}
+            id="tab-notes"
+          >
+            <PenTool size={16} color="var(--accent, #a78bfa)" />
+            <span>{t('tab_notes')}</span>
+            <span style={{ fontSize: '0.75rem', opacity: 0.75 }}>({notes.length})</span>
+          </button>
         </div>
 
         {/* Search & Sort Controls */}
@@ -349,7 +378,7 @@ export default function FavoritesPage() {
             />
             <input
               type="text"
-              placeholder="Filter by title or author..."
+              placeholder={t('search_library_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="input-field"
@@ -367,9 +396,9 @@ export default function FavoritesPage() {
               style={{ height: '40px', fontSize: '0.875rem', paddingRight: '2rem', cursor: 'pointer' }}
               aria-label="Sort library books"
             >
-              <option value="recent">Recently Added</option>
-              <option value="title">Title (A-Z)</option>
-              <option value="rating">Highest Rating</option>
+              <option value="recent">{t('sort_recent')}</option>
+              <option value="title">{t('sort_title')}</option>
+              <option value="rating">{t('sort_rating')}</option>
             </select>
           </div>
         </div>
@@ -388,8 +417,215 @@ export default function FavoritesPage() {
         </div>
       )}
 
-      {/* Empty State */}
-      {!loading && filteredItems.length === 0 && (
+      {/* Learning Notes Tab Content */}
+      {activeTab === 'notes' && !loading && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Note Type Filter Bar */}
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--muted)', marginRight: '0.5rem' }}>
+              {t('filters')}:
+            </span>
+            {(['all', 'personal_note', 'key_takeaway', 'question'] as const).map(ftype => {
+              const isSel = noteTypeFilter === ftype;
+              const label = ftype === 'all'
+                ? t('filter_all_types')
+                : ftype === 'key_takeaway'
+                ? t('note_type_takeaway')
+                : ftype === 'question'
+                ? t('note_type_question')
+                : t('note_type_personal');
+              return (
+                <button
+                  key={ftype}
+                  type="button"
+                  onClick={() => setNoteTypeFilter(ftype)}
+                  style={{
+                    padding: '0.35rem 0.85rem',
+                    borderRadius: '9999px',
+                    fontSize: '0.825rem',
+                    cursor: 'pointer',
+                    background: isSel ? 'var(--primary)' : 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid ' + (isSel ? 'var(--primary)' : 'rgba(255, 255, 255, 0.1)'),
+                    color: isSel ? '#fff' : 'var(--muted)',
+                    fontWeight: isSel ? 600 : 400,
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Notes List or Empty */}
+          {(() => {
+            const filteredNotes = notes.filter(n => {
+              if (noteTypeFilter !== 'all' && n.noteType !== noteTypeFilter) return false;
+              if (searchQuery.trim().length > 0) {
+                const q = searchQuery.toLowerCase();
+                const matchContent = n.content.toLowerCase().includes(q);
+                const matchTitle = n.book?.title?.toLowerCase().includes(q);
+                const matchAuthor = n.book?.authors?.toLowerCase().includes(q);
+                return matchContent || matchTitle || matchAuthor;
+              }
+              return true;
+            });
+
+            if (filteredNotes.length === 0) {
+              return (
+                <div
+                  className="glass-panel text-center animate-fade-in"
+                  style={{ padding: '3.5rem 2rem', borderRadius: '16px' }}
+                >
+                  <PenTool size={36} color="var(--muted)" style={{ margin: '0 auto 1rem' }} />
+                  <h3 style={{ fontSize: '1.35rem', marginBottom: '0.5rem' }}>
+                    {searchQuery ? `No notes match "${searchQuery}"` : t('empty_notes_library')}
+                  </h3>
+                  <p className="text-muted" style={{ maxWidth: '420px', margin: '0 auto', fontSize: '0.9rem' }}>
+                    {searchQuery ? 'Try another keyword or change your filter.' : t('notes_subtitle')}
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {filteredNotes.map(n => {
+                  const isEditing = editingNoteId === n.id;
+                  const typeLabel = n.noteType === 'key_takeaway'
+                    ? t('note_type_takeaway')
+                    : n.noteType === 'question'
+                    ? t('note_type_question')
+                    : t('note_type_personal');
+                  const badgeColor = n.noteType === 'key_takeaway'
+                    ? '#fbbf24'
+                    : n.noteType === 'question'
+                    ? '#34d399'
+                    : 'var(--accent, #a78bfa)';
+                  const badgeBg = n.noteType === 'key_takeaway'
+                    ? 'rgba(245, 158, 11, 0.15)'
+                    : n.noteType === 'question'
+                    ? 'rgba(16, 185, 129, 0.15)'
+                    : 'rgba(139, 92, 246, 0.15)';
+
+                  return (
+                    <article
+                      key={n.id}
+                      className="glass-panel animate-fade-in"
+                      style={{ padding: '1.25rem 1.5rem', borderRadius: '12px' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <span
+                            style={{
+                              padding: '0.2rem 0.65rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background: badgeBg,
+                              color: badgeColor,
+                            }}
+                          >
+                            {typeLabel}
+                          </span>
+                          {n.bookId && (
+                            <Link
+                              href={`/book/${encodeURIComponent(n.bookId)}`}
+                              style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--primary)', textDecoration: 'none' }}
+                            >
+                              {n.book?.title || `Book: ${n.bookId}`}
+                            </Link>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+                            {new Date(n.createdAt).toLocaleDateString()}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingNoteId(n.id);
+                              setEditNoteContent(n.content);
+                            }}
+                            className="btn btn-outline"
+                            style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                          >
+                            {t('edit_note')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const prev = [...notes];
+                              setNotes(prev.filter(x => x.id !== n.id));
+                              const res = await deleteNote(n.id, n.bookId);
+                              if (!res.success) setNotes(prev);
+                            }}
+                            className="btn"
+                            style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.15)', color: 'var(--danger)' }}
+                          >
+                            {t('delete_note')}
+                          </button>
+                        </div>
+                      </div>
+
+                      {isEditing ? (
+                        <div style={{ marginTop: '0.5rem' }}>
+                          <textarea
+                            value={editNoteContent}
+                            onChange={(e) => setEditNoteContent(e.target.value)}
+                            rows={3}
+                            style={{
+                              width: '100%',
+                              padding: '0.6rem',
+                              borderRadius: '8px',
+                              background: 'rgba(0,0,0,0.3)',
+                              color: '#fff',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              outline: 'none',
+                              fontSize: '0.9rem',
+                            }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => setEditingNoteId(null)}
+                              className="btn"
+                              style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.08)' }}
+                            >
+                              {t('cancel')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const prev = [...notes];
+                                setNotes(prev.map(x => x.id === n.id ? { ...x, content: editNoteContent } : x));
+                                setEditingNoteId(null);
+                                const res = await updateNote(n.id, editNoteContent, n.noteType);
+                                if (!res.success) setNotes(prev);
+                              }}
+                              className="btn btn-primary"
+                              style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem' }}
+                            >
+                              {t('save_note')}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: 1.6, color: 'rgba(255,255,255,0.88)', whiteSpace: 'pre-wrap' }}>
+                          {n.content}
+                        </p>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+
+      {/* Empty State for Book Shelves */}
+      {!loading && activeTab !== 'notes' && filteredItems.length === 0 && (
         <div
           className="glass-panel text-center animate-fade-in"
           style={{ padding: '4rem 2rem', borderRadius: '16px', margin: '2rem 0' }}
@@ -417,34 +653,28 @@ export default function FavoritesPage() {
           <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>
             {searchQuery
               ? `No books match "${searchQuery}"`
-              : activeTab === 'favorite'
-              ? 'No favorites saved yet'
-              : activeTab === 'want_to_read'
-              ? 'Your Want to Read list is empty'
-              : activeTab === 'finished'
-              ? 'No finished books marked yet'
-              : 'Your library is empty'}
+              : t('empty_library_title')}
           </h2>
           <p className="text-muted" style={{ maxWidth: '440px', margin: '0 auto 2rem', fontSize: '0.95rem' }}>
             {searchQuery
               ? 'Try adjusting your search terms or clearing the filter.'
-              : 'Discover captivating reads in our catalog or ask our AI assistant for tailored recommendations.'}
+              : t('empty_library_desc')}
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/catalog" className="btn btn-primary">
               <Compass size={16} />
-              <span>Explore Catalog</span>
+              <span>{t('explore_catalog_cta')}</span>
             </Link>
             <Link href="/ai-discovery" className="btn btn-outline">
               <Sparkles size={16} color="var(--accent)" />
-              <span>Ask AI Discovery</span>
+              <span>{t('ai_discovery_cta')}</span>
             </Link>
           </div>
         </div>
       )}
 
       {/* Books Grid */}
-      {!loading && filteredItems.length > 0 && (
+      {!loading && activeTab !== 'notes' && filteredItems.length > 0 && (
         <div className="grid-books">
           {filteredItems.map((item) => {
             const isProcessing = updatingId === item.bookId;

@@ -21,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passCtrl = TextEditingController();
   bool _obscurePass = true;
   bool _rememberMe = true;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -34,6 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _loadSavedEmail() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _rememberMe = prefs.getBool('remember_me') ?? true;
       if (_rememberMe) {
@@ -50,33 +52,46 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
 
-    final auth = context.read<AuthProvider>();
-    final favs = context.read<FavoritesProvider>();
-    final email = _emailCtrl.text.trim();
-    final password = _passCtrl.text;
-    final rememberMe = _rememberMe;
+    setState(() => _isSubmitting = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      final favs = context.read<FavoritesProvider>();
+      final email = _emailCtrl.text.trim();
+      final password = _passCtrl.text;
+      final rememberMe = _rememberMe;
 
-    final success = await auth.login(email: email, password: password);
+      final success = await auth.login(email: email, password: password);
 
-    if (!mounted) return;
-
-    if (success) {
-      // Save credentials if remember me is checked
-      final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
-      await prefs.setBool('remember_me', rememberMe);
-      if (rememberMe) {
-        await prefs.setString('saved_email', email);
-      } else {
-        await prefs.remove('saved_email');
+
+      if (success) {
+        // Save credentials if remember me is checked
+        final prefs = await SharedPreferences.getInstance();
+        if (!mounted) return;
+        await prefs.setBool('remember_me', rememberMe);
+        if (rememberMe) {
+          await prefs.setString('saved_email', email);
+        } else {
+          await prefs.remove('saved_email');
+        }
+
+        if (!mounted) return;
+        final userId = auth.currentUser?.id;
+        if (userId != null) favs.loadFavorites(userId);
+
+        final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+        final target = (redirect != null && redirect.isNotEmpty && redirect != '/login' && redirect != '/register')
+            ? redirect
+            : '/';
+        context.go(target);
       }
-
-      if (!mounted) return;
-      final userId = auth.currentUser?.id;
-      if (userId != null) favs.loadFavorites(userId);
-      context.go('/');
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -211,8 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Submit
-                auth.isLoading
+                (auth.isLoading || _isSubmitting)
                     ? const Center(child: CircularProgressIndicator())
                     : SizedBox(
                         width: double.infinity,

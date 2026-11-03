@@ -37,10 +37,20 @@ def create_app(config_class=Config) -> Flask:
         and not is_pytest
     )
     if enforce_prod_check:
+        if app.config.get("DEBUG"):
+            raise ValueError(
+                "Critical Security Misconfiguration: DEBUG mode cannot be enabled when running in production."
+            )
         secret_key = str(app.config.get("SECRET_KEY", "")).strip()
         if not secret_key or secret_key in ("replace-with-a-long-random-string", "dev-insecure-secret-key"):
             raise ValueError(
                 "Critical Security Misconfiguration: SECRET_KEY environment variable must be set "
+                "to a secure random string when running in production mode."
+            )
+        libris_api_key = str(app.config.get("LIBRIS_API_KEY", "")).strip()
+        if not libris_api_key or libris_api_key in ("replace-with-a-secure-random-api-key", "dev-insecure-api-key"):
+            raise ValueError(
+                "Critical Security Misconfiguration: LIBRIS_API_KEY environment variable must be set "
                 "to a secure random string when running in production mode."
             )
 
@@ -88,6 +98,10 @@ def create_app(config_class=Config) -> Flask:
         if app.config.get("TESTING", False) and not app.config.get("ENFORCE_AUTH_IN_TESTS", False):
             return None
 
+        # Allow CORS preflight OPTIONS requests
+        if request.method == "OPTIONS":
+            return None
+
         # Allow root manifest, health checks, and docs without key
         if (
             request.path == "/"
@@ -115,6 +129,29 @@ def create_app(config_class=Config) -> Flask:
 
                 if hmac.compare_digest(api_key_clean, server_key):
                     g.is_server = True
+                    auth_header = request.headers.get("Authorization")
+                    if auth_header:
+                        if not auth_header.startswith("Bearer "):
+                            log_event(__name__, logging.WARNING, msg="Unauthorized access attempt: Invalid auth scheme with X-Api-Key", ip=request.remote_addr)
+                            return jsonify({"error": "Unauthorized: Invalid Authorization scheme"}), 401
+                        token = auth_header.split(" ", 1)[1].strip()
+                        if not token:
+                            return jsonify({"error": "Unauthorized: Empty Bearer token"}), 401
+                        anon_key = app.config.get("SUPABASE_ANON_KEY")
+                        if anon_key and token == anon_key:
+                            g.is_anon = True
+                        else:
+                            try:
+                                from .routes.routes import _auth_port
+                                user = _auth_port.verify_token(token) if _auth_port else None
+                                if not user or not getattr(user, "id", None):
+                                    return jsonify({"error": "Unauthorized: Invalid or expired Bearer token"}), 401
+                                g.user_id = user.id
+                                g.jwt_token = token
+                                g.user = user
+                            except Exception as exc:
+                                log_event(__name__, logging.WARNING, msg="JWT verification failed with X-Api-Key", error=str(exc), ip=request.remote_addr)
+                                return jsonify({"error": "Unauthorized: Invalid or expired Bearer token"}), 401
                     return None
                 log_event(__name__, logging.WARNING, msg="Unauthorized access attempt: Invalid X-Api-Key", ip=request.remote_addr)
                 return jsonify({"error": "Unauthorized: Invalid API Key"}), 401
@@ -163,6 +200,28 @@ def create_app(config_class=Config) -> Flask:
         if hasattr(g, "request_id"):
             response.headers["X-Request-Id"] = g.request_id
 
+        # Cache directives for privacy and CDN correctness:
+        if "Cache-Control" not in response.headers:
+            path = request.path
+            if response.status_code >= 400:
+                response.headers["Cache-Control"] = "private, no-cache, no-store, max-age=0, must-revalidate"
+                response.headers["Pragma"] = "no-cache"
+            else:
+                is_authenticated = getattr(g, "user_id", None) is not None
+                is_personalized = path.startswith("/api/recommend/personalized")
+                is_mutation_or_private = (
+                    path.startswith("/api/preferences")
+                    or path.startswith("/api/feedback")
+                    or path.startswith("/api/track")
+                    or path.startswith("/api/onboarding")
+                )
+                if is_authenticated or is_personalized or is_mutation_or_private:
+                    response.headers["Cache-Control"] = "private, no-cache, no-store, max-age=0, must-revalidate"
+                    response.headers["Pragma"] = "no-cache"
+                    response.headers["Vary"] = "Authorization, Cookie"
+                elif path.startswith("/api/books") or path == "/api/categories" or path == "/api/recommend":
+                    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=600"
+
         # Don't log if testing or path is root/health
         if app.config.get("TESTING", False) or request.path in ("/", "/api/health"):
             return response
@@ -179,9 +238,6 @@ def create_app(config_class=Config) -> Flask:
             duration_ms=duration_ms,
             content_length=response.content_length
         )
-        # Propagate request id back to client
-        if hasattr(g, "request_id"):
-            response.headers["X-Request-Id"] = g.request_id
         return response
 
     # ── Global error handlers ─────────────────────────────────────────────────
@@ -230,4 +286,6 @@ def create_app(config_class=Config) -> Flask:
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=Config.DEBUG)
+    host = os.getenv("HOST", "127.0.0.1")
+    port = int(os.getenv("PORT", "5000"))
+    app.run(host=host, port=port, debug=Config.DEBUG)

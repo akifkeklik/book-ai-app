@@ -13,4 +13,8 @@ class ViewBookDetailsUseCase {
   Future<List<Book>> getSimilarBooks(String title) {
     return _repository.getRecommendations(title);
   }
+
+  Future<String?> getUserInteraction(String userId, String bookId) {
+    return _repository.getUserInteraction(userId, bookId);
+  }
 }

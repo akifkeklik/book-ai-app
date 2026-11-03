@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
+import '../providers/favorites_provider.dart';
 import '../providers/language_provider.dart';
 import '../theme/design_system.dart';
 
@@ -21,6 +22,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePass = true;
   bool _obscureConfirm = true;
   bool _registered = false;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -31,15 +33,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
-    final auth = context.read<AuthProvider>();
-    final success = await auth.register(
-      email: _emailCtrl.text.trim(),
-      password: _passCtrl.text,
-    );
-    if (!mounted) return;
-    if (success) {
-      setState(() => _registered = true);
+
+    setState(() => _isSubmitting = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      final success = await auth.register(
+        email: _emailCtrl.text.trim(),
+        password: _passCtrl.text,
+      );
+      if (!mounted) return;
+      if (success) {
+        if (auth.requiresEmailConfirmation) {
+          setState(() => _registered = true);
+        } else {
+          final favs = context.read<FavoritesProvider>();
+          final userId = auth.currentUser?.id;
+          if (userId != null) favs.loadFavorites(userId);
+
+          final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+          final target = (redirect != null && redirect.isNotEmpty && redirect != '/login' && redirect != '/register')
+              ? redirect
+              : '/';
+          context.go(target);
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -202,7 +225,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                auth.isLoading
+                (auth.isLoading || _isSubmitting)
                     ? const Center(child: CircularProgressIndicator())
                     : SizedBox(
                         width: double.infinity,

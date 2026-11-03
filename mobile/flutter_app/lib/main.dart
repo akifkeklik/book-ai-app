@@ -7,10 +7,17 @@ import 'package:go_router/go_router.dart';
 
 import 'config.dart';
 import 'di/service_locator.dart';
+import 'services/background_sync_manager.dart';
+import 'services/sync_coordinator.dart';
+import 'data/repositories/notes_outbox_repository.dart';
 import 'providers/auth_provider.dart';
 import 'providers/catalog_provider.dart';
 import 'providers/recommendation_provider.dart';
 import 'providers/search_provider.dart';
+import 'providers/notes_provider.dart';
+import 'providers/learning_path_provider.dart';
+import 'providers/knowledge_graph_provider.dart';
+import 'providers/learning_provider.dart';
 import 'providers/favorites_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/theme_provider.dart';
@@ -42,8 +49,8 @@ class _DevHttpOverrides extends HttpOverrides {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Android emulator debug: SSL sertifika doğrulamasını atla
-  if (kDebugMode) {
+  // Android emulator debug: SSL sertifika doğrulamasını atla (only on native platforms)
+  if (kDebugMode && !kIsWeb) {
     HttpOverrides.global = _DevHttpOverrides();
   }
 
@@ -53,13 +60,24 @@ Future<void> main() async {
     debugPrint('Startup Initialization Error: $e');
   }
 
+  // Native background outbox synchronization registration
+  try {
+    BackgroundSyncManager.registerBackgroundSync();
+  } catch (e) {
+    debugPrint('Background Sync Registration Warning: $e');
+  }
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
-        ChangeNotifierProvider(create: (_) => AuthProvider(ServiceLocator.supabaseService)),
-        Provider(create: (_) => ServiceLocator.processAiChatUseCase),
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(
+            ServiceLocator.supabaseService,
+            bookRepository: ServiceLocator.bookRepository,
+          ),
+        ),
         Provider(create: (_) => ServiceLocator.manageUserProfileUseCase),
         Provider(create: (_) => ServiceLocator.viewBookDetailsUseCase),
         Provider(create: (_) => ServiceLocator.manageCatalogUseCase),
@@ -80,7 +98,16 @@ Future<void> main() async {
           ),
         ),
         ChangeNotifierProvider(create: (_) => FavoritesProvider(ServiceLocator.supabaseService)),
+        ChangeNotifierProvider(
+          create: (_) => NotesProvider(
+            apiService: ServiceLocator.apiService,
+            outboxRepository: NotesOutboxRepository(),
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => ErrorProvider()),
+        ChangeNotifierProvider(create: (_) => LearningPathProvider()),
+        ChangeNotifierProvider(create: (_) => KnowledgeGraphProvider()),
+        ChangeNotifierProvider(create: (_) => LearningProvider()),
       ],
       child: const LibrisApp(),
     ),
@@ -94,8 +121,33 @@ class LibrisApp extends StatefulWidget {
   State<LibrisApp> createState() => _LibrisAppState();
 }
 
-class _LibrisAppState extends State<LibrisApp> {
+class _LibrisAppState extends State<LibrisApp> with WidgetsBindingObserver {
   GoRouter? _router;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      try {
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final userId = auth.currentUser?.id;
+        if (userId != null && userId.isNotEmpty) {
+          SyncCoordinator.instance.resetAuthFailures(userId);
+        }
+      } catch (_) {}
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -115,8 +167,20 @@ class _LibrisAppState extends State<LibrisApp> {
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
       scrollBehavior: MyCustomScrollBehavior(),
-      theme: AppTheme.lightTheme(themeProvider.seedColor),
-      darkTheme: AppTheme.darkTheme(themeProvider.seedColor),
+      theme: AppTheme.lightTheme(
+        themeProvider.seedColor,
+        palette: themeProvider.palette,
+        highContrast: themeProvider.highContrast,
+        fontFamily: themeProvider.fontFamily,
+        lineSpacing: themeProvider.lineSpacing,
+      ),
+      darkTheme: AppTheme.darkTheme(
+        themeProvider.seedColor,
+        palette: themeProvider.palette,
+        highContrast: themeProvider.highContrast,
+        fontFamily: themeProvider.fontFamily,
+        lineSpacing: themeProvider.lineSpacing,
+      ),
       themeMode: themeProvider.themeMode,
       routerConfig: _router!,
       locale: langProvider.locale,

@@ -1,0 +1,168 @@
+{
+  "benchmark_date": "2026-10-25 01:35:07",
+  "timing_mechanism": "time.perf_counter (Monotonic)",
+  "timer_resolution_ns": 100.0,
+  "catalog_size": 6446,
+  "results": [
+    {
+      "id": "CASE-01",
+      "name": "Deterministic Clock Query",
+      "query": "Bugün günlerden ne, saat kaç?",
+      "environment": "Local Deterministic",
+      "cache_state": "N/A (Bypassed)",
+      "external_calls": false,
+      "status": "clock",
+      "metrics": {
+        "samples": 30,
+        "median_ms": 0.026,
+        "p95_ms": 0.032,
+        "min_ms": 0.025,
+        "max_ms": 0.033
+      }
+    },
+    {
+      "id": "CASE-02",
+      "name": "Exact Catalog Existence Lookup",
+      "query": "1984 kitabı var mı?",
+      "environment": "Local Catalog Word-Boundary Match",
+      "cache_state": "Cold -> Warm Cached",
+      "external_calls": false,
+      "status": "success",
+      "metrics": {
+        "samples": 30,
+        "median_ms": 0.097,
+        "p95_ms": 0.102,
+        "min_ms": 0.096,
+        "max_ms": 0.102
+      }
+    },
+    {
+      "id": "CASE-03",
+      "name": "Author Inquiry Lookup",
+      "query": "1984'ün yazarı kim?",
+      "environment": "Local Catalog Deterministic",
+      "cache_state": "Cold -> Warm Cached",
+      "external_calls": false,
+      "status": "success",
+      "metrics": {
+        "samples": 30,
+        "median_ms": 0.097,
+        "p95_ms": 0.102,
+        "min_ms": 0.096,
+        "max_ms": 0.106
+      }
+    },
+    {
+      "id": "CASE-04",
+      "name": "Rating Inquiry Lookup",
+      "query": "1984 kitabı kaç puan almış?",
+      "environment": "Local Catalog Deterministic",
+      "cache_state": "Cold -> Warm Cached",
+      "external_calls": false,
+      "status": "success",
+      "metrics": {
+        "samples": 30,
+        "median_ms": 0.108,
+        "p95_ms": 0.128,
+        "min_ms": 0.104,
+        "max_ms": 0.13
+      }
+    },
+    {
+      "id": "CASE-05",
+      "name": "Semantic Recommendation (Cold Cache)",
+      "query": "bana distopik bir kitap öner",
+      "environment": "Local Recommender + Simulated Provider",
+      "cache_state": "Cold (Miss)",
+      "external_calls": true,
+      "status": "success",
+      "metrics": {
+        "samples": 1,
+        "median_ms": 14.532,
+        "p95_ms": 14.532,
+        "min_ms": 14.532,
+        "max_ms": 14.532
+      }
+    },
+    {
+      "id": "CASE-06",
+      "name": "Identical Semantic (Warm Cache Hit)",
+      "query": "bana distopik bir kitap öner",
+      "environment": "In-Memory LRU Cache",
+      "cache_state": "Warm (Hit)",
+      "external_calls": false,
+      "status": "success",
+      "metrics": {
+        "samples": 50,
+        "median_ms": 0.078,
+        "p95_ms": 0.086,
+        "min_ms": 0.077,
+        "max_ms": 0.114
+      }
+    },
+    {
+      "id": "CASE-07",
+      "name": "Semantically Equivalent Query (Nonidentical)",
+      "query": "distopik edebiyat önerisi istiyorum",
+      "environment": "Local Recommender + Simulated Provider",
+      "cache_state": "Cold (Distinct Key)",
+      "external_calls": true,
+      "status": "success",
+      "metrics": {
+        "samples": 1,
+        "median_ms": 11.782,
+        "p95_ms": 11.782,
+        "min_ms": 11.782,
+        "max_ms": 11.782
+      }
+    },
+    {
+      "id": "CASE-08",
+      "name": "Different User Context (User Isolation)",
+      "query": "bana distopik bir kitap öner [User B]",
+      "environment": "Local Recommender + Simulated Provider",
+      "cache_state": "Cold (User Key Isolation)",
+      "external_calls": true,
+      "status": "success",
+      "metrics": {
+        "samples": 1,
+        "median_ms": 12.543,
+        "p95_ms": 12.543,
+        "min_ms": 12.543,
+        "max_ms": 12.543
+      }
+    },
+    {
+      "id": "CASE-09",
+      "name": "Cache Expiry (Clock Advanced 601s)",
+      "query": "bana distopik bir kitap öner [Post-TTL]",
+      "environment": "In-Memory LRU Cache + Execution",
+      "cache_state": "Expired -> Recomputed",
+      "external_calls": true,
+      "status": "success",
+      "metrics": {
+        "samples": 1,
+        "median_ms": 14.09,
+        "p95_ms": 14.09,
+        "min_ms": 14.09,
+        "max_ms": 14.09
+      }
+    },
+    {
+      "id": "CASE-10",
+      "name": "Provider Timeout / Quota Failure",
+      "query": "karanlık bilim kurgu kitapları [Timeout]",
+      "environment": "Deterministic Fallback Mode",
+      "cache_state": "Uncached (Transient Failure)",
+      "external_calls": true,
+      "status": "llm_fallback",
+      "metrics": {
+        "samples": 1,
+        "median_ms": 14.567,
+        "p95_ms": 14.567,
+        "min_ms": 14.567,
+        "max_ms": 14.567
+      }
+    }
+  ]
+}

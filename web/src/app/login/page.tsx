@@ -105,7 +105,13 @@ function LoginForm() {
       </form>
       
       <p className="text-center" style={{ marginTop: '2rem', fontSize: '0.875rem' }}>
-        Don&apos;t have an account? <Link href="/signup" style={{ color: 'var(--primary)', fontWeight: 500 }}>Sign up</Link>
+        Don&apos;t have an account?{' '}
+        <Link
+          href={searchParams.get('redirect') ? `/signup?redirect=${encodeURIComponent(searchParams.get('redirect')!)}` : '/signup'}
+          style={{ color: 'var(--primary)', fontWeight: 500 }}
+        >
+          Sign up
+        </Link>
       </p>
     </div>
   );

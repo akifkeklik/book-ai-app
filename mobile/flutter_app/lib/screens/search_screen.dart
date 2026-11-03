@@ -152,10 +152,45 @@ class _SearchScreenState extends State<SearchScreen> {
             message: context.tr('search_no_results_message'),
           );
         }
-        return ListView.builder(
-          padding: const EdgeInsets.only(top: 8, bottom: 32),
-          itemCount: searchProv.searchResults.length,
-          itemBuilder: (_, i) => BookListTile(book: searchProv.searchResults[i]),
+        return Column(
+          children: [
+            if (searchProv.isFromCache)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.cloud_off_rounded,
+                      size: 16,
+                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        context.tr('offline_cached_results'),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.8),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.only(top: 0, bottom: 32),
+                itemCount: searchProv.searchResults.length,
+                itemBuilder: (_, i) => BookListTile(book: searchProv.searchResults[i]),
+              ),
+            ),
+          ],
         );
     }
   }
@@ -202,7 +237,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Ask AI what to read',
+                          context.tr('ai_discovery_title'),
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -210,7 +245,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Describe your mood or a scenario.',
+                          context.tr('ai_discovery_desc'),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: Colors.white.withOpacity(0.8),
                           ),

@@ -18,12 +18,9 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  bool _isSaving = false;
 
-  // Configuration for steps
   final List<String> _selectedCategories = [];
-  int _readingFrequency = 2; // Default Medium
-  final List<String> _selectedAuthors = [];
-  String _selectedVibe = 'relaxed';
   final List<String> _selectedBooks = []; // ISBNs
 
   final List<Map<String, String>> _categories = [
@@ -41,7 +38,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     {'id': 'Art', 'icon': '🎨'},
   ];
 
-  final List<String> _vibes = ['relaxed', 'intense', 'adventurous', 'educational'];
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingProfile();
+  }
+
+  Future<void> _loadExistingProfile() async {
+    final userId = context.read<AuthProvider>().currentUser?.id;
+    if (userId != null) {
+      try {
+        final profile = await context.read<ManageUserProfileUseCase>().getUserProfile(userId);
+        if (profile != null && mounted) {
+          final genres = profile['preferred_genres'] as List<dynamic>?;
+          if (genres != null && genres.isNotEmpty) {
+            setState(() {
+              _selectedCategories.clear();
+              _selectedCategories.addAll(genres.map((g) => g.toString()));
+            });
+          }
+        }
+      } catch (_) {
+        // Safe fallback: new user starts with empty selection
+      }
+    }
+  }
 
   void _toggleCategory(String id) {
     setState(() {
@@ -53,40 +74,88 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     });
   }
 
+  Future<void> _skipOnboarding() async {
+    final auth = context.read<AuthProvider>();
+    final userId = auth.currentUser?.id;
+    if (userId != null) {
+      try {
+        // Record profile touch so user is not prompted again in an infinite loop
+        await context.read<ManageUserProfileUseCase>().upsertUserProfile(
+          userId: userId,
+          preferredGenres: _selectedCategories,
+          readingFrequency: 2,
+          preferredAuthors: [],
+          preferredVibe: 'relaxed',
+        );
+      } catch (_) {}
+    }
+    if (mounted) {
+      context.go('/');
+    }
+  }
+
   Future<void> _finishOnboarding() async {
     final auth = context.read<AuthProvider>();
     final recommendationProvider = context.read<RecommendationProvider>();
     final userId = auth.currentUser?.id;
-    if (userId == null) return;
+    if (userId == null) {
+      context.go('/');
+      return;
+    }
+
+    setState(() => _isSaving = true);
 
     try {
-      // 1. Classic profile update (legacy support)
+      // 1. Persist user taste profile (isolated: does not overwrite favorites/reading statuses)
       await context.read<ManageUserProfileUseCase>().upsertUserProfile(
         userId: userId,
         preferredGenres: _selectedCategories,
-        readingFrequency: _readingFrequency,
-        preferredAuthors: _selectedAuthors,
-        preferredVibe: _selectedVibe,
+        readingFrequency: 2,
+        preferredAuthors: [],
+        preferredVibe: 'relaxed',
       );
 
-      // 2. New AI Onboarding submission
+      // 2. Submit AI Onboarding signal to calibrate recommender
       final success = await recommendationProvider.submitOnboarding(
         userId: userId,
         bookIds: _selectedBooks,
         genres: _selectedCategories,
       );
-      
-      if (mounted && success) {
-        context.go('/');
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.tr('error'))),
-        );
+
+      if (mounted) {
+        setState(() => _isSaving = false);
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.tr('taste_profile_saved')),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          context.go('/');
+        } else {
+          // Recoverable: offer user to proceed or retry
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.tr('error_loading_books')),
+              action: SnackBarAction(
+                label: context.tr('retry'),
+                onPressed: _finishOnboarding,
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${context.tr('error')}: $e')),
+          SnackBar(
+            content: Text('${context.tr('error')}: $e'),
+            action: SnackBarAction(
+              label: context.tr('retry'),
+              onPressed: _finishOnboarding,
+            ),
+          ),
         );
       }
     }
@@ -105,7 +174,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             end: Alignment.bottomRight,
             colors: [
               theme.scaffoldBackgroundColor,
-              theme.colorScheme.primary.withOpacity(0.05),
+              theme.colorScheme.primary.withOpacity(0.06),
               theme.scaffoldBackgroundColor,
             ],
           ),
@@ -121,9 +190,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   onPageChanged: (i) => setState(() => _currentPage = i),
                   children: [
                     _buildGenreStep(theme, lang),
-                    _buildHabitStep(theme, lang),
-                    _buildAuthorStep(theme, lang),
-                    _buildVibeStep(theme, lang),
                     _buildBookSelectionStep(theme, lang),
                   ],
                 ),
@@ -137,23 +203,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildHeader(ThemeData theme, LanguageProvider lang) {
-    double progress = (_currentPage + 1) / 5;
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${context.tr('next').toUpperCase()} ${_currentPage + 1} / 5',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
-                ),
-              ),
               if (_currentPage > 0)
                 TextButton.icon(
                   onPressed: () => _pageController.previousPage(
@@ -162,17 +219,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   icon: const Icon(Icons.arrow_back_rounded, size: 16),
                   label: Text(lang.translate('back')),
-                  style: TextButton.styleFrom(foregroundColor: Colors.white24),
+                  style: TextButton.styleFrom(foregroundColor: theme.colorScheme.onSurface.withOpacity(0.7)),
+                )
+              else
+                Text(
+                  '${context.tr('taste_profile').toUpperCase()} (${_currentPage + 1}/2)',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
                 ),
+              TextButton(
+                onPressed: _skipOnboarding,
+                style: TextButton.styleFrom(
+                  foregroundColor: theme.colorScheme.onSurface.withOpacity(0.6),
+                ),
+                child: Text(
+                  context.tr('skip'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 8,
-              backgroundColor: Colors.white10,
+              value: (_currentPage + 1) / 2,
+              minHeight: 6,
+              backgroundColor: theme.colorScheme.onSurface.withOpacity(0.08),
               valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
             ),
           ),
@@ -187,16 +263,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: [
         Text(
           title,
-          style: theme.textTheme.headlineMedium?.copyWith(
+          style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w900,
-            color: Colors.white,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
           subtitle,
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: Colors.white54,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withOpacity(0.65),
             height: 1.4,
           ),
         ),
@@ -205,21 +280,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildGenreStep(ThemeData theme, LanguageProvider lang) {
+    final isDark = theme.brightness == Brightness.dark;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildStepTitle(
             lang.translate('onboarding_title_1'),
-            lang.translate('onboarding_subtitle_1'),
+            lang.translate('select_genres_hint'),
             theme,
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
+          if (_selectedCategories.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                '${_selectedCategories.length} selected',
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
           Expanded(
             child: GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 1.3,
+                childAspectRatio: 1.4,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
@@ -229,195 +319,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 final isSelected = _selectedCategories.contains(cat['id']);
                 return InkWell(
                   onTap: () => _toggleCategory(cat['id']!),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     decoration: BoxDecoration(
-                      color: isSelected ? theme.colorScheme.primary : theme.cardColor.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(20),
+                      color: isSelected
+                          ? theme.colorScheme.primary.withOpacity(0.2)
+                          : (isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03)),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isSelected ? Colors.transparent : Colors.white10,
+                        color: isSelected ? theme.colorScheme.primary : (isDark ? Colors.white12 : Colors.black12),
+                        width: isSelected ? 2 : 1,
                       ),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(cat['icon']!, style: const TextStyle(fontSize: 32)),
-                        const SizedBox(height: 8),
+                        Text(cat['icon']!, style: const TextStyle(fontSize: 28)),
+                        const SizedBox(height: 6),
                         Text(
                           lang.translate('genre_${cat['id']!.toLowerCase().replaceAll('-', '_')}'),
+                          textAlign: TextAlign.center,
                           style: theme.textTheme.titleSmall?.copyWith(
-                            color: isSelected ? Colors.black : Colors.white70,
-                            fontWeight: FontWeight.w800,
+                            color: isSelected
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface,
+                            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHabitStep(ThemeData theme, LanguageProvider lang) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildStepTitle(
-            lang.translate('onboarding_title_2'),
-            lang.translate('onboarding_subtitle_2'),
-            theme,
-          ),
-          const SizedBox(height: 48),
-          _habitCard(theme, 1, lang.translate('habit_low'), Icons.menu_book_outlined),
-          const SizedBox(height: 16),
-          _habitCard(theme, 2, lang.translate('habit_medium'), Icons.auto_stories_outlined),
-          const SizedBox(height: 16),
-          _habitCard(theme, 3, lang.translate('habit_high'), Icons.library_books_rounded),
-        ],
-      ),
-    );
-  }
-
-  Widget _habitCard(ThemeData theme, int value, String label, IconData icon) {
-    final isSelected = _readingFrequency == value;
-    return InkWell(
-      onTap: () => setState(() => _readingFrequency = value),
-      borderRadius: BorderRadius.circular(24),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: isSelected ? theme.colorScheme.primary.withOpacity(0.1) : Colors.white.withOpacity(0.02),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isSelected ? theme.colorScheme.primary : Colors.white10,
-            width: 2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: isSelected ? theme.colorScheme.primary : Colors.white24, size: 32),
-            const SizedBox(width: 24),
-            Text(label, style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: isSelected ? FontWeight.w900 : FontWeight.w500,
-              color: isSelected ? Colors.white : Colors.white54,
-            )),
-            const Spacer(),
-            if (isSelected) Icon(Icons.check_circle, color: theme.colorScheme.primary),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAuthorStep(ThemeData theme, LanguageProvider lang) {
-    // Senior Suggestion: Allow user to type favorite authors instead of static list
-    final List<String> commonAuthors = ['J.R.R. Tolkien', 'George Orwell', 'Stephen King', 'Virginia Woolf', 'Franz Kafka', 'Fyodor Dostoevsky'];
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildStepTitle(
-            lang.translate('onboarding_title_3'),
-            lang.translate('onboarding_subtitle_3'),
-            theme,
-          ),
-          const SizedBox(height: 32),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: commonAuthors.map((author) {
-              final isSelected = _selectedAuthors.contains(author);
-              return FilterChip(
-                label: Text(author),
-                selected: isSelected,
-                onSelected: (val) {
-                  setState(() {
-                    if (val) { _selectedAuthors.add(author); }
-                    else { _selectedAuthors.remove(author); }
-                  });
-                },
-                backgroundColor: theme.cardColor.withOpacity(0.3),
-                selectedColor: theme.colorScheme.primary,
-                labelStyle: TextStyle(
-                  color: isSelected ? Colors.black : Colors.white70,
-                  fontWeight: FontWeight.bold,
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 24),
-          TextField(
-            decoration: InputDecoration(
-              hintText: context.tr('search_hint'),
-              prefixIcon: const Icon(Icons.add),
-              filled: true,
-              fillColor: Colors.white.withOpacity(0.05),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-            ),
-            onSubmitted: (val) {
-              if (val.isNotEmpty) {
-                setState(() => _selectedAuthors.add(val));
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVibeStep(ThemeData theme, LanguageProvider lang) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildStepTitle(
-            lang.translate('onboarding_title_4'),
-            lang.translate('onboarding_subtitle_4'),
-            theme,
-          ),
-          const SizedBox(height: 32),
-          Expanded(
-            child: ListView.separated(
-              itemCount: _vibes.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final vibe = _vibes[index];
-                final isSelected = _selectedVibe == vibe;
-                return InkWell(
-                  onTap: () => setState(() => _selectedVibe = vibe),
-                  borderRadius: BorderRadius.circular(20),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: isSelected ? theme.colorScheme.primary.withOpacity(0.1) : theme.cardColor.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected ? theme.colorScheme.primary : Colors.white10,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          lang.translate('vibe_$vibe'),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: isSelected ? Colors.white : Colors.white70,
-                            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w500,
-                          ),
-                        ),
-                        const Spacer(),
-                        if (isSelected) Icon(Icons.check_circle, color: theme.colorScheme.primary),
                       ],
                     ),
                   ),
@@ -432,8 +361,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildBookSelectionStep(ThemeData theme, LanguageProvider lang) {
     final searchProvider = context.watch<SearchProvider>();
+    final isDark = theme.brightness == Brightness.dark;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -442,65 +373,83 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             lang.translate('onboarding_subtitle_5'),
             theme,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           TextField(
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: theme.colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: lang.translate('search_hint'),
-              prefixIcon: const Icon(Icons.search, color: Colors.white54),
+              prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurface.withOpacity(0.5)),
               filled: true,
-              fillColor: Colors.white.withOpacity(0.05),
+              fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.04),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
             ),
             onChanged: (val) {
               if (val.length > 2) searchProvider.search(val);
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           if (_selectedBooks.isNotEmpty)
             SizedBox(
-              height: 48,
+              height: 40,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _selectedBooks.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, i) {
                   return Chip(
-                    label: Text("${lang.translate('book')} ${i+1}", style: const TextStyle(fontSize: 10)),
-                    backgroundColor: theme.colorScheme.primary,
+                    label: Text('${lang.translate('book')} ${i + 1}', style: const TextStyle(fontSize: 10)),
+                    backgroundColor: theme.colorScheme.primary.withOpacity(0.2),
                     deleteIcon: const Icon(Icons.close, size: 14),
                     onDeleted: () => setState(() => _selectedBooks.removeAt(i)),
                   );
                 },
               ),
             ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Expanded(
             child: searchProvider.status == SearchStatus.loading
                 ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                    itemCount: searchProvider.searchResults.length,
-                    itemBuilder: (context, i) {
-                      final book = searchProvider.searchResults[i];
-                      final isSelected = _selectedBooks.contains(book.isbn13);
-                      return ListTile(
-                        leading: Image.network(book.coverUrl, height: 40, width: 30, fit: BoxFit.cover, 
-                          errorBuilder: (_,__,___) => const Icon(Icons.book)),
-                        title: Text(book.title, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                        subtitle: Text(book.authorsFormatted, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                        trailing: Checkbox(
-                          value: isSelected,
-                          activeColor: theme.colorScheme.primary,
-                          onChanged: (val) {
-                            setState(() {
-                              if (val == true) { _selectedBooks.add(book.isbn13); }
-                              else { _selectedBooks.remove(book.isbn13); }
-                            });
-                          },
+                : searchProvider.searchResults.isEmpty
+                    ? Center(
+                        child: Text(
+                          lang.translate('search_placeholder'),
+                          style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.5)),
                         ),
-                      );
-                    },
-                  ),
+                      )
+                    : ListView.builder(
+                        itemCount: searchProvider.searchResults.length,
+                        itemBuilder: (context, i) {
+                          final book = searchProvider.searchResults[i];
+                          final isSelected = _selectedBooks.contains(book.isbn13);
+                          return ListTile(
+                            leading: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Image.network(
+                                book.coverUrl,
+                                height: 40,
+                                width: 30,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(Icons.book),
+                              ),
+                            ),
+                            title: Text(book.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: Text(book.authorsFormatted, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            trailing: Checkbox(
+                              value: isSelected,
+                              activeColor: theme.colorScheme.primary,
+                              onChanged: (val) {
+                                setState(() {
+                                  if (val == true) {
+                                    _selectedBooks.add(book.isbn13);
+                                  } else {
+                                    _selectedBooks.remove(book.isbn13);
+                                  }
+                                });
+                              },
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
@@ -508,35 +457,63 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildFooter(ThemeData theme, LanguageProvider lang) {
-    bool canGoNext = true;
-    if (_currentPage == 0 && _selectedCategories.length < 3) canGoNext = false;
-    if (_currentPage == 4 && _selectedBooks.length < 3) canGoNext = false;
-    
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-      child: SizedBox(
-        width: double.infinity,
-        height: 64,
-        child: ElevatedButton(
-          onPressed: canGoNext 
-            ? (_currentPage < 4 
-                ? () => _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut)
-                : _finishOnboarding)
-            : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: Colors.black,
-            disabledBackgroundColor: Colors.white10,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            elevation: 8,
-            shadowColor: theme.colorScheme.primary.withOpacity(0.4),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _skipOnboarding,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              child: Text(
+                lang.translate('skip_for_now'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
           ),
-          child: Text(
-            _currentPage == 4 ? lang.translate('finish').toUpperCase() : lang.translate('next').toUpperCase(),
-            style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: _isSaving
+                  ? null
+                  : (_currentPage == 0
+                      ? () => _pageController.nextPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          )
+                      : _finishOnboarding),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 4,
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      _currentPage == 0
+                          ? lang.translate('next').toUpperCase()
+                          : lang.translate('finish').toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1),
+                    ),
+            ),
           ),
-        ),
+        ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 }

@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-10-27 15:59:21Z",
+  "suite": "Libris Deterministic Recommendation & Personalization Evaluation",
+  "scenarios_evaluated": 7,
+  "metrics": {
+    "total_recommendations_generated": 12,
+    "exclusion_violation_count": 0,
+    "duplicate_rate": 0.0,
+    "catalog_validity_rate": 1.0,
+    "fallback_correctness": 1.0,
+    "ranking_order_consistency": 1.0
+  },
+  "scenarios": {
+    "1_strong_favorites": {
+      "status": "PASS",
+      "items_returned": 2
+    },
+    "2_explicit_dislikes": {
+      "status": "PASS",
+      "exclusion_violations": 0
+    },
+    "3_finished_and_reading": {
+      "status": "PASS",
+      "weight_hierarchy_valid": true
+    },
+    "4_sparse_history": {
+      "status": "PASS",
+      "items_returned": 1
+    },
+    "5_no_history_cold_start": {
+      "status": "PASS"
+    },
+    "6_empty_catalog": {
+      "status": "PASS"
+    },
+    "7_duplicate_candidates": {
+      "status": "PASS"
+    }
+  }
+}

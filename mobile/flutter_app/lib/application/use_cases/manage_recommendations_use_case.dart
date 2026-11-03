@@ -1,3 +1,4 @@
+import '../../data/repositories/book_repository_impl.dart';
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/book.dart';
 import '../../domain/repositories/book_repository.dart';
@@ -7,9 +8,23 @@ class ManageRecommendationsUseCase {
 
   ManageRecommendationsUseCase(this._repository);
 
-  Future<List<Book>> getPersonalizedRecs(String userId, List<Book> currentPopularBooks) async {
+  Future<List<Book>> getPersonalizedRecs(
+    String userId,
+    List<Book> currentPopularBooks, {
+    String? category,
+    bool? excludeCompleted,
+  }) async {
     try {
-      final recs = await _repository.getPersonalizedRecommendations(userId);
+      List<Book> recs;
+      if (_repository is BookRepositoryImpl) {
+        recs = await _repository.getAdaptiveRecommendations(
+          userId: userId,
+          category: category,
+          excludeCompleted: excludeCompleted,
+        );
+      } else {
+        recs = await _repository.getPersonalizedRecommendations(userId);
+      }
       
       if (recs.isEmpty || _isTooSimilarToPopular(recs, currentPopularBooks)) {
         debugPrint('Personalized recs empty/similar to popular, trying fallback...');

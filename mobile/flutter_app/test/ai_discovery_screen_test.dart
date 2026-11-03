@@ -11,10 +11,15 @@ import 'auth_provider_test.dart' show FakeAuthService;
 
 void main() {
   Widget createScreen(ProcessAiChatUseCase useCase) {
+    final lang = LanguageProvider();
+    lang.setTranslationsForTest('en', {
+      'ai_discovery_error': 'Failed to get recommendation from AI',
+      'no_response': 'No response received from AI librarian',
+    });
     return MultiProvider(
       providers: [
         Provider<ProcessAiChatUseCase>.value(value: useCase),
-        ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ChangeNotifierProvider<LanguageProvider>.value(value: lang),
         ChangeNotifierProvider(create: (_) => book_ai_app_auth_provider.AuthProvider(FakeAuthService())),
       ],
       child: const MaterialApp(
@@ -78,7 +83,8 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('ai_discovery_error'), findsOneWidget);
+      expect(find.textContaining('Failed to get recommendation from AI'), findsOneWidget);
+      expect(find.textContaining('ai_discovery_error'), findsNothing);
     });
 
     testWidgets('duplicate submit prevented while loading', (tester) async {
@@ -106,6 +112,66 @@ void main() {
 
       // Should only call repo once due to _isLoading flag
       expect(repo.chatCallCount, 1);
+    });
+
+    testWidgets('error response in payload displays backend error message', (tester) async {
+      final repo = FakeBookRepository();
+      repo.chatWithAIResult = {'error': 'Rate limit exceeded. Please try again later.'};
+
+      await tester.pumpWidget(createScreen(ProcessAiChatUseCase(repo)));
+
+      await tester.enterText(find.byType(TextField), 'Rate limit me');
+      await tester.tap(find.byType(IconButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rate limit exceeded. Please try again later.'), findsOneWidget);
+    });
+
+    testWidgets('empty answer string displays no_response fallback', (tester) async {
+      final repo = FakeBookRepository();
+      repo.chatWithAIResult = {'answer': '   '};
+
+      await tester.pumpWidget(createScreen(ProcessAiChatUseCase(repo)));
+
+      await tester.enterText(find.byType(TextField), 'Empty answer');
+      await tester.tap(find.byType(IconButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No response received from AI librarian'), findsOneWidget);
+      expect(find.text('no_response'), findsNothing);
+    });
+
+    testWidgets('multi-turn conversation preserves history across consecutive queries', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final repo = FakeBookRepository();
+      repo.chatWithAIResult = {'answer': 'First answer regarding sci-fi.'};
+
+      await tester.pumpWidget(createScreen(ProcessAiChatUseCase(repo)));
+
+      // Turn 1
+      await tester.enterText(find.byType(TextField), 'First question');
+      await tester.tap(find.byType(IconButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('First question'), findsOneWidget);
+      expect(find.text('First answer regarding sci-fi.'), findsOneWidget);
+
+      // Turn 2
+      repo.chatWithAIResult = {'answer': 'Second answer with cyberpunk recommendations.'};
+      await tester.enterText(find.byType(TextField), 'Second follow-up');
+      await tester.tap(find.byType(IconButton));
+      await tester.pumpAndSettle();
+
+      // Both turns must coexist in conversation history
+      expect(find.text('First question'), findsOneWidget);
+      expect(find.text('First answer regarding sci-fi.'), findsOneWidget);
+      expect(find.text('Second follow-up'), findsOneWidget);
+      expect(find.text('Second answer with cyberpunk recommendations.'), findsOneWidget);
+      expect(repo.chatCallCount, 2);
     });
   });
 }
