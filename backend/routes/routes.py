@@ -15,6 +15,14 @@ from ..infrastructure.security.rate_limiter import get_rate_limiter
 
 logger = logging.getLogger(__name__)
 
+
+class _UnavailableAuthPort:
+    """Fail-closed auth adapter used when Supabase auth is not configured."""
+    @staticmethod
+    def verify_token(token: str):
+        return None
+
+
 catalog_bp = Blueprint("catalog", __name__)
 discovery_bp = Blueprint("discovery", __name__)
 activity_bp = Blueprint("activity", __name__)
@@ -22,7 +30,7 @@ health_bp = Blueprint("health", __name__)
 
 # Re-exporting aliases for convenience and to avoid changing the rest of this file
 _book_data_port = container.book_data_port
-_auth_port = container.auth_port
+_auth_port = container.auth_port or _UnavailableAuthPort()
 _interaction_repo = container.interaction_repo
 _svc = container.book_service
 _get_books_uc = container.get_books_uc
@@ -88,7 +96,7 @@ def rebind_container(new_container):
     global _get_review_history_uc, _create_review_item_uc, _update_review_item_uc
     global _delete_review_item_uc, _get_concept_outcomes_uc
     _book_data_port = new_container.book_data_port
-    _auth_port = new_container.auth_port
+    _auth_port = new_container.auth_port or _UnavailableAuthPort()
     _interaction_repo = new_container.interaction_repo
     _svc = new_container.book_service
     _get_books_uc = new_container.get_books_uc
