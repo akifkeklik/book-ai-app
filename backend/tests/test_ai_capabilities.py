@@ -239,6 +239,22 @@ def test_llm_provider_unavailable_deterministic_fallback(client, auth_headers, m
         raise RuntimeError("External LLM API unavailable: 503 Service Unavailable")
 
     monkeypatch.setattr(container.llm_port, "generate_response", mock_fail_response)
+    monkeypatch.setattr(
+        container.process_rag_query_uc,
+        "_lookup_catalog_candidates",
+        lambda _query: [{
+            "isbn13": "9780451524935",
+            "title": "1984",
+            "authors": "George Orwell",
+            "thumbnail": "",
+            "average_rating": 4.6,
+        }],
+    )
+    monkeypatch.setattr(
+        container.process_rag_query_uc._enrichment_service,
+        "enrich",
+        lambda books: books,
+    )
 
     resp = client.post(
         "/api/ai/chat",
@@ -248,7 +264,7 @@ def test_llm_provider_unavailable_deterministic_fallback(client, auth_headers, m
     assert resp.status_code == 200
     data = resp.get_json()
     # Falls back gracefully to deterministic catalog result without crashing
-    assert data["status"] in ("llm_fallback", "success", "empty_retrieval", "embedding_failed")
+    assert data["status"] in ("llm_fallback", "success", "empty_retrieval")
     assert len(data.get("referenced_books", [])) > 0
     assert any("1984" in b.get("title", "") for b in data["referenced_books"])
 
