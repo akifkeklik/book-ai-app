@@ -53,7 +53,7 @@ An AI-assisted, multi-platform reading and personal-knowledge application built 
 
 **Libris** is a unified digital library and personal knowledge intelligence application engineered to address fragmented reader experiences. Rather than treating books as static isolated catalog entries, Libris treats reading as an ongoing cognitive journey—interlinking books, personal takeaways, concepts, learning milestones, and structured recall intervals into a cohesive personal knowledge graph.
 
-The system is deployed across three first-class platforms:
+The project is organized around three application surfaces:
 - **Mobile (iOS / Android):** A Flutter application with an optimistic local outbox and retry-based synchronization. Responsive behavior is covered by targeted tests; universal zero-overflow behavior is not claimed.
 - **Web (Desktop / Tablet):** A high-performance Next.js 16 App Router application powered by React 19, Turbopack, and Server Actions.
 - **Backend API:** A Python 3.12 Flask service implementing Clean Architecture with pluggable ports for relational persistence, hybrid recommendation, rate limiting, and vector RAG.
