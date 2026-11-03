@@ -129,16 +129,16 @@ def create_app(config_class=Config) -> Flask:
             return None
 
         if request.path.startswith("/api/"):
-            # Misconfiguration guard: never run "open" by accident
-            if not app.config.get("LIBRIS_API_KEY"):
-                log_event(__name__, logging.ERROR, msg="LIBRIS_API_KEY is not set. Refusing to serve protected endpoints.")
-                return jsonify({"error": "Server misconfigured"}), 503
-
-            # 1. Server-to-Server Authentication via X-Api-Key
+            # 1. Server-to-Server Authentication via X-Api-Key.
+            # A missing server key must not disable independent user-JWT authentication.
             api_key = request.headers.get("X-Api-Key")
             if api_key is not None:
-                api_key_clean = api_key.strip()
                 server_key = str(app.config.get("LIBRIS_API_KEY", "")).strip()
+                if not server_key:
+                    log_event(__name__, logging.ERROR, msg="LIBRIS_API_KEY is not set; rejecting X-Api-Key authentication.")
+                    return jsonify({"error": "Server misconfigured"}), 503
+
+                api_key_clean = api_key.strip()
                 if not api_key_clean or not server_key:
                     log_event(__name__, logging.WARNING, msg="Unauthorized access attempt: Empty X-Api-Key", ip=request.remote_addr)
                     return jsonify({"error": "Unauthorized: Invalid API Key"}), 401
