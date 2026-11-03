@@ -297,7 +297,13 @@ test('AI Grounding Integrity: verified books derive isGrounded true while empty 
     isbn13: '9780451524935',
     title: '1984',
     authors: 'George Orwell',
-    categories: ['Fiction'],
+    categories: 'Fiction',
+    description: '',
+    thumbnail: '',
+    averageRating: 4.5,
+    ratingsCount: 100,
+    publishedDate: '1949',
+    pageCount: 328,
   };
   assert.strictEqual(deriveGrounding([sampleBook]), true);
 });
