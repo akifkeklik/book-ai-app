@@ -10,8 +10,7 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 import psycopg2
-import psycopg2.extras
-import psycopg2.sql
+from psycopg2 import extras, sql
 import pytest
 
 from backend.app import create_app
@@ -51,7 +50,7 @@ def real_pg_uri():
     try:
         with admin_connection.cursor() as cursor:
             cursor.execute(
-                psycopg2.sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name))
+                sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name))
             )
     finally:
         admin_connection.close()
@@ -246,7 +245,7 @@ def test_b2_favorite_survives_fresh_read_and_shelf_changes(real_pg_uri: str):
 
     # 3. Read directly from public.favorites table
     conn = psycopg2.connect(real_pg_uri)
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+    with conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
         cur.execute("SELECT * FROM public.favorites WHERE user_id = %s AND book_id = %s;", (user_id, book_id))
         fav = cur.fetchone()
         assert fav is not None, "Favorite record was erased by reading status change!"
