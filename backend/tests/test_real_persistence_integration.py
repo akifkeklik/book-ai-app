@@ -23,7 +23,6 @@ from backend.routes.routes import rebind_container
 from psycopg2 import extras, sql
 
 
-
 pytestmark = pytest.mark.integration
 
 
