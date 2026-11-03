@@ -18,6 +18,9 @@ class Book {
   final double? finalScore;
   final double? diversityPenalty;
   final String? recommendationReason;
+  final String? explanationType;
+  final String? confidence;
+  final bool? isColdStart;
 
   const Book({
     required this.isbn13,
@@ -37,6 +40,9 @@ class Book {
     this.finalScore,
     this.diversityPenalty,
     this.recommendationReason,
+    this.explanationType,
+    this.confidence,
+    this.isColdStart,
   });
 
   @override
@@ -57,6 +63,7 @@ class FavoriteBook {
   final String bookTitle;
   final String thumbnail;
   final DateTime addedAt;
+  final String? status;
 
   const FavoriteBook({
     required this.id,
@@ -65,5 +72,6 @@ class FavoriteBook {
     required this.bookTitle,
     required this.thumbnail,
     required this.addedAt,
+    this.status,
   });
 }

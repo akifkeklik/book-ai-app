@@ -1,11 +1,13 @@
 import { ApiService } from '@/lib/api';
-import { BookCard } from '@/components/BookCard';
+import { CatalogBookList } from '@/components/CatalogBookList';
 import type { Book, Category, PaginatedResponse } from '@/types';
 import Link from 'next/link';
 import { Search, SlidersHorizontal, X, ArrowUpDown, Star, BookOpen } from 'lucide-react';
+import { cookies } from 'next/headers';
+import { translate, type TranslationKey } from '@/lib/i18n';
+import type { Language } from '@/lib/preferences';
 
-
-export const instant = false;
+export const dynamic = 'force-dynamic';
 
 export default async function CatalogPage({
   searchParams,
@@ -13,6 +15,11 @@ export default async function CatalogPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const resolvedParams = await searchParams;
+  const cookieStore = await cookies();
+  const rawLang = cookieStore.get('libris_lang')?.value;
+  const lang: Language = (rawLang === 'tr' || rawLang === 'de' || rawLang === 'en') ? rawLang : 'en';
+  const t = (key: TranslationKey, args?: Record<string, string | number>) => translate(lang, key, args);
+
   const page = Math.max(1, Number(resolvedParams.page) || 1);
   const category = (resolvedParams.category as string) || '';
   const q = (resolvedParams.q as string) || '';
@@ -82,10 +89,10 @@ export default async function CatalogPage({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>
           <div>
             <h1 style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>
-              {q ? `Search: "${q}"` : category ? `${category}` : 'Explore Catalog'}
+              {q ? `Search: "${q}"` : category ? `${category}` : t('catalog_title')}
             </h1>
             <p className="text-muted">
-              {q ? `Matching books for your query` : category ? `Discover books in ${category}` : 'Browse all books, filter by genre, or search by title and author'}
+              {q ? `Matching books for your query` : category ? `Discover books in ${category}` : t('catalog_subtitle')}
             </p>
           </div>
 
@@ -99,7 +106,7 @@ export default async function CatalogPage({
               <input 
                 type="text" 
                 name="q" 
-                placeholder="Search title, author, description..." 
+                placeholder={t('search_placeholder')} 
                 defaultValue={q}
                 className="input-field"
                 style={{ width: '100%', paddingLeft: '2.5rem', paddingRight: q ? '2.5rem' : '1rem' }}
@@ -116,7 +123,7 @@ export default async function CatalogPage({
               )}
             </div>
             <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 1.25rem' }}>
-              Search
+              {t('search')}
             </button>
           </form>
         </div>
@@ -258,9 +265,9 @@ export default async function CatalogPage({
           </Link>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: '2.5rem', alignItems: 'flex-start' }}>
+        <div className="catalog-layout">
           {/* Categories Sidebar */}
-          <aside style={{ width: '260px', flexShrink: 0, position: 'sticky', top: '100px' }}>
+          <aside className="catalog-sidebar">
             <div className="glass-panel" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--card-border)' }}>
                 <SlidersHorizontal size={18} color="var(--primary)" />
@@ -315,7 +322,7 @@ export default async function CatalogPage({
           </aside>
 
           {/* Books Grid */}
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="catalog-content">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <p className="text-muted" style={{ fontSize: '0.9rem' }}>
                 Showing {displayedBooks.length} books {totalBooks ? `of ${totalBooks}` : ''} {page > 1 ? `(Page ${page})` : ''}
@@ -323,45 +330,111 @@ export default async function CatalogPage({
             </div>
             
             {displayedBooks.length === 0 ? (
-              <div className="glass-panel" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+              <div className="glass-panel" style={{ textAlign: 'center', padding: '3.5rem 2rem' }} data-testid="empty-catalog-state">
                 <BookOpen size={48} style={{ opacity: 0.3, margin: '0 auto 1rem' }} />
-                <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>No books match your criteria</h3>
-                <p className="text-muted" style={{ maxWidth: '400px', margin: '0 auto 1.5rem' }}>
-                  We couldn&apos;t find any books with the selected search terms and filters. Try clearing your search query or choosing another category.
-                </p>
-                <Link href="/catalog" className="btn btn-primary">
-                  Reset All Filters
-                </Link>
+                {q && category ? (
+                  <>
+                    <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>
+                      No books found for &ldquo;{q}&rdquo; in {category}
+                    </h3>
+                    <p className="text-muted" style={{ maxWidth: '520px', margin: '0 auto 1.5rem', lineHeight: '1.6' }}>
+                      The active category filter excludes matching catalog entries. You can expand your search across all categories or browse all titles in {category}.
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+                      <Link
+                        href={createFilterUrl({ category: null })}
+                        className="btn btn-primary"
+                        style={{ padding: '0.5rem 1.25rem' }}
+                      >
+                        Search &ldquo;{q}&rdquo; in All Categories
+                      </Link>
+                      <Link
+                        href={createFilterUrl({ q: null })}
+                        className="btn btn-outline"
+                        style={{ padding: '0.5rem 1.25rem' }}
+                      >
+                        Browse All in {category}
+                      </Link>
+                      <Link
+                        href="/catalog"
+                        className="btn"
+                        style={{ padding: '0.5rem 1rem', background: 'rgba(255, 255, 255, 0.06)' }}
+                      >
+                        Clear All Filters
+                      </Link>
+                    </div>
+                  </>
+                ) : q ? (
+                  <>
+                    <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>
+                      No books match &ldquo;{q}&rdquo;
+                    </h3>
+                    <p className="text-muted" style={{ maxWidth: '440px', margin: '0 auto 1.5rem', lineHeight: '1.6' }}>
+                      We couldn&apos;t find any books with that title, author, or ISBN. Try clearing your search query or explore one of these popular genres:
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '480px', margin: '0 auto 1.5rem' }}>
+                      {['Fiction', 'Science', 'History', 'Philosophy', 'Mystery & Thriller', 'Fantasy'].map((suggestedGenre) => (
+                        <Link
+                          key={suggestedGenre}
+                          href={`/catalog?category=${encodeURIComponent(suggestedGenre)}`}
+                          className="btn"
+                          style={{
+                            padding: '0.4rem 0.85rem',
+                            fontSize: '0.8rem',
+                            background: 'rgba(255, 255, 255, 0.06)',
+                            border: '1px solid var(--card-border)',
+                            color: 'var(--foreground)',
+                          }}
+                        >
+                          {suggestedGenre}
+                        </Link>
+                      ))}
+                    </div>
+                    <Link href="/catalog" className="btn btn-primary">
+                      Clear Search Query
+                    </Link>
+                  </>
+                ) : category ? (
+                  <>
+                    <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>
+                      No books found in {category}
+                    </h3>
+                    <p className="text-muted" style={{ maxWidth: '440px', margin: '0 auto 1.5rem', lineHeight: '1.6' }}>
+                      No titles are listed in this category matching your active filter criteria.
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <Link href="/catalog" className="btn btn-primary">
+                        Browse All Books
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>No books match your criteria</h3>
+                    <p className="text-muted" style={{ maxWidth: '420px', margin: '0 auto 1.5rem', lineHeight: '1.6' }}>
+                      Try adjusting or clearing your filters to see more results:
+                    </p>
+                    <Link href="/catalog" className="btn btn-primary">
+                      Reset All Filters
+                    </Link>
+                  </>
+                )}
               </div>
             ) : (
-              <div className="grid-books">
-                {displayedBooks.map((book) => (
-                  <BookCard key={book.isbn13} book={book} />
-                ))}
-              </div>
-            )}
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '3.5rem' }}>
-                <Link 
-                  href={createFilterUrl({ page: Math.max(1, page - 1) })}
-                  className="btn btn-outline"
-                  style={{ pointerEvents: page <= 1 ? 'none' : 'auto', opacity: page <= 1 ? 0.4 : 1 }}
-                >
-                  Previous
-                </Link>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--muted)', fontSize: '0.95rem' }}>
-                  <span>Page <strong style={{ color: 'var(--foreground)' }}>{page}</strong> of {totalPages}</span>
-                </div>
-                <Link 
-                  href={createFilterUrl({ page: Math.min(totalPages, page + 1) })}
-                  className="btn btn-outline"
-                  style={{ pointerEvents: page >= totalPages ? 'none' : 'auto', opacity: page >= totalPages ? 0.4 : 1 }}
-                >
-                  Next
-                </Link>
-              </div>
+              <CatalogBookList
+                initialBooks={displayedBooks}
+                initialPage={page}
+                totalPages={totalPages}
+                totalBooks={totalBooks}
+                filterParams={{
+                  category: category || undefined,
+                  query: q || undefined,
+                  sort: sort || undefined,
+                  order: order || undefined,
+                  min_rating: minRating,
+                }}
+                createFilterUrl={createFilterUrl}
+              />
             )}
           </div>
         </div>

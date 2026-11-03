@@ -1,44 +1,198 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { submitFeedbackAction, trackActivityAction } from '@/app/actions/user';
-import { ThumbsUp, ThumbsDown, Heart, Bookmark, Check, AlertCircle } from 'lucide-react';
+import {
+  removeLibraryItem,
+  addFavoriteItem,
+  removeFavoriteItem,
+} from '@/app/actions/library';
+import { ThumbsUp, ThumbsDown, Heart, Bookmark, Check, AlertCircle, Trash2, BookOpen, CheckCircle2, WifiOff } from 'lucide-react';
 
 interface BookFeedbackProps {
   bookId: string;
+  initialInteraction?: string | null;
+  initialIsFavorite?: boolean;
+  interactionError?: string | null;
+  isAuthenticated?: boolean;
 }
 
-export default function BookFeedback({ bookId }: BookFeedbackProps) {
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [activeFeedback, setActiveFeedback] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+export default function BookFeedback({
+  bookId,
+  initialInteraction = null,
+  initialIsFavorite = false,
+  interactionError = null,
+  isAuthenticated = false,
+}: BookFeedbackProps) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'offline_pending'>(
+    interactionError ? 'error' : 'idle'
+  );
+
+  // Independent favorite status (Model A canonical)
+  const [isFavorite, setIsFavorite] = useState<boolean>(
+    initialIsFavorite || initialInteraction === 'favorite'
+  );
+
+  // Separate reading status / recommendation signal (like, dislike, want_to_read, reading, finished)
+  const [activeFeedback, setActiveFeedback] = useState<string | null>(
+    initialInteraction === 'favorite' ? null : initialInteraction || null
+  );
+
+  const [feedbackSuccessText, setFeedbackSuccessText] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(interactionError || null);
+  const [isOffline, setIsOffline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? !navigator.onLine : false
+  );
   const hasTracked = useRef(false);
 
   useEffect(() => {
-    // Track book view once per mount
-    if (!hasTracked.current) {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Only track authenticated visits to prevent unnecessary 401 calls
+    if (isAuthenticated && !hasTracked.current) {
       hasTracked.current = true;
       trackActivityAction(bookId, 'view').catch(() => {});
     }
-  }, [bookId]);
+  }, [bookId, isAuthenticated]);
 
-  const handleFeedback = async (
-    interaction: 'like' | 'dislike' | 'favorite' | 'want_to_read' | 'finished'
-  ) => {
+  const handleFavoriteToggle = async () => {
+    const currentlyFav = isFavorite;
+    const targetAction = currentlyFav ? 'remove' : 'add';
+
+    // Optimistic favorite update - does NOT mutate active reading status or signals!
+    setIsFavorite(!currentlyFav);
     setStatus('loading');
     setErrorMessage(null);
+    setFeedbackSuccessText(null);
+
     try {
-      const res = await submitFeedbackAction(bookId, interaction);
+      const res = currentlyFav
+        ? await removeFavoriteItem(bookId)
+        : await addFavoriteItem(bookId);
+
       if (res.success) {
         setStatus('success');
-        setActiveFeedback(interaction);
+        setFeedbackSuccessText(
+          currentlyFav ? 'Removed from favorites.' : 'Added to favorites! Recommendations updated.'
+        );
       } else {
+        // Rollback on failure
+        setIsFavorite(currentlyFav);
         setStatus('error');
-        setErrorMessage(res.error || 'Failed to save feedback');
+        setErrorMessage(
+          res.error === 'Unauthorized'
+            ? 'Please sign in to manage your favorites'
+            : res.error || (targetAction === 'remove' ? 'Failed to remove from favorites' : 'Failed to add to favorites')
+        );
       }
     } catch {
-      setStatus('error');
-      setErrorMessage('Network error occurred');
+      const offline = isOffline || (typeof navigator !== 'undefined' && !navigator.onLine);
+      if (offline) {
+        setStatus('offline_pending');
+        setFeedbackSuccessText('Saved offline — will sync automatically when back online.');
+      } else {
+        // Rollback on non-offline unexpected error
+        setIsFavorite(currentlyFav);
+        setStatus('error');
+        setErrorMessage('Network connection issue. Please check your connection and try again.');
+      }
+    }
+  };
+
+  const handleFeedback = async (
+    interaction: 'like' | 'dislike' | 'favorite' | 'want_to_read' | 'reading' | 'finished'
+  ) => {
+    if (interaction === 'favorite') {
+      return handleFavoriteToggle();
+    }
+
+    const isClearing = activeFeedback === interaction;
+    const targetInteraction = isClearing ? 'clear' : interaction;
+    const previousFeedback = activeFeedback;
+
+    // Optimistic update for feedback / reading status - does NOT touch isFavorite!
+    setActiveFeedback(isClearing ? null : interaction);
+    setStatus('loading');
+    setErrorMessage(null);
+    setFeedbackSuccessText(null);
+
+    try {
+      const res = await submitFeedbackAction(bookId, targetInteraction);
+      if (res.success) {
+        setStatus('success');
+        setFeedbackSuccessText(
+          isClearing ? 'Status cleared! Recommendations updated.' : 'Preference saved! Recommendations updated.'
+        );
+      } else {
+        setActiveFeedback(previousFeedback);
+        setStatus('error');
+        setErrorMessage(
+          res.error === 'Unauthorized'
+            ? 'Please sign in to save feedback'
+            : res.error || (isClearing ? 'Failed to clear status' : 'Failed to save feedback')
+        );
+      }
+    } catch {
+      const offline = isOffline || (typeof navigator !== 'undefined' && !navigator.onLine);
+      if (offline) {
+        setStatus('offline_pending');
+        setFeedbackSuccessText('Saved offline — will sync automatically when back online.');
+      } else {
+        setActiveFeedback(previousFeedback);
+        setStatus('error');
+        setErrorMessage('Network connection issue. Please check your connection and try again.');
+      }
+    }
+  };
+
+  const handleRemoveFromLibrary = async () => {
+    const previousFav = isFavorite;
+    const previousFeedback = activeFeedback;
+
+    // Optimistic removal of all library and feedback associations
+    setIsFavorite(false);
+    setActiveFeedback(null);
+    setStatus('loading');
+    setErrorMessage(null);
+    setFeedbackSuccessText(null);
+
+    try {
+      const res = await removeLibraryItem(bookId);
+      if (res.success) {
+        setStatus('success');
+        setFeedbackSuccessText('Removed completely from your library.');
+      } else {
+        // Rollback both states on failure
+        setIsFavorite(previousFav);
+        setActiveFeedback(previousFeedback);
+        setStatus('error');
+        setErrorMessage(
+          res.error === 'Unauthorized'
+            ? 'Please sign in to manage your library'
+            : res.error || 'Failed to remove from library'
+        );
+      }
+    } catch {
+      const offline = isOffline || (typeof navigator !== 'undefined' && !navigator.onLine);
+      if (offline) {
+        setStatus('offline_pending');
+        setFeedbackSuccessText('Removal saved offline — will sync when back online.');
+      } else {
+        setIsFavorite(previousFav);
+        setActiveFeedback(previousFeedback);
+        setStatus('error');
+        setErrorMessage('Network connection issue. Please check your connection and try again.');
+      }
     }
   };
 
@@ -53,7 +207,19 @@ export default function BookFeedback({ bookId }: BookFeedbackProps) {
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
-        <h3 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 600 }}>Your Reading Activity & Feedback</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <h3 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 600 }}>Your Reading Activity & Feedback</h3>
+          {activeFeedback === 'reading' && (
+            <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: '9999px', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+              Currently Reading
+            </span>
+          )}
+          {activeFeedback === 'finished' && (
+            <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: '9999px', background: 'rgba(16, 185, 129, 0.2)', color: 'var(--success)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+              Finished Reading
+            </span>
+          )}
+        </div>
         <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
           Directly shapes your personalized recommendations
         </span>
@@ -62,17 +228,18 @@ export default function BookFeedback({ bookId }: BookFeedbackProps) {
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <button
           type="button"
-          onClick={() => handleFeedback('favorite')}
+          onClick={handleFavoriteToggle}
           disabled={status === 'loading'}
-          aria-label="Favorite book"
+          aria-label={isFavorite ? 'Remove from favorites' : 'Favorite book'}
+          title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.4rem',
             padding: '0.55rem 1rem',
-            background: activeFeedback === 'favorite' ? 'rgba(236, 72, 153, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-            color: activeFeedback === 'favorite' ? '#f472b6' : 'var(--foreground)',
-            border: activeFeedback === 'favorite' ? '1px solid #ec4899' : '1px solid var(--card-border)',
+            background: isFavorite ? 'rgba(236, 72, 153, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+            color: isFavorite ? '#f472b6' : 'var(--foreground)',
+            border: isFavorite ? '1px solid #ec4899' : '1px solid var(--card-border)',
             borderRadius: '9999px',
             cursor: status === 'loading' ? 'not-allowed' : 'pointer',
             fontSize: '0.875rem',
@@ -80,7 +247,7 @@ export default function BookFeedback({ bookId }: BookFeedbackProps) {
             transition: 'all 0.2s',
           }}
         >
-          <Heart size={16} fill={activeFeedback === 'favorite' ? '#f472b6' : 'none'} color={activeFeedback === 'favorite' ? '#f472b6' : 'currentColor'} />
+          <Heart size={16} fill={isFavorite ? '#f472b6' : 'none'} color={isFavorite ? '#f472b6' : 'currentColor'} />
           <span>Favorite</span>
         </button>
 
@@ -106,6 +273,54 @@ export default function BookFeedback({ bookId }: BookFeedbackProps) {
         >
           <Bookmark size={16} fill={activeFeedback === 'want_to_read' ? 'currentColor' : 'none'} color={activeFeedback === 'want_to_read' ? 'var(--primary)' : 'currentColor'} />
           <span>Want to Read</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleFeedback('reading')}
+          disabled={status === 'loading'}
+          aria-label="Currently reading book"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            padding: '0.55rem 1rem',
+            background: activeFeedback === 'reading' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+            color: activeFeedback === 'reading' ? '#fbbf24' : 'var(--foreground)',
+            border: activeFeedback === 'reading' ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid var(--card-border)',
+            borderRadius: '9999px',
+            cursor: status === 'loading' ? 'not-allowed' : 'pointer',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            transition: 'all 0.2s',
+          }}
+        >
+          <BookOpen size={16} color={activeFeedback === 'reading' ? '#fbbf24' : 'currentColor'} />
+          <span>Reading</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleFeedback('finished')}
+          disabled={status === 'loading'}
+          aria-label="Finished reading book"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            padding: '0.55rem 1rem',
+            background: activeFeedback === 'finished' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+            color: activeFeedback === 'finished' ? 'var(--success)' : 'var(--foreground)',
+            border: activeFeedback === 'finished' ? '1px solid var(--success)' : '1px solid var(--card-border)',
+            borderRadius: '9999px',
+            cursor: status === 'loading' ? 'not-allowed' : 'pointer',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            transition: 'all 0.2s',
+          }}
+        >
+          <CheckCircle2 size={16} color={activeFeedback === 'finished' ? 'var(--success)' : 'currentColor'} />
+          <span>Finished</span>
         </button>
 
         <button
@@ -155,6 +370,34 @@ export default function BookFeedback({ bookId }: BookFeedbackProps) {
           <ThumbsDown size={16} fill={activeFeedback === 'dislike' ? 'currentColor' : 'none'} color={activeFeedback === 'dislike' ? 'var(--danger)' : 'currentColor'} />
           <span>Dislike</span>
         </button>
+
+        {(isFavorite || activeFeedback) && (
+          <button
+            type="button"
+            onClick={handleRemoveFromLibrary}
+            disabled={status === 'loading'}
+            aria-label="Remove completely from library"
+            title="Remove all saved status and interactions from library"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.55rem 0.85rem',
+              background: 'rgba(239, 68, 68, 0.1)',
+              color: 'var(--danger)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              borderRadius: '9999px',
+              cursor: status === 'loading' ? 'not-allowed' : 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              marginLeft: 'auto',
+              transition: 'all 0.2s',
+            }}
+          >
+            <Trash2 size={14} />
+            <span>Remove from Library</span>
+          </button>
+        )}
       </div>
 
       <div style={{ marginTop: '0.75rem', minHeight: '1.25rem' }}>
@@ -165,16 +408,39 @@ export default function BookFeedback({ bookId }: BookFeedbackProps) {
         )}
         {status === 'success' && (
           <span style={{ color: 'var(--success)', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <Check size={14} /> Preference saved! Recommendations updated.
+            <Check size={14} />{' '}
+            {feedbackSuccessText ||
+              (isFavorite
+                ? 'Added to favorites! Recommendations updated.'
+                : 'Preference saved! Recommendations updated.')}
+          </span>
+        )}
+        {status === 'offline_pending' && (
+          <span style={{ color: '#fbbf24', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+            <WifiOff size={14} />{' '}
+            {feedbackSuccessText || 'Saved offline — will sync automatically when back online.'}
           </span>
         )}
         {status === 'error' && (
-          <span style={{ color: 'var(--danger)', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <AlertCircle size={14} /> {errorMessage || 'Could not save feedback. Please try again.'}
+          <span style={{ color: 'var(--danger)', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+            <AlertCircle size={14} style={{ flexShrink: 0 }} />
+            <span>{errorMessage || 'Could not save feedback. Please try again.'}</span>
+            {(errorMessage?.toLowerCase().includes('sign in') || errorMessage?.toLowerCase().includes('unauthorized')) && (
+              <Link
+                href={`/login?redirect=${encodeURIComponent(`/book/${bookId}`)}`}
+                style={{
+                  color: 'var(--primary)',
+                  textDecoration: 'underline',
+                  fontWeight: 600,
+                  marginLeft: '0.35rem',
+                }}
+              >
+                Sign in now &rarr;
+              </Link>
+            )}
           </span>
         )}
       </div>
     </div>
   );
 }
-

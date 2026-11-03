@@ -24,17 +24,29 @@ FROM python:3.12.10-slim-bookworm
 
 WORKDIR /src
 
+# Create non-root system user and group
+RUN groupadd -r libris && useradd -r -g libris -d /src -s /sbin/nologin libris
+
 # Copy only the installed dependencies from the builder
 COPY --from=builder /install /usr/local
 COPY . ./backend
+
+# Set proper ownership for non-root execution
+RUN chown -R libris:libris /src
 
 # Environment Defaults
 ENV FLASK_ENV=production
 ENV PORT=5000
 ENV PYTHONPATH=/src
 
+USER libris
+
 # Metadata
 EXPOSE 5000
+
+# Health check using built-in urllib
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5000/api/health', timeout=3).getcode() == 200 else 1)"
 
 # High-performance server: Gunicorn with 1 worker to fit in Free Tier RAM (512MB)
 CMD sh -c "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --preload --timeout 120 backend.app:app"

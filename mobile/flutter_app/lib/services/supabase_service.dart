@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/entities/book.dart';
 import '../data/models/book_dto.dart';
 import '../utils/category_mapper.dart';
+import '../config.dart';
 import 'auth_service_base.dart';
 
 class SupabaseService implements AuthServiceBase {
@@ -12,6 +13,9 @@ class SupabaseService implements AuthServiceBase {
   SupabaseClient get client => Supabase.instance.client;
 
   // ── Auth ───────────────────────────────────────────────────────────────────
+
+  @override
+  bool get isConfigured => AppConfig.isSupabaseConfigured;
 
   @override
   User? get currentUser => client.auth.currentUser;
@@ -185,6 +189,22 @@ class SupabaseService implements AuthServiceBase {
     }
   }
 
+  Future<String?> getUserInteraction(String userId, String bookId) async {
+    try {
+      final response = await client
+          .from('user_interactions')
+          .select('interaction_type')
+          .eq('user_id', userId)
+          .eq('book_id', bookId)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 5));
+      if (response != null && response['interaction_type'] != null) {
+        return response['interaction_type'] as String;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // ── Activity & Profile ──────────────────────────────────────────────────
 
   Future<void> trackActivity({
@@ -202,6 +222,15 @@ class SupabaseService implements AuthServiceBase {
     } catch (_) {}
   }
 
+  bool _isSchemaMismatchError(Object e) {
+    final str = e.toString().toLowerCase();
+    return str.contains('42703') || // undefined_column
+        str.contains('pgrst204') || // column not found in schema cache
+        str.contains('could not find the') ||
+        (str.contains('column') && str.contains('not exist')) ||
+        str.contains('schema cache');
+  }
+
   Future<void> upsertUserProfile({
     required String userId,
     required List<String> preferredGenres,
@@ -209,23 +238,65 @@ class SupabaseService implements AuthServiceBase {
     required List<String> preferredAuthors,
     required String preferredVibe,
   }) async {
+    final now = DateTime.now().toIso8601String();
+    // Try dual-column upsert first (modern / staging migration schema)
+    try {
+      await client.from('user_profiles').upsert({
+        'id': userId,
+        'user_id': userId,
+        'preferred_genres': preferredGenres,
+        'reading_frequency': readingFrequency,
+        'preferred_authors': preferredAuthors,
+        'preferred_vibe': preferredVibe,
+        'updated_at': now,
+      });
+      return;
+    } catch (e) {
+      if (!_isSchemaMismatchError(e)) {
+        debugPrint('[SupabaseService] upsertUserProfile failed with non-schema error: $e');
+        rethrow;
+      }
+      debugPrint('[SupabaseService] Detected unmigrated user_profiles schema, falling back to baseline columns: $e');
+    }
+
+    // Fallback: unmigrated remote Supabase schema (where user_id or author columns do not exist)
     await client.from('user_profiles').upsert({
-      'user_id': userId,
+      'id': userId,
       'preferred_genres': preferredGenres,
       'reading_frequency': readingFrequency,
-      'preferred_authors': preferredAuthors,
-      'preferred_vibe': preferredVibe,
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': now,
     });
   }
 
   Future<Map<String, dynamic>?> getUserProfile(String userId) async {
-    final response = await client
-        .from('user_profiles')
-        .select()
-        .eq('user_id', userId)
-        .maybeSingle();
-    return response;
+    // 1. Try querying by user_id (staged migration schema)
+    try {
+      final response = await client
+          .from('user_profiles')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (response != null) return response;
+    } catch (e) {
+      if (!_isSchemaMismatchError(e)) {
+        debugPrint('[SupabaseService] Query user_profiles by user_id failed with non-schema error: $e');
+        rethrow;
+      }
+      debugPrint('[SupabaseService] Query user_profiles by user_id column unavailable, trying id: $e');
+    }
+
+    // 2. Fallback: unmigrated remote Supabase schema where PK is 'id'
+    try {
+      final response = await client
+          .from('user_profiles')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      return response;
+    } catch (e) {
+      debugPrint('[SupabaseService] Query user_profiles by id failed: $e');
+      rethrow;
+    }
   }
 
   // ── Book Detail Lookup ─────────────────────────────────────────────────────

@@ -16,14 +16,21 @@ class CatalogProvider extends ChangeNotifier {
   int _totalBooksCount = 0;
   DateTime? _lastFetchTime;
   bool _isLoadingMore = false;
+  bool _isFromCache = false;
 
   // Canonical fallback genres — derived from real dataset analysis (6,396 books).
   // These are the exact canonical names returned by the backend after normalization.
   // Order: by book count descending.
   static const List<String> _fallbackGenres = [
     'Fiction',
+    'Biography & Memoir',
     'Young Adult & Children',
     'History',
+    'Comics & Graphic Novels',
+    'Business',
+    'Psychology',
+    'Education & Reference',
+    'Health & Wellness',
     'Drama & Plays',
     'Philosophy',
     'Religion & Spirituality',
@@ -32,20 +39,17 @@ class CatalogProvider extends ChangeNotifier {
     'Social Sciences',
     'Art & Design',
     'Food & Cooking',
-    'Psychology',
     'Self-Development',
     'Technology',
     'Travel',
     'Mystery & Thriller',
     'Humor & Satire',
     'Fantasy',
-    'Health & Wellness',
-    'Biography & Memoir',
     'Science Fiction',
     'Horror',
-    'Comics & Graphic Novels',
     'Romance',
-    'Business',
+    'Sports & Games',
+    'Crafts & Hobbies',
   ];
 
   List<String> _genres = List<String>.from(_fallbackGenres);
@@ -71,6 +75,8 @@ class CatalogProvider extends ChangeNotifier {
   String? get error => _error;
   int get totalBooksCount => _totalBooksCount;
   bool get isLoadingMore => _isLoadingMore;
+  bool get isFromCache => _isFromCache;
+  bool get isOffline => _isFromCache;
   List<String> get defaultGenres => _genres;
 
   String get filterAuthor => _filterAuthor;
@@ -90,6 +96,7 @@ class CatalogProvider extends ChangeNotifier {
     if (cached.isNotEmpty) {
       _rawPopularBooks = cached;
       _applyGlobalFilters();
+      _isFromCache = true;
       _status = CatalogStatus.loaded;
     }
     notifyListeners();
@@ -110,9 +117,11 @@ class CatalogProvider extends ChangeNotifier {
     try {
       final categories = await _manageCatalog.getCategories();
       if (categories.isNotEmpty) {
-        _genres = categories.map((e) => e['name'] as String).toList();
+        _genres = categories.map((e) => e['name']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
         _categoryCounts = {
-          for (var e in categories) e['name'] as String: e['count'] as int
+          for (var e in categories)
+            if (e['name'] != null)
+              e['name'].toString(): (e['count'] as num?)?.toInt() ?? 0
         };
       } else {
         _genres = List<String>.from(_fallbackGenres);
@@ -140,12 +149,28 @@ class CatalogProvider extends ChangeNotifier {
       _rawPopularBooks =
           await _manageCatalog.getPopularBooks(forceRefresh: force);
       _applyGlobalFilters();
+      _isFromCache = false;
       _status = CatalogStatus.loaded;
+      _error = null;
       _lastFetchTime = DateTime.now();
       notifyListeners();
     } catch (e) {
-      _status = CatalogStatus.error;
-      _error = 'error_loading_books';
+      final cached = _manageCatalog.getCachedPopularBooks();
+      if (cached.isNotEmpty) {
+        _rawPopularBooks = cached;
+        _applyGlobalFilters();
+        _isFromCache = true;
+        _status = CatalogStatus.loaded;
+        _error = null;
+      } else if (_rawPopularBooks.isNotEmpty) {
+        _isFromCache = true;
+        _status = CatalogStatus.loaded;
+        _error = null;
+      } else {
+        _isFromCache = false;
+        _status = CatalogStatus.error;
+        _error = 'error_loading_books';
+      }
       notifyListeners();
     }
   }

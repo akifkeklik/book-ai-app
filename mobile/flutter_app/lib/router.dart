@@ -8,10 +8,14 @@ import 'screens/categories_screen.dart';
 import 'screens/category_timeline_screen.dart';
 import 'screens/detail_screen.dart';
 import 'screens/favorites_screen.dart';
+import 'screens/learning_paths_screen.dart';
+import 'screens/knowledge_graph_screen.dart';
+import 'screens/learning_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/recommendation_screen.dart';
+import 'screens/personalized_discovery_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
@@ -34,13 +38,22 @@ class AppRouter {
         final isAuthRoute = state.matchedLocation == '/login' ||
             state.matchedLocation == '/register';
 
-        // 1. If NOT logged in and NOT on an auth page, redirect to LOGIN (not register!)
-        if (!loggedIn && !isAuthRoute) {
-          return '/login';
+        // Strictly protected route requiring authentication:
+        final isProtectedRoute = state.matchedLocation == '/onboarding';
+
+        if (!loggedIn && isProtectedRoute) {
+          return '/login?redirect=${Uri.encodeComponent(state.matchedLocation)}';
         }
 
-        // 2. If logged in and trying to go to LOGIN/REGISTER, redirect to HOME
+        // If logged in and visiting auth screens, redirect to destination or root:
         if (loggedIn && isAuthRoute) {
+          final redirect = state.uri.queryParameters['redirect'];
+          if (redirect != null &&
+              redirect.isNotEmpty &&
+              redirect != '/login' &&
+              redirect != '/register') {
+            return redirect;
+          }
           return '/';
         }
 
@@ -93,6 +106,18 @@ class AppRouter {
           builder: (context, state) => const OnboardingScreen(),
         ),
         GoRoute(
+          path: '/learning-paths',
+          builder: (context, state) => const LearningPathsScreen(),
+        ),
+        GoRoute(
+          path: '/knowledge-graph',
+          builder: (context, state) => const KnowledgeGraphScreen(),
+        ),
+        GoRoute(
+          path: '/learning',
+          builder: (context, state) => const LearningScreen(),
+        ),
+        GoRoute(
           path: '/settings',
           builder: (context, state) => const SettingsScreen(),
         ),
@@ -112,6 +137,10 @@ class AppRouter {
             isbn: state.pathParameters['isbn']!,
             initialBook: state.extra is Book ? state.extra as Book : null,
           ),
+        ),
+        GoRoute(
+          path: '/recommendations/personalized',
+          builder: (context, state) => const PersonalizedDiscoveryScreen(),
         ),
         GoRoute(
           path: '/recommend/:title',

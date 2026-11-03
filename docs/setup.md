@@ -88,6 +88,21 @@ GET http://localhost:5000/api/search?q=tolkien
 → {"books":[...],"total":2,"query":"tolkien"}
 ```
 
+### 2.6 Distributed Multi-Worker Scaling (Redis)
+
+By default, the backend uses a thread-safe in-memory sliding window rate limiter. In production with multiple Gunicorn/Uvicorn workers or multi-pod clusters, configure Redis:
+
+```env
+REDIS_URL=redis://localhost:6379/0
+RATE_LIMIT_FAILURE_POLICY=fail_closed
+```
+
+- **Atomic Lua Scripting:** When `REDIS_URL` is set, Redis executes an atomic Lua script (`ZREMRANGEBYSCORE` -> `ZCARD` -> `ZADD` -> `EXPIRE`) to ensure zero race conditions or quota leaks under concurrent multi-worker requests.
+- **Explicit Failure Policy:** If the Redis cluster becomes unavailable:
+  - `fail_closed` (default for protected AI endpoints): Returns HTTP 503 (`Service Unavailable`), preventing multi-worker quota multiplication or abuse during Redis outages.
+  - `fallback_local`: Temporarily falls back to local in-memory sliding window rate limiting.
+  - `fail_open`: Allows requests through if rate limiting infrastructure is degraded.
+
 ---
 
 ## 3. Flutter App Setup
@@ -133,21 +148,79 @@ flutter build apk --release
 
 ---
 
-## 4. Running Both Together
+## 4. Web App Setup (Next.js 16 App Router)
 
-Terminal 1 (backend):
+### 4.1 Install dependencies
+
 ```bash
-cd backend && python app.py
+cd web
+npm install
 ```
 
-Terminal 2 (Flutter):
+### 4.2 Configure environment variables
+
+Copy `web/.env.example` to `web/.env.local`:
+
+```bash
+cp .env.example .env.local
+```
+
+Fill in:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `BACKEND_URL=http://localhost:5000`
+- `LIBRIS_API_KEY=your-backend-api-key`
+
+### 4.3 Run the Web App
+
+```bash
+# Development mode
+npm run dev
+
+# Production build and start
+npm run build
+npm start
+```
+Open `http://localhost:3000` in your browser.
+
+---
+
+## 5. Running the Full Stack Locally
+
+Terminal 1 (Backend):
+```bash
+python -m backend.app
+```
+
+Terminal 2 (Web):
+```bash
+cd web && npm run dev
+```
+
+Terminal 3 (Mobile - Optional):
 ```bash
 cd mobile/flutter_app && flutter run
 ```
 
 ---
 
-## 5. Common Issues
+## 6. Visual QA Gate & Screenshot Verification
+
+Libris includes an automated headless Chrome verification harness covering 7 core routes across Desktop (`1280x800`) and Mobile (`390x844`) viewports:
+
+```bash
+python scripts/visual_qa_gate.py --output-dir artifacts/visual_qa
+```
+
+The script:
+1. Probes or starts the backend on port 5000 and web app on port 3000.
+2. Captures full-fidelity screenshots for desktop and mobile viewports.
+3. Dumps and verifies rendered DOM for core content, navigation, and absence of catastrophic client exceptions.
+4. Generates an execution summary table and returns exit code `0` on success.
+
+---
+
+## 7. Common Issues
 
 | Problem | Solution |
 |---------|----------|
@@ -156,3 +229,6 @@ cd mobile/flutter_app && flutter run
 | Model training slow | Normal on first run — model is cached after |
 | Flutter pub get fails | Run `flutter doctor` and fix SDK issues |
 | `CORS error` in browser testing | Set `ALLOWED_ORIGINS=*` in `.env` |
+| `429 Rate Limit` on AI | Configured at 10 requests / 60 seconds per IP/token |
+| `503 Service Unavailable` on AI | Rate limiter `fail_closed` policy active while Redis is unreachable |
+

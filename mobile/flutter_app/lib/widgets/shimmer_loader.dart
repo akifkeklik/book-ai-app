@@ -147,8 +147,10 @@ class ShimmerList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: List.generate(count, (_) => const ShimmerListTile()),
+    return ListView.builder(
+      padding: EdgeInsets.zero,
+      itemCount: count,
+      itemBuilder: (_, __) => const ShimmerListTile(),
     );
   }
 }

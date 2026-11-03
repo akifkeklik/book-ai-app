@@ -1,4 +1,14 @@
-import type { Book } from '@/types';
+import type {
+  Book,
+  KnowledgeEdge,
+  KnowledgeGraphData,
+  KnowledgeNode,
+  KnowledgeNodeType,
+  KnowledgeRelationshipSource,
+  ReviewItem,
+  ReviewAttempt,
+  LearningProgress,
+} from '@/types';
 
 export interface RawBookDto {
   isbn13?: string | number | null;
@@ -33,6 +43,11 @@ export interface RawBookDto {
   explanation?: string | null;
   explanation_source_book?: string | null;
   explanationSourceBook?: string | null;
+  explanation_type?: string | null;
+  explanationType?: string | null;
+  confidence?: 'high' | 'medium' | 'cold_start' | null;
+  is_cold_start?: boolean | null;
+  isColdStart?: boolean | null;
 
   [key: string]: unknown;
 }
@@ -202,6 +217,24 @@ export function normalizeBook(raw: unknown): Book {
     book.explanationSourceBook = explanationSourceBook;
   }
 
+  const rawType = r.explanationType !== undefined && r.explanationType !== null
+    ? r.explanationType
+    : r.explanation_type;
+  const explanationType = parseOptionalString(rawType);
+  if (explanationType !== undefined) {
+    book.explanationType = explanationType;
+  }
+
+  const rawConfidence = parseOptionalString(r.confidence);
+  if (rawConfidence === 'high' || rawConfidence === 'medium' || rawConfidence === 'cold_start') {
+    book.confidence = rawConfidence;
+  }
+
+  const isColdStart = Boolean(r.isColdStart || r.is_cold_start);
+  if (isColdStart || r.isColdStart !== undefined || r.is_cold_start !== undefined) {
+    book.isColdStart = isColdStart;
+  }
+
   return book;
 }
 
@@ -216,4 +249,135 @@ export function normalizeBooks(rawList: unknown): Book[] {
   return rawList
     .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
     .map(normalizeBook);
+}
+
+
+export function normalizeKnowledgeNode(raw: Record<string, unknown> | null | undefined): KnowledgeNode {
+  return {
+    id: String(raw?.id || ''),
+    label: String(raw?.label || raw?.id || ''),
+    type: (raw?.type || 'concept') as KnowledgeNodeType,
+    data: typeof raw?.data === 'object' && raw?.data !== null ? (raw.data as Record<string, unknown>) : {},
+    degree: Number(raw?.degree || 0),
+  };
+}
+
+export function normalizeKnowledgeEdge(raw: Record<string, unknown> | null | undefined): KnowledgeEdge {
+  return {
+    id: raw?.id ? String(raw.id) : undefined,
+    userId: String(raw?.user_id || raw?.userId || ''),
+    sourceId: String(raw?.source_id || raw?.sourceId || ''),
+    sourceType: (raw?.source_type || raw?.sourceType || 'concept') as KnowledgeNodeType,
+    targetId: String(raw?.target_id || raw?.targetId || ''),
+    targetType: (raw?.target_type || raw?.targetType || 'concept') as KnowledgeNodeType,
+    relationshipType: String(raw?.relationship_type || raw?.relationshipType || 'relates_to'),
+    source: (raw?.source || 'user_explicit') as KnowledgeRelationshipSource,
+    evidenceRef: raw?.evidence_ref !== undefined ? (raw.evidence_ref ? String(raw.evidence_ref) : null) : (raw?.evidenceRef ? String(raw.evidenceRef) : null),
+    confidence: (raw?.confidence || 'high') as 'high' | 'medium' | 'suggested',
+    metadata: typeof raw?.metadata === 'object' && raw?.metadata !== null ? (raw.metadata as Record<string, unknown>) : {},
+    createdAt: raw?.created_at ? String(raw.created_at) : (raw?.createdAt ? String(raw.createdAt) : undefined),
+    updatedAt: raw?.updated_at ? String(raw.updated_at) : (raw?.updatedAt ? String(raw.updatedAt) : undefined),
+  };
+}
+
+export function normalizeKnowledgeGraph(raw: Record<string, unknown> | null | undefined): KnowledgeGraphData {
+  const rawNodes = raw?.nodes as unknown;
+  const nodes = Array.isArray(rawNodes) ? (rawNodes as (Record<string, unknown> | null | undefined)[]).map(normalizeKnowledgeNode) : [];
+  const rawEdges = raw?.edges as unknown;
+  const edges = Array.isArray(rawEdges) ? (rawEdges as (Record<string, unknown> | null | undefined)[]).map(normalizeKnowledgeEdge) : [];
+  return {
+    nodes,
+    edges,
+    totalNodes: typeof raw?.total_nodes === 'number' ? raw.total_nodes : nodes.length,
+    totalEdges: typeof raw?.total_edges === 'number' ? raw.total_edges : edges.length,
+    focusId: raw?.focus_id ? String(raw.focus_id) : (raw?.focusId ? String(raw.focusId) : null),
+    depth: typeof raw?.depth === 'number' ? raw.depth : 1,
+  };
+}
+
+
+export function normalizeReviewItem(raw: Record<string, unknown> | null | undefined): ReviewItem {
+  return {
+    id: String(raw?.id || ''),
+    userId: String(raw?.user_id || raw?.userId || ''),
+    title: String(raw?.title || ''),
+    concept: String(raw?.concept || ''),
+    question: String(raw?.question || ''),
+    answer: String(raw?.answer || ''),
+    explanation: String(raw?.explanation || ''),
+    sourceType: String(raw?.source_type || raw?.sourceType || 'user_created'),
+    sourceId: raw?.source_id !== undefined ? (raw.source_id ? String(raw.source_id) : null) : (raw?.sourceId ? String(raw.sourceId) : null),
+    bookId: raw?.book_id !== undefined ? (raw.book_id ? String(raw.book_id) : null) : (raw?.bookId ? String(raw.bookId) : null),
+    pathId: raw?.path_id !== undefined ? (raw.path_id ? String(raw.path_id) : null) : (raw?.pathId ? String(raw.pathId) : null),
+    stage: Number(raw?.stage || 1),
+    intervalDays: Number(raw?.interval_days || raw?.intervalDays || 1),
+    nextReviewAt: raw?.next_review_at ? String(raw.next_review_at) : (raw?.nextReviewAt ? String(raw.nextReviewAt) : undefined),
+    lastReviewedAt: raw?.last_reviewed_at ? String(raw.last_reviewed_at) : (raw?.lastReviewedAt ? String(raw.lastReviewedAt) : null),
+    totalReviews: Number(raw?.total_reviews || raw?.totalReviews || 0),
+    successfulReviews: Number(raw?.successful_reviews || raw?.successfulReviews || 0),
+    status: String(raw?.status || 'active'),
+    metadata: typeof raw?.metadata === 'object' && raw?.metadata !== null ? (raw.metadata as Record<string, unknown>) : {},
+    createdAt: raw?.created_at ? String(raw.created_at) : (raw?.createdAt ? String(raw.createdAt) : undefined),
+    updatedAt: raw?.updated_at ? String(raw.updated_at) : (raw?.updatedAt ? String(raw.updatedAt) : undefined),
+    book: raw?.book ? normalizeBook(raw.book as Record<string, unknown>) : null,
+    priority: typeof raw?.priority === 'number' ? raw.priority : undefined,
+    recommendationReason: raw?.recommendation_reason ? String(raw.recommendation_reason) : (raw?.recommendationReason ? String(raw.recommendationReason) : undefined),
+    recommendationReasonKey: raw?.recommendation_reason_key ? String(raw.recommendation_reason_key) : (raw?.recommendationReasonKey ? String(raw.recommendationReasonKey) : undefined),
+  };
+}
+
+export function normalizeReviewAttempt(raw: Record<string, unknown> | null | undefined): ReviewAttempt {
+  return {
+    id: raw?.id ? String(raw.id) : undefined,
+    userId: String(raw?.user_id || raw?.userId || ''),
+    itemId: String(raw?.item_id || raw?.itemId || ''),
+    outcome: (raw?.outcome || 'struggled') as 'remembered' | 'struggled',
+    responseText: String(raw?.response_text || raw?.responseText || ''),
+    isCorrect: Boolean(raw?.is_correct !== undefined ? raw.is_correct : raw?.isCorrect),
+    stageBefore: Number(raw?.stage_before || raw?.stageBefore || 1),
+    stageAfter: Number(raw?.stage_after || raw?.stageAfter || 1),
+    reviewedAt: raw?.reviewed_at ? String(raw.reviewed_at) : (raw?.reviewedAt ? String(raw.reviewedAt) : undefined),
+    createdAt: raw?.created_at ? String(raw.created_at) : (raw?.createdAt ? String(raw.createdAt) : undefined),
+    itemTitle: raw?.item_title ? String(raw.item_title) : (raw?.itemTitle ? String(raw.itemTitle) : undefined),
+    concept: raw?.concept ? String(raw.concept) : undefined,
+    bookId: raw?.book_id ? String(raw.book_id) : (raw?.bookId ? String(raw.bookId) : undefined),
+  };
+}
+
+export function normalizeLearningProgress(raw: Record<string, unknown> | null | undefined): LearningProgress {
+  const rawDifficult = (raw?.difficult_concepts || raw?.difficultConcepts) as unknown;
+  const diffConcepts = Array.isArray(rawDifficult)
+    ? (rawDifficult as Record<string, unknown>[]).map((c: Record<string, unknown>) => ({
+        concept: String(c?.concept || ''),
+        totalItems: Number(c?.total_items || c?.totalItems || 0),
+        totalAttempts: Number(c?.total_attempts || c?.totalAttempts || 0),
+        successfulRecalls: Number(c?.successful_recalls || c?.successfulRecalls || 0),
+        struggledRecalls: Number(c?.struggled_recalls || c?.struggledRecalls || 0),
+        retentionRate: Number(c?.retention_rate !== undefined ? c.retention_rate : c?.retentionRate || 0),
+        averageStage: Number(c?.average_stage || c?.averageStage || 1),
+        dueItems: Number(c?.due_items || c?.dueItems || 0),
+        needsReview: Boolean(c?.needs_review !== undefined ? c.needs_review : c?.needsReview),
+      }))
+    : [];
+
+  const rawActivity = (raw?.recent_activity || raw?.recentActivity) as unknown;
+  const activity = Array.isArray(rawActivity)
+    ? (rawActivity as (Record<string, unknown> | null | undefined)[]).map(normalizeReviewAttempt)
+    : [];
+
+  return {
+    masteryScore: Number(raw?.mastery_score !== undefined ? raw.mastery_score : raw?.masteryScore || 0),
+    masteryLevel: String(raw?.mastery_level || raw?.masteryLevel || 'insufficient_data'),
+    totalItems: Number(raw?.total_items || raw?.totalItems || 0),
+    reviewsDue: Number(raw?.reviews_due || raw?.reviewsDue || 0),
+    reviewsCompleted: Number(raw?.reviews_completed || raw?.reviewsCompleted || 0),
+    successfulRecalls: Number(raw?.successful_recalls || raw?.successfulRecalls || 0),
+    struggledRecalls: Number(raw?.struggled_recalls || raw?.struggledRecalls || 0),
+    retentionRate: Number(raw?.retention_rate !== undefined ? raw.retention_rate : raw?.retentionRate || 0),
+    conceptsCount: Number(raw?.concepts_count || raw?.conceptsCount || 0),
+    difficultConcepts: diffConcepts,
+    recentActivity: activity,
+    activeStreakDays: Number(raw?.active_streak_days || raw?.activeStreakDays || 0),
+    algorithmVersion: String(raw?.algorithm_version || raw?.algorithmVersion || 'v1'),
+  };
 }

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { assertSafeSupabaseTarget } from './isolation'
 
 let testClientOverride: ReturnType<typeof createServerClient> | null = null;
 
@@ -7,33 +8,61 @@ export function setTestClient(client: unknown) {
   testClientOverride = client as ReturnType<typeof createServerClient> | null;
 }
 
+export function isTestClientActive(): boolean {
+  return testClientOverride !== null;
+}
+
 export async function createClient() {
   if (testClientOverride) {
     return testClientOverride;
   }
 
-  const cookieStore = await cookies()
+  let cookieStore: {
+    getAll: () => { name: string; value: string }[];
+    set: (name: string, value: string, options?: unknown) => void;
+  } | Awaited<ReturnType<typeof cookies>>;
+  try {
+    cookieStore = await cookies();
+  } catch {
+    // When called outside Next.js request lifecycle (e.g. testing)
+    cookieStore = {
+      getAll: () => [],
+      set: () => {},
+    };
+  }
 
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+  const client = createServerClient(
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll()
+          return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
-            )
+            );
           } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
+            // Ignored outside request lifecycle
           }
         },
       },
     }
-  )
+  );
+
+  (client as unknown as { __isRealClient?: boolean }).__isRealClient = true;
+
+  // Wrap client.from with fail-closed isolation guard
+  const originalFrom = client.from.bind(client);
+  client.from = ((table: string) => {
+    assertSafeSupabaseTarget(supabaseUrl, `table query: ${table}`);
+    return originalFrom(table);
+  }) as typeof client.from;
+
+  return client;
 }

@@ -25,10 +25,16 @@ class Config:
         if (os.getenv("DEBUG", "False").lower() == "true" or os.getenv("TESTING", "False").lower() == "true")
         else "",
     )
-    LIBRIS_API_KEY: str = os.getenv("LIBRIS_API_KEY", "")
+    LIBRIS_API_KEY: str = os.getenv(
+        "LIBRIS_API_KEY",
+        "dev-insecure-api-key"
+        if (os.getenv("DEBUG", "False").lower() == "true" or os.getenv("TESTING", "False").lower() == "true")
+        else "",
+    )
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini").lower() # gemini or openai
-    LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", os.getenv("LLM_API_KEY", ""))
+    LLM_API_KEY: str = os.getenv("LLM_API_KEY") or os.getenv("GEMINI_API_KEY") or ""
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY") or os.getenv("LLM_API_KEY") or ""
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "models/gemini-2.5-flash")
 
     # ── Reverse Proxy ─────────────────────────────────────────────────────────
     # Count of trusted reverse proxy headers (e.g. 1 for Render / Railway / Nginx).
@@ -52,9 +58,15 @@ class Config:
     GOOGLE_BOOKS_API_KEY: str = os.getenv("GOOGLE_BOOKS_API_KEY", "")
     GOOGLE_BOOKS_API_URL: str = "https://www.googleapis.com/books/v1/volumes"
 
-    # ── Supabase (reference only — main Supabase usage is in Flutter) ─────────
+    # ── Supabase & JWT Authentication ────────────────────────────────────────
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
+    SUPABASE_JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "")
+    SUPABASE_JWT_AUDIENCE: str = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated")
+    SUPABASE_JWT_ISSUER: str = os.getenv("SUPABASE_JWT_ISSUER", "")
+
+    # ── Direct PostgreSQL / Local Integration ─────────────────────────────────
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 
     # ── ML Settings ───────────────────────────────────────────────────────────
     TOP_N_RECOMMENDATIONS: int = int(os.getenv("TOP_N_RECOMMENDATIONS", "10"))

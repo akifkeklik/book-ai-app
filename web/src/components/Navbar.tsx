@@ -1,52 +1,174 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
-import { BookOpen, LogOut, Compass, Sparkles, Bookmark } from 'lucide-react';
+import { usePreferences } from './PreferencesProvider';
+import { BookOpen, LogOut, Compass, Sparkles, Bookmark, Settings, Globe, Search, Network, Brain } from 'lucide-react';
 
 export function Navbar() {
+  const pathname = usePathname();
   const { user, loading, signOut } = useAuth();
+  const { preferences, setLanguage, t } = usePreferences();
+
+  const isActive = (route: string) => {
+    if (route === '/') return pathname === '/';
+    return pathname === route || pathname.startsWith(route + '/');
+  };
+
+  const nextLanguage = preferences.language === 'en' ? 'tr' : preferences.language === 'tr' ? 'de' : 'en';
+
+  const handleOpenSpotlight = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('open-spotlight'));
+    }
+  };
 
   return (
     <nav className="navbar">
       <div className="container nav-container">
-        <Link href="/" className="brand">
+        <Link href="/" className="brand" aria-label="Libris Home">
           <BookOpen size={24} color="var(--primary)" />
           <span>Libris</span>
         </Link>
-        
+
         <div className="nav-links">
-          <Link href="/catalog" className="text-muted flex items-center gap-2 hover:text-white transition-colors">
+          {/* Spotlight Search Trigger */}
+          <button
+            type="button"
+            onClick={handleOpenSpotlight}
+            id="nav-spotlight-btn"
+            className="btn btn-outline"
+            style={{
+              padding: '0.4rem 0.75rem',
+              fontSize: '0.8rem',
+              borderRadius: '9999px',
+              gap: '0.4rem',
+              color: 'var(--text-muted)',
+            }}
+            title="Search books (Ctrl+K / ⌘K)"
+            aria-label="Open spotlight search (Ctrl+K / ⌘K)"
+          >
+            <Search size={14} color="var(--text-muted)" />
+            <span className="nav-link-text">{t('search') || 'Search...'}</span>
+            <kbd
+              style={{
+                fontSize: '0.65rem',
+                padding: '1px 5px',
+                borderRadius: '4px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid var(--card-border)',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              ⌘K
+            </kbd>
+          </button>
+
+          <Link
+            href="/catalog"
+            id="nav-catalog-link"
+            className={`nav-link ${isActive("/catalog") ? "active" : ""}`}
+          >
             <Compass size={18} />
-            <span>Catalog</span>
-          </Link>
-          <Link href="/ai-discovery" className="text-muted flex items-center gap-2 hover:text-white transition-colors">
-            <Sparkles size={18} color="var(--accent)" />
-            <span className="text-gradient">AI Discovery</span>
+            <span className="nav-link-text">{t('nav_discover')}</span>
           </Link>
 
-          {!loading && user && (
-            <Link
-              href="/favorites"
-              id="nav-library-link"
-              className="text-muted flex items-center gap-2 hover:text-white transition-colors"
-            >
-              <Bookmark size={18} color="var(--primary)" />
-              <span>Library</span>
-            </Link>
-          )}
+          <Link
+            href="/ai-discovery"
+            id="nav-ai-discovery-link"
+            className={`nav-link ${isActive("/ai-discovery") ? "active" : ""}`}
+          >
+            <Sparkles size={18} color="var(--accent)" />
+            <span className="text-gradient nav-link-text">{t('nav_for_you')}</span>
+          </Link>
+
+          <Link
+            href="/favorites"
+            id="nav-library-link"
+            className={`nav-link ${isActive("/favorites") ? "active" : ""}`}
+          >
+            <Bookmark size={18} color="var(--primary)" />
+            <span className="nav-link-text">{t('nav_my_library')}</span>
+          </Link>
+
+          <Link
+            href="/knowledge-graph"
+            id="nav-knowledge-graph-link"
+            className={`nav-link ${isActive("/knowledge-graph") ? "active" : ""}`}
+          >
+            <Network size={18} color="var(--primary)" />
+            <span className="nav-link-text">{t('nav_knowledge_graph')}</span>
+          </Link>
+          <Link
+            href="/learning"
+            id="nav-learning-link"
+            className={`nav-link ${isActive("/learning") ? "active" : ""}`}
+          >
+            <Brain size={18} color="var(--primary)" />
+            <span className="nav-link-text">{t('nav_learning')}</span>
+          </Link>
+
+
+          <Link
+            href="/settings"
+            id="nav-settings-link"
+            className={`nav-link ${isActive("/settings") ? "active" : ""}`}
+            title={t('nav_profile_settings')}
+          >
+            <Settings size={18} />
+            <span className="nav-settings-label nav-link-text">{t('nav_profile_settings')}</span>
+          </Link>
+
+
+          {/* Quick Language Toggle */}
+          <button
+            type="button"
+            onClick={() => setLanguage(nextLanguage)}
+            className="btn btn-outline"
+            style={{
+              padding: '0.4rem 0.75rem',
+              fontSize: '0.8rem',
+              borderRadius: '9999px',
+              gap: '0.35rem',
+            }}
+            title="Switch Language (EN / TR / DE)"
+            aria-label="Toggle language"
+          >
+            <Globe size={14} color="var(--primary)" />
+            <span style={{ fontWeight: 700, textTransform: 'uppercase' }}>{preferences.language}</span>
+          </button>
 
           {!loading && (
             <>
               {user ? (
-                <button onClick={signOut} className="btn btn-outline" style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', marginLeft: '0.5rem' }}>
+                <button
+                  onClick={signOut}
+                  id="nav-signout-btn"
+                  className="btn btn-outline"
+                  style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                >
                   <LogOut size={16} />
-                  <span>Sign Out</span>
+                  <span>{t('nav_signout')}</span>
                 </button>
               ) : (
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginLeft: '0.5rem' }}>
-                  <Link href="/login" className="btn btn-outline" style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}>Log in</Link>
-                  <Link href="/signup" className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}>Sign up</Link>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <Link
+                    href="/login"
+                    id="nav-login-btn"
+                    className="btn btn-outline"
+                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                  >
+                    {t('nav_login')}
+                  </Link>
+                  <Link
+                    href="/signup"
+                    id="nav-signup-btn"
+                    className="btn btn-primary"
+                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                  >
+                    {t('nav_signup')}
+                  </Link>
                 </div>
               )}
             </>

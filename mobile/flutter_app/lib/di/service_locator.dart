@@ -33,6 +33,10 @@ class ServiceLocator {
     
     await Hive.initFlutter();
     await Hive.openBox('books_cache');
+    await Hive.openBox('favorites_outbox');
+    await Hive.openBox('interactions_outbox');
+    await Hive.openBox('notes_outbox');
+    await Hive.openBox('notes_cache');
 
     apiService = ApiService.instance;
     apiService.init();

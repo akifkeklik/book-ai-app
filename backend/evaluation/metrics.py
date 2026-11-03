@@ -93,3 +93,51 @@ def catalog_coverage(all_recommended_isbns: Set[str], total_catalog_size: int) -
     if total_catalog_size <= 0:
         return 0.0
     return len(all_recommended_isbns) / float(total_catalog_size)
+
+
+def duplicate_result_rate(recommended: List[str], k: int = 10) -> float:
+    """
+    Calculate Duplicate Result Rate:
+    Proportion of recommended items in top-K that are duplicate entries.
+    Target: 0.0 (no duplicate items).
+    """
+    if not recommended or k <= 0:
+        return 0.0
+    rec_k = recommended[:k]
+    if not rec_k:
+        return 0.0
+    duplicates = len(rec_k) - len(set(rec_k))
+    return float(duplicates) / float(len(rec_k))
+
+
+def seed_leakage_rate(recommended: List[str], seed_items: Set[str], k: int = 10) -> float:
+    """
+    Calculate Seed-Item Leakage Rate:
+    Proportion of recommended items in top-K that were input training seeds.
+    Target: 0.0 (user is not recommended books they already provided as seeds).
+    """
+    if not recommended or not seed_items or k <= 0:
+        return 0.0
+    rec_k = recommended[:k]
+    if not rec_k:
+        return 0.0
+    clean_seeds = set(str(s).strip().replace("-", "").lower() for s in seed_items if str(s).strip())
+    leaked = sum(1 for item in rec_k if str(item).strip().replace("-", "").lower() in clean_seeds)
+    return float(leaked) / float(len(rec_k))
+
+
+def disliked_violation_rate(recommended: List[str], dislikes: Set[str], k: int = 10) -> float:
+    """
+    Calculate Disliked-Item Violation Rate:
+    Proportion of recommended items in top-K that violate explicit user dislikes.
+    Target: 0.0 (zero disliked items recommended).
+    """
+    if not recommended or not dislikes or k <= 0:
+        return 0.0
+    rec_k = recommended[:k]
+    if not rec_k:
+        return 0.0
+    clean_dislikes = set(str(d).strip().replace("-", "").lower() for d in dislikes if str(d).strip())
+    violations = sum(1 for item in rec_k if str(item).strip().replace("-", "").lower() in clean_dislikes)
+    return float(violations) / float(len(rec_k))
+

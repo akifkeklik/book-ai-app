@@ -361,14 +361,14 @@ test('updateLibraryItemStatus: validates statuses and updates collections', asyn
 
   setTestClient(fakeSupabase);
   try {
-    // Valid transition to want_to_read
+    // Valid transition to want_to_read preserves favorites in Model A
     const res = await updateLibraryItemStatus('9785555', 'want_to_read');
     assert.equal(res.success, true);
     assert.ok(upsertedInteraction);
     assert.equal(upsertedInteraction['user_id'], userId);
     assert.equal(upsertedInteraction['book_id'], '9785555');
     assert.equal(upsertedInteraction['interaction_type'], 'want_to_read');
-    assert.equal(favoritesDeleted, true);
+    assert.equal(favoritesDeleted, false, 'Model A contract: reading status update must never erase favorites');
 
     // Invalid status validation
     const invalidRes = await updateLibraryItemStatus('9785555', 'invalid_status' as unknown as LibraryCollectionStatus);

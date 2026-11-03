@@ -6,8 +6,28 @@ import '../application/use_cases/process_ai_chat_use_case.dart';
 import '../domain/entities/book.dart';
 import '../data/models/book_dto.dart';
 import '../widgets/book_card.dart';
+import '../widgets/saas_widgets.dart';
 import '../providers/language_provider.dart';
 import '../theme/design_system.dart';
+
+/// Message model for multi-turn AI chat thread.
+class AiChatMessage {
+  final String id;
+  final bool isUser;
+  final String text;
+  final List<Book> referencedBooks;
+  final bool isError;
+  final DateTime timestamp;
+
+  const AiChatMessage({
+    required this.id,
+    required this.isUser,
+    required this.text,
+    this.referencedBooks = const [],
+    this.isError = false,
+    required this.timestamp,
+  });
+}
 
 class AiDiscoveryScreen extends StatefulWidget {
   const AiDiscoveryScreen({super.key});
@@ -20,18 +40,8 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  final List<AiChatMessage> _messages = [];
   bool _isLoading = false;
-  String _answer = "";
-  List<Book> _referencedBooks = [];
-  bool _hasSearched = false;
-  String? _error;
-
-  final List<String> _examplePrompts = [
-    "I want a dark fantasy with political intrigue",
-    "Something like Harry Potter but darker",
-    "A short mystery for the weekend",
-    "Books that will make me think"
-  ];
 
   @override
   void dispose() {
@@ -46,38 +56,78 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
     final query = predefinedQuery ?? _controller.text.trim();
     if (query.isEmpty) return;
 
-    if (predefinedQuery != null) {
-      _controller.text = predefinedQuery;
-    }
-
     FocusScope.of(context).unfocus();
     HapticFeedback.mediumImpact();
 
+    final messageId = DateTime.now().millisecondsSinceEpoch.toString();
+
     setState(() {
       _isLoading = true;
-      _hasSearched = true;
-      _answer = "";
-      _referencedBooks = [];
-      _error = null;
+      _messages.add(AiChatMessage(
+        id: 'u_$messageId',
+        isUser: true,
+        text: query,
+        timestamp: DateTime.now(),
+      ));
     });
+
+    _controller.clear();
+    _scrollToBottom();
 
     try {
       final res = await context.read<ProcessAiChatUseCase>().execute(query);
       if (!mounted) return;
+
+      if (res['error'] != null) {
+        final errText = res['error'].toString();
+        setState(() {
+          _messages.add(AiChatMessage(
+            id: 'e_$messageId',
+            isUser: false,
+            text: errText,
+            isError: true,
+            timestamp: DateTime.now(),
+          ));
+        });
+        _scrollToBottom();
+        return;
+      }
+
+      final rawAnswer = res['answer'];
+      final trimmedAnswer = rawAnswer is String ? rawAnswer.trim() : '';
+
+      List<Book> books = [];
+      if (res['referenced_books'] != null) {
+        books = (res['referenced_books'] as List)
+            .map((b) => BookDto.fromJson(b as Map<String, dynamic>))
+            .toList();
+      }
+
       setState(() {
-        _answer = res['answer'] ?? context.read<LanguageProvider>().translate('no_response');
-        if (res['referenced_books'] != null) {
-          _referencedBooks = (res['referenced_books'] as List)
-              .map((b) => BookDto.fromJson(b as Map<String, dynamic>))
-              .toList();
-        }
+        _messages.add(AiChatMessage(
+          id: 'a_$messageId',
+          isUser: false,
+          text: trimmedAnswer.isNotEmpty
+              ? trimmedAnswer
+              : context.read<LanguageProvider>().translate('no_response'),
+          referencedBooks: books,
+          timestamp: DateTime.now(),
+        ));
       });
-      _scrollToTop();
+      _scrollToBottom();
     } catch (e) {
       if (!mounted) return;
+      final errStr = context.read<LanguageProvider>().translate('ai_discovery_error');
       setState(() {
-        _error = context.read<LanguageProvider>().translate('ai_discovery_error');
+        _messages.add(AiChatMessage(
+          id: 'err_$messageId',
+          isUser: false,
+          text: errStr,
+          isError: true,
+          timestamp: DateTime.now(),
+        ));
       });
+      _scrollToBottom();
     } finally {
       if (mounted) {
         setState(() {
@@ -87,14 +137,16 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
     }
   }
 
-  void _scrollToTop() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent + 100,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   @override
@@ -126,7 +178,9 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
           child: Column(
             children: [
               Expanded(
-                child: _hasSearched ? _buildResults(theme, isDark) : _buildEmptyState(theme, isDark),
+                child: _messages.isNotEmpty
+                    ? _buildResults(theme, isDark)
+                    : _buildEmptyState(theme, isDark),
               ),
               _buildInputArea(theme, isDark),
             ],
@@ -160,13 +214,13 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
           ),
           const SizedBox(height: DesignSystem.spacing24),
           Text(
-            "Your AI Librarian",
+            context.tr('ai_discovery_empty_title'),
             style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: DesignSystem.spacing12),
           Text(
-            "Tell me what you feel like reading.",
+            context.tr('ai_discovery_empty_subtitle'),
             style: theme.textTheme.bodyLarge?.copyWith(
               color: isDark ? Colors.white70 : DesignSystem.textLightSecondary,
               height: 1.5,
@@ -182,7 +236,12 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
             ),
           ),
           const SizedBox(height: DesignSystem.spacing16),
-          ..._examplePrompts.map((prompt) => _buildPromptPill(prompt, theme, isDark)),
+          ...[
+            context.tr('ai_prompt_1'),
+            context.tr('ai_prompt_2'),
+            context.tr('ai_prompt_3'),
+            context.tr('ai_prompt_4'),
+          ].map((prompt) => _buildPromptPill(prompt, theme, isDark)),
         ],
       ),
     );
@@ -192,7 +251,7 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: DesignSystem.spacing12),
       child: Material(
-        color: isDark ? DesignSystem.surfaceDarkHighlight : Colors.white,
+        color: isDark ? DesignSystem.saasNavy900 : Colors.white,
         borderRadius: DesignSystem.borderRadiusLarge,
         elevation: isDark ? 0 : 2,
         shadowColor: Colors.black.withOpacity(0.05),
@@ -204,7 +263,9 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
             padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20, vertical: DesignSystem.spacing16),
             decoration: BoxDecoration(
               borderRadius: DesignSystem.borderRadiusLarge,
-              border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+              border: Border.all(
+                color: isDark ? DesignSystem.electricBlueBorder.withOpacity(0.35) : Colors.black12,
+              ),
             ),
             child: Row(
               children: [
@@ -214,7 +275,7 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
                     style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
-                Icon(Icons.arrow_forward_rounded, size: 16, color: theme.colorScheme.primary),
+                Icon(Icons.arrow_forward_rounded, size: 16, color: isDark ? DesignSystem.electricBlue : theme.colorScheme.primary),
               ],
             ),
           ),
@@ -224,140 +285,154 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
   }
 
   Widget _buildResults(ThemeData theme, bool isDark) {
-    if (_isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(vertical: DesignSystem.spacing16),
+      itemCount: _messages.length + (_isLoading ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == _messages.length && _isLoading) {
+          return _buildLoadingBubble(theme, isDark);
+        }
+        final message = _messages[index];
+        if (message.isUser) {
+          return _buildUserBubble(message, theme, isDark);
+        } else {
+          return _buildAssistantBubble(message, theme, isDark);
+        }
+      },
+    );
+  }
+
+  Widget _buildUserBubble(AiChatMessage message, ThemeData theme, bool isDark) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20, vertical: DesignSystem.spacing8),
+        padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20, vertical: DesignSystem.spacing16),
+        decoration: BoxDecoration(
+          color: isDark ? DesignSystem.saasNavy700 : theme.colorScheme.primary,
+          border: isDark ? Border.all(color: DesignSystem.electricBlueBorder.withOpacity(0.5)) : null,
+          boxShadow: DesignSystem.shadowSm(isDark),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+            bottomLeft: Radius.circular(20),
+            bottomRight: Radius.circular(4),
+          ),
+        ),
+        child: Text(
+          message.text,
+          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500, height: 1.45),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssistantBubble(AiChatMessage message, ThemeData theme, bool isDark) {
+    if (message.isError) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20, vertical: DesignSystem.spacing8),
+        padding: const EdgeInsets.all(DesignSystem.spacing20),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.error.withOpacity(0.1),
+          borderRadius: DesignSystem.borderRadiusLarge,
+          border: Border.all(color: theme.colorScheme.error.withOpacity(0.3)),
+        ),
+        child: Row(
           children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: DesignSystem.spacing24),
-            Text(
-              context.tr('analyzing_request'),
-              style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary),
+            Icon(Icons.error_outline, color: theme.colorScheme.error, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message.text,
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
+              ),
             ),
           ],
         ),
       );
     }
 
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20, vertical: DesignSystem.spacing8),
+      padding: const EdgeInsets.all(DesignSystem.spacing24),
+      decoration: BoxDecoration(
+        color: isDark ? DesignSystem.saasNavy900 : Colors.white,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+          bottomLeft: Radius.circular(4),
+        ),
+        border: Border.all(
+          color: isDark ? DesignSystem.electricBlueBorder.withOpacity(0.35) : Colors.black12,
+        ),
+        boxShadow: isDark ? DesignSystem.saasCardShadow(true) : DesignSystem.shadowSm(false),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error.withOpacity(0.8)),
-              const SizedBox(height: 24),
+              const SaasPulseDot(color: DesignSystem.electricBlue, size: 6.5),
+              const SizedBox(width: 6),
               Text(
-                _error!,
-                style: theme.textTheme.titleMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () => _submitQuery(),
-                icon: const Icon(Icons.refresh),
-                label: Text(context.tr('retry')),
+                'AI Insight · Verified',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: isDark ? DesignSystem.electricBlue : theme.colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
-        ),
-      );
-    }
-
-    return ListView(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(vertical: DesignSystem.spacing24),
-      children: [
-        // Query bubble
-        Align(
-          alignment: Alignment.centerRight,
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20, vertical: DesignSystem.spacing8),
-            padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20, vertical: DesignSystem.spacing16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-                bottomLeft: Radius.circular(24),
-                bottomRight: Radius.circular(4),
-              ),
-            ),
-            child: Text(
-              _controller.text,
-              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: DesignSystem.spacing16),
-
-        // AI Answer bubble
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20, vertical: DesignSystem.spacing8),
-            padding: const EdgeInsets.all(DesignSystem.spacing24),
-            decoration: BoxDecoration(
-              color: isDark ? DesignSystem.surfaceDarkHighlight : Colors.white,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-                bottomRight: Radius.circular(24),
-                bottomLeft: Radius.circular(4),
-              ),
-              border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
-              boxShadow: DesignSystem.shadowSm(isDark),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.auto_awesome, size: 18, color: theme.colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Text(
-                      'AI Insight',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: DesignSystem.spacing16),
-                Text(
-                  _answer,
-                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.6),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        if (_referencedBooks.isNotEmpty) ...[
-          const SizedBox(height: DesignSystem.spacing32),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20),
-            child: Text(
-              context.tr('referenced_books'),
-              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
-          ),
           const SizedBox(height: DesignSystem.spacing16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20),
-            child: Column(
+          Text(
+            message.text,
+            style: theme.textTheme.bodyLarge?.copyWith(height: 1.6),
+          ),
+          if (message.referencedBooks.isNotEmpty) ...[
+            const SizedBox(height: DesignSystem.spacing24),
+            Text(
+              context.tr('referenced_books'),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: DesignSystem.spacing12),
+            Column(
               children: [
-                for (var i = 0; i < _referencedBooks.length; i++)
-                  BookListTile(book: _referencedBooks[i]),
+                for (var book in message.referencedBooks)
+                  BookListTile(book: book),
               ],
             ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingBubble(ThemeData theme, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: DesignSystem.spacing20, vertical: DesignSystem.spacing8),
+      padding: const EdgeInsets.all(DesignSystem.spacing16),
+      decoration: BoxDecoration(
+        color: isDark ? DesignSystem.surfaceDarkHighlight : Colors.white,
+        borderRadius: DesignSystem.borderRadiusLarge,
+        border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
-        ]
-      ],
+          const SizedBox(width: 12),
+          Text(
+            context.tr('analyzing_request'),
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.primary),
+          ),
+        ],
+      ),
     );
   }
 

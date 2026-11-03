@@ -6,7 +6,15 @@ class SearchBooksUseCase {
 
   SearchBooksUseCase(this._repository);
 
-  Future<List<Book>> execute(String query) {
-    return _repository.searchBooks(query);
+  Future<List<Book>> execute(String query) async {
+    final results = await _repository.searchBooks(query);
+    if (results.isNotEmpty) {
+      _repository.saveSearchResultsToCache(query, results);
+    }
+    return results;
+  }
+
+  List<Book> getCached(String query) {
+    return _repository.getCachedSearchResults(query);
   }
 }

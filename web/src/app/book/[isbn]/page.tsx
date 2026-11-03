@@ -2,18 +2,97 @@ import { ApiService } from '@/lib/api';
 import { BookCard } from '@/components/BookCard';
 import { BookCoverImage } from '@/components/BookCoverImage';
 import type { Book } from '@/types';
-import { Star, ArrowLeft, Calendar, FileText, Bookmark, Hash } from 'lucide-react';
+import { Star, ArrowLeft, Calendar, FileText, Bookmark, Hash, AlertTriangle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import BookFeedback from '@/components/BookFeedback';
+import BookNotesWidget from '@/components/BookNotesWidget';
+import { getBookNotes } from '@/app/actions/notes';
+import type { LearningNote } from '@/types';
+import { getBookInteraction } from '@/app/actions/library';
 
-
-export const instant = false;
+export const dynamic = 'force-dynamic';
 
 export default async function BookPage({ params }: { params: Promise<{ isbn: string }> }) {
   const { isbn } = await params;
   
-  const book = await ApiService.getBookByIsbn(isbn);
-  
+  let book: Book | null = null;
+  let serviceError: { isTimeout: boolean; message: string } | null = null;
+
+  try {
+    book = await ApiService.getBookByIsbn(isbn);
+  } catch (err: unknown) {
+    const isTimeout =
+      (err as { isTimeout?: boolean })?.isTimeout === true ||
+      (err instanceof Error && (err.name === 'ApiTimeoutError' || err.message.toLowerCase().includes('timeout')));
+    serviceError = {
+      isTimeout,
+      message: isTimeout
+        ? 'The book catalog service timed out. Please check your connection and try again.'
+        : 'The book catalog service is temporarily unavailable. Please try again shortly.',
+    };
+  }
+
+  // Controlled UI for network / timeout / 5xx service errors
+  if (serviceError) {
+    return (
+      <div className="container" style={{ textAlign: 'center', padding: '6rem 2rem' }}>
+        <div
+          className="glass-panel"
+          style={{
+            maxWidth: '560px',
+            margin: '0 auto',
+            padding: '3rem 2rem',
+            borderRadius: '16px',
+          }}
+        >
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.15)',
+              color: 'var(--danger, #ef4444)',
+              marginBottom: '1.5rem',
+            }}
+          >
+            <AlertTriangle size={32} />
+          </div>
+          <h2 style={{ fontSize: '1.75rem', marginBottom: '0.75rem' }}>
+            Service Temporarily Unavailable
+          </h2>
+          <p className="text-muted" style={{ marginBottom: '2rem', lineHeight: '1.6' }}>
+            {serviceError.message}
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link
+              href={`/book/${encodeURIComponent(isbn)}`}
+              className="btn btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <RefreshCw size={16} /> Retry
+            </Link>
+            <Link
+              href="/catalog"
+              className="btn"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                background: 'rgba(255, 255, 255, 0.08)',
+              }}
+            >
+              <ArrowLeft size={16} /> Back to Catalog
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 404 / Book Not Found
   if (!book) {
     return (
       <div className="container" style={{ textAlign: 'center', padding: '6rem 2rem' }}>
@@ -36,6 +115,35 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
     console.error('Failed to fetch recommendations', e);
   }
 
+  // Retrieve verified server-side user interaction
+  let initialInteraction: string | null = null;
+  let initialIsFavorite = false;
+  let interactionError: string | null = null;
+  let isAuthenticated = false;
+
+  let initialNotes: LearningNote[] = [];
+  try {
+    const notesResult = await getBookNotes(book.isbn13);
+    if (notesResult.success) {
+      initialNotes = notesResult.notes;
+    }
+  } catch {
+    // Non-fatal
+  }
+
+  try {
+    const interResult = await getBookInteraction(book.isbn13);
+    isAuthenticated = interResult.isAuthenticated;
+    if (interResult.success) {
+      initialInteraction = interResult.interaction;
+      initialIsFavorite = !!interResult.isFavorite;
+    } else {
+      interactionError = interResult.error || 'Could not verify existing activity';
+    }
+  } catch (err: unknown) {
+    interactionError = err instanceof Error ? err.message : 'Could not check interaction';
+  }
+
   const categoryList = (book.categories || '')
     .split(',')
     .map(c => c.trim())
@@ -49,9 +157,9 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
         </Link>
       </div>
       
-      <div className="glass-panel" style={{ display: 'flex', gap: '3.5rem', flexWrap: 'wrap', padding: '2.5rem' }}>
+      <div className="glass-panel" style={{ display: 'flex', gap: '2.5rem', flexWrap: 'wrap', padding: 'clamp(1rem, 4vw, 2.5rem)', maxWidth: '100%', overflowX: 'hidden' }}>
         {/* Cover Column */}
-        <div style={{ flex: '1', minWidth: '240px', maxWidth: '320px' }}>
+        <div style={{ flex: '1 1 200px', minWidth: '0', maxWidth: '320px', width: '100%' }}>
           <BookCoverImage
             thumbnail={book.thumbnail}
             title={book.title}
@@ -60,8 +168,8 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
         </div>
         
         {/* Details Column */}
-        <div style={{ flex: '2', minWidth: '320px' }}>
-          <h1 style={{ fontSize: '2.75rem', lineHeight: 1.15, marginBottom: '0.5rem' }}>{book.title}</h1>
+        <div style={{ flex: '2 1 260px', minWidth: '0', maxWidth: '100%' }}>
+          <h1 style={{ fontSize: 'clamp(1.75rem, 5vw, 2.75rem)', lineHeight: 1.15, marginBottom: '0.5rem', wordBreak: 'break-word' }}>{book.title}</h1>
           
           <div style={{ marginBottom: '1.5rem' }}>
             {book.authors ? (
@@ -149,7 +257,20 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
           </div>
           
           {/* Interactive User Feedback */}
-          <BookFeedback bookId={book.isbn13} />
+          <BookFeedback
+            bookId={book.isbn13}
+            initialInteraction={initialInteraction}
+            initialIsFavorite={initialIsFavorite}
+            interactionError={interactionError}
+            isAuthenticated={isAuthenticated}
+          />
+
+          {/* Learning Notes & Knowledge Retention */}
+          <BookNotesWidget
+            bookId={book.isbn13}
+            initialNotes={initialNotes}
+            isAuthenticated={isAuthenticated}
+          />
         </div>
       </div>
       
@@ -170,4 +291,3 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
     </div>
   );
 }
-

@@ -60,6 +60,13 @@ class AppConfig {
     return 'placeholder-anon-key';
   }
 
+  /// Returns true only if genuine Supabase credentials are provided (not empty or placeholder).
+  static bool get isSupabaseConfigured {
+    if (_envSupabaseUrl.isEmpty || _envSupabaseKey.isEmpty) return false;
+    if (_envSupabaseUrl.contains('placeholder') || _envSupabaseKey.contains('placeholder')) return false;
+    return true;
+  }
+
   // ── API Paths ──────────────────────────────────────────────────────────────
 
   static const String apiBooks = '/api/books';

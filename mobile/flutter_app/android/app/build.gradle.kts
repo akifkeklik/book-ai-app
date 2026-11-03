@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.book_ai_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 35
     ndkVersion = "25.1.8937393"
 
     compileOptions {

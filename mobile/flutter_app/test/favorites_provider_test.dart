@@ -23,6 +23,8 @@ class FakeSupabaseService implements SupabaseService {
     return _favoritesStreamController.stream;
   }
 
+  int addFavoriteCallCount = 0;
+
   @override
   Future<void> addFavorite({
     required String userId,
@@ -31,6 +33,7 @@ class FakeSupabaseService implements SupabaseService {
     required String author,
     required String? imageUrl,
   }) async {
+    addFavoriteCallCount++;
     if (shouldFailAdd) throw Exception('Add failed');
     _mockDb.insert(0, {
       'id': 'db_id_$bookId',
@@ -161,6 +164,35 @@ void main() {
       expect(provider.error, isNotNull);
       expect(provider.isFavorite('isbn-new'), false);
 
+      provider.dispose();
+    });
+
+    test('toggleFavorite ignores rapid duplicate calls while operation in flight', () async {
+      final svc = FakeSupabaseService();
+      final provider = FavoritesProvider(svc);
+      provider.loadFavorites('user-1');
+
+      const book = Book(
+        isbn13: 'isbn-dup',
+        title: 'Dup Book',
+        authors: 'Author',
+        categories: '',
+        description: '',
+        thumbnail: '',
+        averageRating: 0,
+        ratingsCount: 0,
+        publishedDate: '2023',
+        pageCount: 100,
+      );
+
+      final f1 = provider.toggleFavorite(userId: 'user-1', book: book);
+      // Concurrent second call while f1 is executing
+      final f2 = provider.toggleFavorite(userId: 'user-1', book: book);
+
+      await Future.wait([f1, f2]);
+      await Future.delayed(Duration.zero);
+
+      expect(svc.addFavoriteCallCount, 1);
       provider.dispose();
     });
   });

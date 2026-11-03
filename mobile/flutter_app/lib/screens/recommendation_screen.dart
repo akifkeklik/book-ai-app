@@ -68,12 +68,17 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
   }
 
   Widget _buildBody() {
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+    final responsiveAspectRatio = textScale > 1.0
+        ? (0.46 / (1.0 + (textScale - 1.0) * 0.7)).clamp(0.36, 0.46)
+        : 0.46;
+
     if (_loading) {
       return GridView.builder(
         padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: 200,
-          childAspectRatio: 0.55,
+          childAspectRatio: responsiveAspectRatio,
           crossAxisSpacing: 16,
           mainAxisSpacing: 24,
         ),
@@ -130,12 +135,16 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
               Icon(Icons.auto_awesome,
                   size: 16, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
-              Text(
-                context.tr('similar_to', args: {'count': _recommendations.length.toString(), 'title': widget.bookTitle}),
-                style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w600),
+              Expanded(
+                child: Text(
+                  context.tr('similar_to', args: {'count': _recommendations.length.toString(), 'title': widget.bookTitle}),
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w600),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -144,39 +153,19 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
         Expanded(
           child: GridView.builder(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 200,
-              childAspectRatio: 0.55,
+              childAspectRatio: responsiveAspectRatio,
               crossAxisSpacing: 16,
               mainAxisSpacing: 24,
             ),
             itemCount: _recommendations.length,
             itemBuilder: (_, i) {
               final book = _recommendations[i];
-              return Stack(
-                children: [
-                  BookCard(book: book),
-                  if (book.similarityScore != null)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '%${(book.similarityScore! * 100).round()}',
-                          style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white),
-                        ),
-                      ),
-                    ),
-                ],
+              return BookCard(
+                book: book,
+                width: null,
+                margin: EdgeInsets.zero,
               );
             },
           ),

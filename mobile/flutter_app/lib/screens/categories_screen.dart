@@ -14,6 +14,11 @@ class CategoriesScreen extends StatelessWidget {
     final catalog = context.watch<CatalogProvider>();
     final theme = Theme.of(context);
 
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+    final responsiveAspectRatio = textScale > 1.0
+        ? (1.35 / (1.0 + (textScale - 1.0) * 1.1)).clamp(0.75, 1.35)
+        : 1.35;
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -32,9 +37,9 @@ class CategoriesScreen extends StatelessWidget {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 1.35,
+                childAspectRatio: responsiveAspectRatio,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
               ),
@@ -80,37 +85,48 @@ class _CategoryCard extends StatelessWidget {
         onTap: () => context.push('/category/${Uri.encodeComponent(category)}'),
         child: Container(
           decoration: BoxDecoration(gradient: gradient),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.18),
                   borderRadius: DesignSystem.borderRadiusMedium,
                 ),
-                child: Icon(icon, color: Colors.white, size: 22),
+                child: Icon(icon, color: Colors.white, size: 20),
               ),
-              const Spacer(),
-              Text(
-                context.trGenre(category),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                bookCount > 0
-                    ? context.trPlural('book_count', bookCount)
-                    : context.tr('explore_category'),
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: Colors.white.withOpacity(0.72),
+              const SizedBox(height: 6),
+              Flexible(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.trGenre(category),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      bookCount > 0
+                          ? context.trPlural('book_count', bookCount)
+                          : context.tr('explore_category'),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white.withOpacity(0.72),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -170,6 +186,12 @@ class _CategoryCard extends StatelessWidget {
         return Icons.image_rounded;
       case 'Romance':
         return Icons.favorite_border_rounded;
+      case 'Education & Reference':
+        return Icons.school_rounded;
+      case 'Sports & Games':
+        return Icons.sports_basketball_rounded;
+      case 'Crafts & Hobbies':
+        return Icons.handyman_rounded;
       case 'Business':
         return Icons.business_center_rounded;
       default:
@@ -204,6 +226,9 @@ class _CategoryCard extends StatelessWidget {
       'Comics & Graphic Novels': [Color(0xFFDC2626), Color(0xFFB91C1C)],
       'Romance': [Color(0xFFEC4899), Color(0xFFDB2777)],
       'Business': [Color(0xFF1E3A5F), Color(0xFF1E40AF)],
+      'Education & Reference': [Color(0xFF0D9488), Color(0xFF115E59)],
+      'Sports & Games': [Color(0xFFF97316), Color(0xFFC2410C)],
+      'Crafts & Hobbies': [Color(0xFF84CC16), Color(0xFF4D7C0F)],
     };
 
     final colors = gradients[cat] ?? [const Color(0xFF6366F1), const Color(0xFF4F46E5)];

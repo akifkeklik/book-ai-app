@@ -5,7 +5,8 @@ __pycache__/
 venv/
 tests/
 scripts/
-data/
+data/enrichment/
+data/*.tmp
 test_recommender_out.txt
 *.pyc
 *.pyo

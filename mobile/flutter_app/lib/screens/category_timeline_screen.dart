@@ -22,6 +22,9 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
   bool _hasMore = true;
   int _page = 1;
   final int _perPage = 40; // Senior Update: Increased for smoother browsing
+  bool _isFromCache = false;
+  String? _errorMessage;
+  int _requestToken = 0;
 
   // Filters
   String? _sort = 'popularity';
@@ -36,11 +39,42 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
     _scrollController.addListener(_onScroll);
   }
 
+  @override
+  void didUpdateWidget(covariant CategoryTimelineScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.genre != oldWidget.genre) {
+      _requestToken++;
+      setState(() {
+        _books.clear();
+        _page = 1;
+        _hasMore = true;
+        _isLoading = false;
+        _isFromCache = false;
+        _errorMessage = null;
+      });
+      _fetchInitial();
+    }
+  }
+
   Future<void> _fetchInitial() async {
     await _fetchMore();
   }
 
+  void _retry() {
+    _requestToken++;
+    setState(() {
+      _books.clear();
+      _page = 1;
+      _hasMore = true;
+      _isLoading = false;
+      _isFromCache = false;
+      _errorMessage = null;
+    });
+    _fetchMore();
+  }
+
   Future<void> _applyFilters({String? sort, int? minPages, int? maxPages, double? minRating}) async {
+    _requestToken++;
     setState(() {
       _sort = sort ?? _sort;
       if (minPages != -1) _minPages = minPages ?? _minPages;
@@ -53,13 +87,19 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
       _books.clear();
       _page = 1;
       _hasMore = true;
+      _isFromCache = false;
+      _errorMessage = null;
     });
     await _fetchMore();
   }
 
   Future<void> _fetchMore() async {
     if (!_hasMore || _isLoading) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    final currentToken = ++_requestToken;
     try {
       final result = await context.read<ManageCatalogUseCase>().getBooksByCategory(
         category: widget.genre,
@@ -70,21 +110,33 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
         maxPages: _maxPages,
         minRating: _minRating,
       );
-      final newBooks = result['books'] as List<Book>;
+      if (!mounted || currentToken != _requestToken) return;
+      final newBooks = (result['books'] as List<dynamic>?)?.cast<Book>() ?? [];
       final totalPages = result['total_pages'] as int? ?? 1;
-      if (!mounted) return;
+      final fromCache = result['is_from_cache'] as bool? ?? false;
+
       setState(() {
+        _isFromCache = fromCache;
+        _errorMessage = null;
         _books.addAll(newBooks);
         _page++;
-        if (_page > totalPages || newBooks.isEmpty) {
+        if (_page > totalPages || newBooks.isEmpty || fromCache) {
           _hasMore = false;
         }
       });
     } catch (e) {
       debugPrint('Error fetching category books: $e');
-      if (mounted) setState(() => _hasMore = false);
+      if (!mounted || currentToken != _requestToken) return;
+      setState(() {
+        _hasMore = false;
+        if (_books.isEmpty) {
+          _errorMessage = 'error_loading_books';
+        }
+      });
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && currentToken == _requestToken) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -121,45 +173,121 @@ class _CategoryTimelineScreenState extends State<CategoryTimelineScreen> {
       ),
       body: _books.isEmpty && _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _books.isEmpty
-              ? _buildEmptyState(theme, lang)
-              : CustomScrollView(
-                  controller: _scrollController,
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text(
-                          context.tr('scroll_to_discover'),
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          : _books.isEmpty && _errorMessage != null
+              ? _buildErrorState(theme)
+              : _books.isEmpty
+                  ? _buildEmptyState(theme, lang)
+                  : CustomScrollView(
+                      controller: _scrollController,
+                      slivers: [
+                        if (_isFromCache)
+                          SliverToBoxAdapter(
+                            child: Container(
+                              margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: theme.brightness == Brightness.dark
+                                    ? Colors.white.withOpacity(0.06)
+                                    : Colors.black.withOpacity(0.04),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                    color: theme.colorScheme.outline
+                                        .withOpacity(0.2)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.cloud_off_rounded,
+                                    size: 16,
+                                    color: theme.colorScheme.onSurface
+                                        .withOpacity(0.7),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      context.tr('offline_cached_results'),
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.onSurface
+                                            .withOpacity(0.8),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text(
+                              context.tr('scroll_to_discover'),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant),
+                            ),
+                          ),
                         ),
-                      ),
+                        SliverPadding(
+                          padding: const EdgeInsets.all(16),
+                          sliver: SliverGrid(
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: MediaQuery.textScalerOf(context).scale(1.0) > 1.0
+                                  ? (0.45 / (1.0 + (MediaQuery.textScalerOf(context).scale(1.0) - 1.0) * 0.7)).clamp(0.35, 0.45)
+                                  : 0.45,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                            ),
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                if (index < _books.length) {
+                                  return BookCard(book: _books[index]);
+                                }
+                                return const Center(
+                                    child: CircularProgressIndicator());
+                              },
+                              childCount: _books.length + (_hasMore ? 1 : 0),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    SliverPadding(
-                      padding: const EdgeInsets.all(16),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.45,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            if (index < _books.length) {
-                              return BookCard(book: _books[index]);
-                            }
-                            return const Center(
-                                child: CircularProgressIndicator());
-                          },
-                          childCount: _books.length + (_hasMore ? 1 : 0),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+    );
+  }
+
+  Widget _buildErrorState(ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.wifi_off_rounded,
+                size: 64, color: theme.colorScheme.error.withOpacity(0.7)),
+            const SizedBox(height: 16),
+            Text(
+              context.tr(_errorMessage ?? 'error_loading_books'),
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _retry,
+              icon: const Icon(Icons.refresh),
+              label: Text(context.tr('retry')),
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -276,41 +404,43 @@ class _FilterSheetState extends State<_FilterSheet> {
         top: 24,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            context.tr('sort_and_filter'),
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 24),
-          Text(context.tr('sort_by'), style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildSortChip('popularity', context.tr('popularity')),
-              _buildSortChip('rating', context.tr('rating')),
-              _buildSortChip('newest', context.tr('newest')),
-              _buildSortChip('oldest', context.tr('oldest')),
-              _buildSortChip('title', context.tr('title_a_z')),
-            ],
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton(
-            onPressed: () {
-              widget.onApply(_selectedSort);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              context.tr('sort_and_filter'),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
-            child: Text(context.tr('apply_options')),
-          ),
-        ],
+            const SizedBox(height: 24),
+            Text(context.tr('sort_by'), style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildSortChip('popularity', context.tr('popularity')),
+                _buildSortChip('rating', context.tr('rating')),
+                _buildSortChip('newest', context.tr('newest')),
+                _buildSortChip('oldest', context.tr('oldest')),
+                _buildSortChip('title', context.tr('title_a_z')),
+              ],
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: () {
+                widget.onApply(_selectedSort);
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(context.tr('apply_options')),
+            ),
+          ],
+        ),
       ),
     );
   }

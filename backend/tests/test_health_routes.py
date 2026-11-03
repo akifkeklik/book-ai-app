@@ -48,3 +48,12 @@ def test_api_health_ready_handles_database_failure_cleanly(client):
         assert data["error"] == "Database unavailable"
         assert "traceback" not in data
         assert "password" not in str(data)
+
+def test_api_health_ready_fails_when_port_is_none(client):
+    """When DB port is unconfigured or None, readiness returns 503."""
+    with patch("backend.routes.routes._book_data_port", None):
+        res = client.get("/api/health/ready")
+        assert res.status_code == 503
+        data = res.get_json()
+        assert data["status"] == "not_ready"
+        assert data["error"] == "Database unavailable"

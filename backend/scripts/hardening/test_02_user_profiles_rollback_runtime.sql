@@ -35,6 +35,10 @@ BEGIN
     CREATE TABLE IF NOT EXISTS auth.users (id UUID PRIMARY KEY DEFAULT gen_random_uuid());
 END $$;
 
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid AS $$
+    SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+$$ LANGUAGE sql STABLE;
+
 -- user_profiles test tablosunu kur
 DROP TABLE IF EXISTS public._archived_user_profiles_rollback_backup CASCADE;
 DROP TABLE IF EXISTS public.user_profiles CASCADE;

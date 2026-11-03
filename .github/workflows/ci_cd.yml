@@ -18,11 +18,19 @@ on:
       - 'docs/**'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  #   Database / Migration CI 
+  # ─── Database / Migration CI ──────────────────────────────────────────────
   database-ci:
     name: Migration Validation
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -89,9 +97,9 @@ jobs:
 
   #   Backend CI (Python/Flask) 
   backend-ci:
-    name: Backend Lint & Test
+    name: Backend Lint & Fast Tests
     runs-on: ubuntu-latest
-    needs: database-ci
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -100,26 +108,28 @@ jobs:
         with:
           python-version: "3.12"
           cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
-          pip install ruff pytest
+          pip install ruff
 
       - name: Static Analysis (Ruff)
         run: |
           ruff check backend/
         continue-on-error: false
 
-      - name: Execute Pytest Suite
+      - name: Execute Fast Pytest Suite
         run: |
-          PYTHONPATH=backend python -m pytest backend/tests/ -v --tb=short
+          PYTHONPATH=. python -m pytest backend/tests/ -v --tb=short
 
   #   Docker Build CI 
   docker-ci:
     name: Docker Build Check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       
@@ -127,10 +137,15 @@ jobs:
         run: |
           docker build --no-cache -t libris-backend backend/
 
+      - name: Build Web Image
+        run: |
+          docker build --no-cache -t libris-web web/
+
   #   Frontend CI (Flutter/Dart) 
   frontend-ci:
     name: Mobile App Analysis & Test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -159,6 +174,7 @@ jobs:
   backend-integration-ci:
     name: Backend Integration Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -176,7 +192,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Apply Migrations
+      - name: Apply Migrations and Hardening Schema
         env:
           PGPASSWORD: postgrespassword
         run: |
@@ -186,29 +202,41 @@ jobs:
             echo "Applying $sql..."
             psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "$sql"
           done
+          echo "Setting up Supabase Roles and Hardening Migrations..."
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -c "
+            DO \$\$ BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon; END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated; END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role; END IF;
+            END \$\$;
+          "
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/01_DRAFT_revoke_dangerous_privileges.sql"
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/02_DRAFT_reconcile_user_profiles.sql"
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "backend/scripts/hardening/03_DRAFT_reconcile_interactions_and_trigger.sql"
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
-          pip install pytest
 
       - name: Execute Integration Tests
         env:
           SUPABASE_DB_URL: postgresql://postgres:postgrespassword@localhost:5432/postgres
         run: |
-          PYTHONPATH=backend python -m pytest backend/tests/ -m "integration" -v --tb=short
+          PYTHONPATH=. python -m pytest backend/tests/ -m "integration" -v --tb=short
 
   #   Frontend CI (Next.js/Web)
   web-ci:
     name: Web App Build & Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -243,3 +271,57 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "mock_anon_key"
           LIBRIS_API_KEY: "mock_api_key"
           BACKEND_URL: "http://localhost:5000"
+
+  # Visual QA CI (Headless Chrome Verification)
+  visual-qa-ci:
+    name: Headless Chrome Visual QA Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [backend-ci, web-ci]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+          cache-dependency-path: 'backend/requirements.txt'
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'web/package-lock.json'
+
+      - name: Install Web Dependencies & Build
+        run: |
+          cd web
+          npm ci
+          npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: "https://mock.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "mock_anon_key"
+          LIBRIS_API_KEY: "mock_api_key"
+          BACKEND_URL: "http://localhost:5000"
+
+      - name: Execute Visual QA Gate
+        env:
+          CHROME_BIN: "/usr/bin/google-chrome"
+        run: |
+          python scripts/visual_qa_gate.py --output-dir artifacts/visual_qa
+
+      - name: Upload Visual QA Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-qa-screenshots
+          path: artifacts/visual_qa/
+          if-no-files-found: ignore
+

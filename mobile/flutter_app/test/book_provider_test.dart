@@ -130,6 +130,9 @@ class FakeBookRepository implements BookRepository {
   Future<Book?> getBookByIsbn(String isbn) async => null;
 
   @override
+  Future<String?> getUserInteraction(String userId, String bookId) async => null;
+
+  @override
   Future<void> upsertUserProfile(
       {required String userId,
       required List<String> preferredGenres,
@@ -146,8 +149,36 @@ class FakeBookRepository implements BookRepository {
   @override
   void savePopularBooksToCache(List<Book> books) => savedToCache = books;
 
+  Map<String, List<Book>> cachedSearchResultsMap = {};
+  Map<String, List<Book>> savedSearchResultsMap = {};
+
+  @override
+  List<Book> getCachedSearchResults(String query) =>
+      cachedSearchResultsMap[query.trim().toLowerCase()] ?? [];
+
+  @override
+  void saveSearchResultsToCache(String query, List<Book> books) {
+    savedSearchResultsMap[query.trim().toLowerCase()] = books;
+  }
+
+  Map<String, List<Book>> cachedCategoryBooksMap = {};
+  Map<String, List<Book>> savedCategoryBooksMap = {};
+
+  @override
+  List<Book> getCachedCategoryBooks(String category) =>
+      cachedCategoryBooksMap[category.trim().toLowerCase()] ?? [];
+
+  @override
+  void saveCategoryBooksToCache(String category, List<Book> books,
+      {int? total, int? totalPages}) {
+    savedCategoryBooksMap[category.trim().toLowerCase()] = books;
+  }
+
   @override
   Future<int> getTotalBookCount() async => totalCount;
+
+  @override
+  void clearUserCache(String userId) {}
 }
 
 // ---------------------------------------------------------------------------

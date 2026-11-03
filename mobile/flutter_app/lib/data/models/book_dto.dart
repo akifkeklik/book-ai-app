@@ -20,6 +20,9 @@ class BookDto {
       finalScore: (json['final_score'] as num?)?.toDouble(),
       diversityPenalty: (json['diversity_penalty'] as num?)?.toDouble(),
       recommendationReason: json['recommendation_reason']?.toString(),
+      explanationType: json['explanation_type']?.toString(),
+      confidence: json['confidence']?.toString(),
+      isColdStart: json['is_cold_start'] == true,
     );
   }
 
@@ -41,6 +44,9 @@ class BookDto {
         if (book.finalScore != null) 'final_score': book.finalScore,
         if (book.diversityPenalty != null) 'diversity_penalty': book.diversityPenalty,
         if (book.recommendationReason != null) 'recommendation_reason': book.recommendationReason,
+        if (book.explanationType != null) 'explanation_type': book.explanationType,
+        if (book.confidence != null) 'confidence': book.confidence,
+        if (book.isColdStart != null) 'is_cold_start': book.isColdStart,
       };
 }
 
@@ -49,12 +55,25 @@ class FavoriteBookDto {
     return FavoriteBook(
       id: json['id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? '',
-      isbn13: json['book_id']?.toString() ?? '',
-      bookTitle: json['book_title']?.toString() ?? '',
-      thumbnail: json['book_image_url']?.toString() ?? '',
+      isbn13: json['book_id']?.toString() ?? json['isbn13']?.toString() ?? '',
+      bookTitle: json['book_title']?.toString() ?? json['title']?.toString() ?? '',
+      thumbnail: json['book_image_url']?.toString() ?? json['thumbnail']?.toString() ?? '',
       addedAt: json['added_at'] != null
           ? DateTime.tryParse(json['added_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
+      status: json['status']?.toString() ?? json['interaction_type']?.toString(),
     );
+  }
+
+  static Map<String, dynamic> toJson(FavoriteBook fav) {
+    return {
+      'id': fav.id,
+      'user_id': fav.userId,
+      'book_id': fav.isbn13,
+      'book_title': fav.bookTitle,
+      'book_image_url': fav.thumbnail,
+      'added_at': fav.addedAt.toIso8601String(),
+      if (fav.status != null) 'status': fav.status,
+    };
   }
 }

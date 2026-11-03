@@ -29,12 +29,18 @@ abstract class BookRepository {
   Future<List<Book>> getRecommendations(String title);
   Future<void> trackActivity({required String userId, required String activityType, required String bookId});
   Future<Book?> getBookByIsbn(String isbn);
+  Future<String?> getUserInteraction(String userId, String bookId);
   Future<void> upsertUserProfile({required String userId, required List<String> preferredGenres, required int readingFrequency, required List<String> preferredAuthors, required String preferredVibe});
   Future<Map<String, dynamic>?> getUserProfile(String userId);
 
   // Cache methods
   List<Book> getCachedPopularBooks();
   void savePopularBooksToCache(List<Book> books);
+  List<Book> getCachedSearchResults(String query);
+  void saveSearchResultsToCache(String query, List<Book> books);
+  List<Book> getCachedCategoryBooks(String category);
+  void saveCategoryBooksToCache(String category, List<Book> books, {int? total, int? totalPages});
+  void clearUserCache(String userId);
   
   // Total count
   Future<int> getTotalBookCount();
