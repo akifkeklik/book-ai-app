@@ -25,6 +25,10 @@ class ValidProdConfig(Config):
     SECRET_KEY = "strong-random-production-secret-key-32chars"
     LIBRIS_API_KEY = "test-api-key"
     NUM_PROXIES = 1
+    ALLOWED_ORIGINS = ["https://app.example.com"]
+
+class WildcardCorsProdConfig(ValidProdConfig):
+    ALLOWED_ORIGINS = ["*"]
 
 class DevConfig(Config):
     TESTING = True
@@ -94,6 +98,10 @@ def test_production_fails_when_api_key_is_placeholder():
 def test_production_fails_when_api_key_is_dev_secret():
     with pytest.raises(ValueError, match="LIBRIS_API_KEY environment variable must be set"):
         create_app(DevApiKeyInProdConfig)
+
+def test_production_rejects_wildcard_cors_origins():
+    with pytest.raises(ValueError, match="ALLOWED_ORIGINS must contain explicit trusted origins"):
+        create_app(WildcardCorsProdConfig)
 
 def test_production_succeeds_with_strong_secret():
     app = create_app(ValidProdConfig)
