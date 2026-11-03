@@ -15,7 +15,7 @@
 [![pgvector](https://img.shields.io/badge/pgvector-3072--dim-green.svg)](https://github.com/pgvector/pgvector)
 [![Turbopack](https://img.shields.io/badge/Turbopack-Ready-blueviolet.svg)](https://turbo.build/pack)
 
-A production-grade, multi-platform reading intelligence ecosystem uniting Clean Architecture, semantic retrieval-augmented generation (RAG), bidirectional knowledge graphs, adaptive learning paths, and spaced repetition active recall across Web, Mobile, and Microservices.
+An AI-assisted, multi-platform reading and personal-knowledge application built with Clean Architecture principles, retrieval-augmented generation (RAG), knowledge-graph features, learning paths, and spaced-repetition reviews across Web and Mobile.
 
 [Key Features](#core-features) • [System Architecture](#system-architecture) • [Tech Stack](#technology-stack) • [Quick Start](#local-development-setup) • [Verification](#testing--quality-assurance) • [Docs](docs/)
 
@@ -54,7 +54,7 @@ A production-grade, multi-platform reading intelligence ecosystem uniting Clean 
 **Libris** is a unified digital library and personal knowledge intelligence application engineered to address fragmented reader experiences. Rather than treating books as static isolated catalog entries, Libris treats reading as an ongoing cognitive journey—interlinking books, personal takeaways, concepts, learning milestones, and structured recall intervals into a cohesive personal knowledge graph.
 
 The system is deployed across three first-class platforms:
-- **Mobile (iOS / Android):** An offline-resilient, zero-overflow Flutter application with optimistic outbox sync.
+- **Mobile (iOS / Android):** A Flutter application with an optimistic local outbox and retry-based synchronization. Responsive behavior is covered by targeted tests; universal zero-overflow behavior is not claimed.
 - **Web (Desktop / Tablet):** A high-performance Next.js 16 App Router application powered by React 19, Turbopack, and Server Actions.
 - **Backend API:** A Python 3.12 Flask service implementing Clean Architecture with pluggable ports for relational persistence, hybrid recommendation, rate limiting, and vector RAG.
 
@@ -68,8 +68,8 @@ Libris is built upon four non-negotiable engineering principles:
    Personal shelves (`want_to_read`, `reading`, `finished`) and `favorites` operate with strict lifecycle independence. Changing a reading status never mutates, overwrites, or inadvertently destroys a user's favorite record.
 2. **Causal Attribution & Grounding Truth:**
    Recommendations and AI answers are never hallucinated or falsely attributed. Grounding badges (`✓ Catalog Verified`) are rendered strictly when actual verified catalog evidence was retrieved; ungrounded fallback states are honestly surfaced to the reader.
-3. **Zero-Overflow Responsive Discipline:**
-   Every interface across Web and Mobile is designed with elastic constraints, ensuring zero layout overflows, graceful line clamping, and robust rendering across screen widths from 320px to 1440px+.
+3. **Responsive Design Discipline:**
+   Interfaces use adaptive layout constraints and text handling. Visual QA currently captures selected routes at 390px and 1280px; this is a targeted smoke check, not an exhaustive 320px–1440px overflow proof.
 4. **Isolated & Reproducible Verification:**
    All test suites run deterministically in isolated environments without mandatory external cloud connections, using embedded PostgreSQL (`pgserver`), in-memory repositories, and mock authorization adapters.
 
@@ -99,7 +99,7 @@ Libris is built upon four non-negotiable engineering principles:
 - Real-time milestone progress tracking, status transitions, and drag-and-drop book reordering.
 
 ### 5. Spaced Repetition Smart Reviews
-- Leitner / SuperMemo (SM-2)-inspired active recall flashcards derived directly from reader highlights and notes.
+- Leitner-inspired active recall reviews derived from reader highlights and notes, using deterministic review stages and fixed intervals (1, 3, 7, and 30 days). This is not a SuperMemo SM-2 implementation.
 - Categorized note types: `personal_note`, `key_takeaway`, and `question`.
 - Clean Markdown export with guaranteed preservation of Turkish and multi-byte UTF-8 characters.
 
@@ -109,12 +109,12 @@ Libris is built upon four non-negotiable engineering principles:
 - Offline-first local mutations with resilient outbox queuing.
 
 ### 7. Trilingual Runtime Localization
-- 100% dictionary key parity across English (`en`), Turkish (`tr`), and German (`de`).
-- Zero unlocalized raw keys or runtime string interpolations on both Web and Mobile.
+- Matching dictionary key sets across English (`en`), Turkish (`tr`), and German (`de`) were verified in a repository inspection.
+- Key parity does not guarantee translation quality or complete runtime coverage; localization QA remains an ongoing task.
 
 ### 8. Adaptive Design System
 - Six editorial color palettes: *Sapphire*, *Emerald*, *Amber*, *Rose*, *Amethyst*, and *Obsidian*.
-- Full Light and Dark appearance mode compliance with CSS token variables and accessible contrast ratios.
+- Light and Dark appearance modes using CSS design tokens; accessibility contrast should be verified against the current rendered UI.
 
 ---
 
@@ -123,7 +123,7 @@ Libris is built upon four non-negotiable engineering principles:
 ```mermaid
 flowchart TD
     subgraph Clients["Presentation Layer"]
-        Mobile["Flutter 3.24 Mobile App<br/>(iOS / Android / PWA)<br/>• Provider State • Hive Outbox • GoRouter"]
+        Mobile["Flutter 3.24 Mobile App<br/>(iOS / Android)<br/>• Provider State • Hive Outbox • GoRouter"]
         Web["Next.js 16 Web App<br/>(React 19 / Turbopack)<br/>• Server Actions • SSE Client • CSS Tokens"]
     end
 
@@ -162,7 +162,7 @@ flowchart TD
 | **Mobile Client** | Flutter / Dart | 3.24.3 / 3.5.3 | Cross-platform native mobile application |
 | **Mobile State** | Provider | ^6.1.2 | Reactive UI state management and dependency injection |
 | **Mobile Offline** | Hive / Dio | ^2.2.3 / ^5.4.1 | Local key-value storage, outbox persistence, HTTP client |
-| **Web Client** | Next.js / React | 16.4.3 / 19.0.0 | Full-stack server/client framework with Turbopack |
+| **Web Client** | Next.js / React | 16.4.3 / 19.3.0 | Full-stack server/client framework with Turbopack |
 | **Web Language** | TypeScript | ^5.6.3 | Strict end-to-end type safety |
 | **Web Styling** | Vanilla CSS Tokens | Custom | Apple-inspired glassmorphism design system |
 | **Backend API** | Python / Flask | 3.12 / 3.0.2 | REST and SSE microservice backend |
@@ -187,13 +187,13 @@ book-ai-app/
 │   │   ├── learning_notes.py       # Notes & highlights
 │   │   ├── learning_paths.py       # Reading curricula & suggestions
 │   │   ├── recommendations.py      # Personalized recommender orchestration
-│   │   └── spaced_repetition.py    # SM-2 review scheduling & stats
+│   │   └── spaced_repetition.py    # Leitner-inspired review scheduling & stats
 │   ├── domain/                     # Pure domain models, enums & interfaces
 │   ├── infrastructure/             # Concrete adapters (Postgres, LLM, Security)
 │   ├── routes/                     # Blueprint controllers & rate limiters
 │   ├── scripts/                    # Sequential SQL migrations (00 to 13)
 │   │   └── hardening/              # Safe stage-gated migrations & rollback tests
-│   └── tests/                      # 576 automated Pytest tests
+│   └── tests/                      # Backend Pytest suite (see dated verification report)
 ├── web/                            # Next.js 16 Web Application
 │   ├── src/
 │   │   ├── app/                    # Next.js App Router pages & route handlers
@@ -205,7 +205,7 @@ book-ai-app/
 │   │   ├── components/             # Reusable UI widgets & skeletons
 │   │   ├── lib/                    # API clients, normalizers, i18n dictionaries
 │   │   └── types/                  # TypeScript interface definitions
-│   └── src/__tests__/              # 217 automated Node test runner tests
+│   └── src/__tests__/              # Web Node test suite (see dated verification report)
 ├── mobile/flutter_app/             # Flutter Mobile Application
 │   ├── lib/
 │   │   ├── application/use_cases/  # Mobile application layer use cases
@@ -215,7 +215,7 @@ book-ai-app/
 │   │   ├── screens/                # Mobile views (Home, Detail, Knowledge Graph)
 │   │   ├── services/               # ApiService, background sync coordinator
 │   │   └── theme/                  # Design system tokens and palettes
-│   └── test/                       # 272 automated Flutter unit/widget tests
+│   └── test/                       # Flutter unit/widget test suite (see dated verification report)
 ├── docs/                           # Architectural audit reports & specifications
 ├── scripts/                        # Development orchestration scripts
 ├── docker-compose.yaml             # Multi-service container orchestration
@@ -230,9 +230,9 @@ The mobile application is crafted with Flutter 3.24, targeting Android, iOS, and
 
 ### Highlights:
 - **Resilient Offline Architecture:** Mutations (shelf updates, favorites, learning notes) are committed optimistically to a Hive local outbox and synced via `SyncCoordinator` with exponential retry backoff and conflict resolution.
-- **Dynamic Text Scale Robustness:** All UI widgets adapt cleanly across dynamic accessibility font scaling (1.0x to 2.0x) without render overflows.
+- **Dynamic Text Scale:** The UI includes adaptive text and layout handling; verify individual screens and font scales on target devices before making universal no-overflow claims.
 - **Biometric & Token Renewal:** Session persistence and token refresh lifecycle managed through `AuthProvider`.
-- **Localization Parity:** Complete translation coverage across English, Turkish, and German with runtime language switching.
+- **Localization:** English, Turkish, and German dictionaries are present with matching key sets; translation quality and runtime coverage still require QA.
 
 ---
 
@@ -241,10 +241,10 @@ The mobile application is crafted with Flutter 3.24, targeting Android, iOS, and
 The web frontend is engineered with Next.js 16, React 19, and TypeScript, utilizing Turbopack for near-instant compilation and Server Actions for mutation workflows.
 
 ### Highlights:
-- **Zero ESLint Warnings:** Strict React Hook concurrency compliance (`useCallback`, `useTransition`, `useMemo`) with zero exhaustive-deps violations.
+- **Linting:** The Batch 3 report recorded a clean ESLint run. Re-run lint on the target commit before release; a clean lint result does not replace runtime or accessibility testing.
 - **Streaming SSE Client:** Robust reader in `web/src/lib/ai_stream.ts` handling network frame fragmentation, multi-byte UTF-8 sequences, and client cancellation.
 - **Server/Client Boundary Security:** Upstream credentials (`LIBRIS_API_KEY`) reside exclusively in server runtime and are never leaked to browser bundles.
-- **Accessible Design System:** Full contrast compliance across 6 palettes and Dark/Light modes with dedicated skeleton loaders for smooth perceived performance.
+- **Design System:** Six palettes and Dark/Light themes with dedicated skeleton loaders; formal contrast compliance should be verified with automated and manual accessibility checks.
 
 ---
 
@@ -257,7 +257,7 @@ The backend service is structured according to Clean Architecture / Hexagonal Ar
 - **Infrastructure Layer (`backend/infrastructure/`):** Implements ports using concrete technologies:
   - `PostgresAdapters`: Direct PostgreSQL access with connection pooling.
   - `JwtAuthAdapter`: Validates Supabase JWTs and extracts claims safely.
-  - `GeminiLlmAdapter` / `OpenAiLlmAdapter`: Generates grounded summaries and embeddings.
+  - `GeminiLlmAdapter` / `OpenAiLlmAdapter`: Generates grounded summaries and embeddings. Embedding task configuration for document indexing versus user-query retrieval is a known verification item.
 - **Web Layer (`backend/routes/`):** Exposes REST blueprints with structured JSON logging, strict schema validation, and tiered token-bucket rate limiting.
 
 ---
@@ -393,7 +393,7 @@ services:
 
 ### Validating Docker Compose
 ```powershell
-$env:SECRET_KEY="dev-secret-key-12345"
+$env:SECRET_KEY="replace-with-a-local-development-secret"
 docker compose config
 ```
 
@@ -411,7 +411,7 @@ docker compose ps
 python -m pytest backend/tests/test_local_vertical_slice.py -v
 
 # 4. Teardown
-docker compose down -v
+docker compose down
 ```
 
 ---
@@ -421,7 +421,7 @@ docker compose down -v
 | Variable | Service | Required? | Default / Purpose |
 |---|---|---|---|
 | `SECRET_KEY` | Backend | Yes | Flask session and cryptographic secret |
-| `LIBRIS_API_KEY` | Backend / Web | Yes | Gateway API key for server-to-server calls |
+| `LIBRIS_API_KEY` | Backend / Web server | Deployment-dependent | Server-to-server gateway credential; never embed this secret in the Flutter/mobile app. Mobile user requests use user authentication tokens. |
 | `DATABASE_URL` | Backend | Optional | PostgreSQL connection URI |
 | `SUPABASE_URL` | All | Optional | Supabase API URL (mocked in test mode) |
 | `SUPABASE_ANON_KEY` | All | Optional | Public anonymous client key |
@@ -430,16 +430,17 @@ docker compose down -v
 | `NEXT_PUBLIC_SUPABASE_URL` | Web | Yes | Public Supabase endpoint for web client |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Web | Yes | Public anon key for web client |
 | `BACKEND_URL` | Web | Optional | Backend URL (defaults to `http://localhost:5000`) |
+| `REDIS_URL` | Backend | Optional | Shared rate-limit storage for multi-worker deployments; without it, in-memory limits are process-local. |
 
 ---
 
 ## Testing & Quality Assurance
 
-Libris maintains deterministic, automated test suites across all tiers. Every test runs without requiring access to live production cloud services:
+The following table records the Batch 3 verification results reported at that time. These figures are historical evidence, not a claim that the current branch has been re-tested. Re-run the commands below on the target commit before release. Tests must use isolated local/test services and must not connect to a live production database.
 
 ```
 ====================================================================================================
-TEST SUITE SUMMARY — BATCH 3 VERIFIED BASELINE
+HISTORICAL TEST SUITE SUMMARY — BATCH 3 REPORTED BASELINE
 ====================================================================================================
 Tier               Command                                              Passed    Skipped    Failed
 ----------------------------------------------------------------------------------------------------
@@ -451,7 +452,7 @@ Web Production     npm --prefix web run build                           Clean   
 Mobile Tests       flutter test (in mobile/flutter_app)                 272       1**        0
 Mobile Analyzer    flutter analyze (in mobile/flutter_app)              Clean     0          0
 ----------------------------------------------------------------------------------------------------
-TOTAL VERIFIED AUTOMATED TESTS: 1,065 PASSED / 0 FAILURES
+BATCH 3 REPORTED TOTAL: 1,065 PASSED / 0 FAILURES (historical; not independently re-run here)
 ====================================================================================================
 * 9 tests in test_local_vertical_slice.py require an active Docker daemon.
 ** 1 test skipped pending physical biometric hardware integration.
@@ -486,8 +487,8 @@ flutter test
 
 - **Credentials Boundary:** Server credentials (`LIBRIS_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `LLM_API_KEY`) are isolated strictly within backend and Next.js server processes; they are never sent to the browser or mobile client.
 - **Fail-Closed Authorization:** Personal endpoints (`/api/library`, `/api/recommend/personalized`, `/api/notes`, `/api/learning-paths`, `/api/knowledge-graph`) enforce JWT verification. Anonymous tokens cannot access personal data.
-- **Multi-Tenant Isolation:** Database operations enforce `user_id` scoping in every query and RLS policy. User A cannot read or modify User B's shelves, notes, or knowledge connections.
-- **Rate Limiting Protection:** AI discovery and recommendation endpoints are protected by tiered token-bucket rate limiters preventing denial-of-service and resource exhaustion.
+- **Multi-Tenant Isolation:** Repository queries and RLS policies include user-scoped access controls. Effective isolation must be verified against the deployed schema, grants, policies, and runtime roles; this README is not a substitute for a security audit.
+- **Rate Limiting Protection:** AI discovery and recommendation endpoints include rate-limiting controls. The default in-memory limiter is process-local; configure `REDIS_URL` for shared multi-worker limits and validate the selected failure policy.
 - **Input Validation & Sanitization:** Query inputs, ISBNs, and payload sizes are bounded and validated against injection attacks, path traversal, and malicious payloads.
 - **Safe Test Isolation:** CI and unit tests use isolated in-process mock targets or local PostgreSQL (`pgserver`); connection to live production databases is strictly barred by test assertions.
 
@@ -503,7 +504,7 @@ Automated verification is governed by GitHub Actions (`.github/workflows/ci_cd.y
 4. **`frontend-ci`:** Runs `flutter analyze --no-fatal-infos` and `flutter test` across all mobile modules.
 5. **`backend-integration-ci`:** Executes real persistence integration tests against PostgreSQL service containers.
 6. **`web-ci`:** Runs `npm run lint`, `npm test`, and `npm run build` with Turbopack.
-7. **`visual-qa-ci`:** Validates responsive rendering and screenshot matrix across device viewports.
+7. **`visual-qa-ci`:** Runs a targeted screenshot/DOM smoke check for configured routes and viewports. It does not prove universal responsive correctness or automatically detect every overflow.
 
 ---
 
@@ -516,10 +517,10 @@ Automated verification is governed by GitHub Actions (`.github/workflows/ci_cd.y
 - [x] Hybrid recommendation engine (TF-IDF + pgvector embeddings + feedback loop).
 - [x] Bidirectional personal knowledge graph with 9 evidence-based relationship types.
 - [x] Curated and adaptive learning paths with milestone progress tracking.
-- [x] Spaced repetition active recall with SM-2 scheduling and Markdown export.
+- [x] Leitner-inspired spaced-repetition active recall with deterministic stage scheduling and Markdown export.
 - [x] Offline-first mobile outbox synchronization with conflict resolution.
-- [x] Trilingual localization (English, Turkish, German) with 100% dictionary parity.
-- [x] Stage-gated database hardening with preflight checks and atomic rollbacks.
+- [x] English, Turkish, and German localization dictionaries with matching key sets (translation quality and runtime coverage still require QA).
+- [x] Stage-gated database hardening with preflight checks and rollback rehearsals; production safety depends on the exact migration, operator gates, and target environment.
 
 ### Future Milestones (Planned)
 - [ ] Cross-device end-to-end encryption for private reading notes.
@@ -532,7 +533,7 @@ Automated verification is governed by GitHub Actions (`.github/workflows/ci_cd.y
 
 ## Known Limitations
 
-- **Docker Desktop Daemon in Headless Sessions:** Starting Docker containers requires a running Docker Desktop engine or elevated WSL2 environment on Windows. In headless automated CLI sessions without an active desktop daemon, the 9 vertical slice tests are safely skipped while 576 unit, integration, and pgserver tests run deterministically.
+- **Docker Desktop Daemon in Headless Sessions:** Compose integration tests require an active Docker daemon. The Batch 3 report recorded nine vertical-slice tests as not run when the daemon was unavailable; current test counts must be regenerated from the commit being released.
 - **Embedded pgserver on Windows:** When using `pgserver` for real PostgreSQL integration tests in Python on Windows, worker cleanup may log a transient `ValueError: I/O operation on closed file` during process termination; this does not affect test assertions or database consistency.
 - **Biometric Authentication:** Biometric login tests on mobile are mocked in CI; physical biometric sensor verification requires deployment to a physical device or emulator with biometric enrollment.
 
