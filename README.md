@@ -71,7 +71,7 @@ Libris is built upon four non-negotiable engineering principles:
 3. **Responsive Design Discipline:**
    Interfaces use adaptive layout constraints and text handling. Visual QA currently captures selected routes at 390px and 1280px; this is a targeted smoke check, not an exhaustive 320px–1440px overflow proof.
 4. **Isolated & Reproducible Verification:**
-   All test suites run deterministically in isolated environments without mandatory external cloud connections, using embedded PostgreSQL (`pgserver`), in-memory repositories, and mock authorization adapters.
+   Backend tests use isolated in-memory repositories and mock adapters where appropriate. PostgreSQL integration checks run against a disposable database; selected migration-gate tests also use an ephemeral local PostgreSQL instance (`pgserver`). No production database is used by CI.
 
 ---
 
@@ -170,7 +170,7 @@ flowchart TD
 | **Security & Auth** | PyJWT / Supabase Auth | 2.15.1 | Bearer token validation and multi-tenant isolation |
 | **Database** | PostgreSQL | 16.x | Relational persistence with ACID transactions |
 | **Vector Engine** | pgvector | 0.7+ | 3072-dimensional dense vector embeddings with HNSW index |
-| **Local Testing DB** | pgserver | 0.1.4 | In-process isolated PostgreSQL for deterministic CI testing |
+| **Test Databases** | PostgreSQL / pgserver | 16.x / 0.1.4 | Disposable PostgreSQL integration service and isolated migration-gate tests |
 | **Containerization** | Docker / Compose | Compose v2 | Isolated multi-container deployment orchestration |
 
 ---
