@@ -11,8 +11,6 @@ from uuid import uuid4
 
 import psycopg2
 import pytest
-from psycopg2 import sql
-from psycopg2.extras import RealDictCursor
 from backend.app import create_app
 from backend.config import Config
 from backend.container import Container
@@ -21,6 +19,11 @@ from backend.infrastructure.persistence.postgres_adapters import (
     PostgresInteractionRepository,
 )
 from backend.routes.routes import rebind_container
+from psycopg2 import sql
+from psycopg2.extras import RealDictCursor
+
+
+pytestmark = pytest.mark.integration
 
 
 class RealPgTestConfig(Config):
