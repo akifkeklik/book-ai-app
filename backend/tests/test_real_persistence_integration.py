@@ -587,7 +587,7 @@ def test_c7_mobile_outbox_offline_recovery_sync(real_pg_uri: str):
 
     # Verify both records synchronized cleanly
     conn = psycopg2.connect(real_pg_uri)
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+    with conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
         cur.execute("SELECT book_id FROM public.favorites WHERE user_id = %s;", (user_id,))
         assert cur.fetchone()["book_id"] == "9780141439518"
 
