@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 import psycopg2
-from psycopg2 import extras, sql
 import pytest
 
 from backend.app import create_app
@@ -21,6 +20,7 @@ from backend.infrastructure.persistence.postgres_adapters import (
     PostgresInteractionRepository,
 )
 from backend.routes.routes import rebind_container
+from psycopg2 import extras, sql
 
 
 pytestmark = pytest.mark.integration
