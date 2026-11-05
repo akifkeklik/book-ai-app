@@ -538,6 +538,36 @@ class ProcessRagQueryUseCase:
         catalog_matches = self._lookup_catalog_candidates(query)
         cat_latency = round((time.time() - t_cat_start) * 1000, 2)
 
+        # Anonymous generic recommendations must remain useful without an embedding
+        # provider. Seed the deterministic path from the local catalog's best-rated books.
+        is_generic_rec = bool(
+            re.search(r"(bana\s+)?(bir\s+)?(kitap\s+)?(öner|tavsiye|recommend|empfehl)", query, re.IGNORECASE)
+        )
+        if is_generic_rec and user_id is None and not catalog_matches:
+            catalog_df = getattr(self._recommender, "df", None)
+            if catalog_df is not None and not catalog_df.empty and {"isbn13", "title"}.issubset(catalog_df.columns):
+                ranked_catalog = catalog_df.copy()
+                ranked_catalog["_rating_rank"] = (
+                    pd.to_numeric(ranked_catalog["average_rating"], errors="coerce").fillna(0)
+                    if "average_rating" in ranked_catalog.columns
+                    else 0
+                )
+                ranked_catalog["_ratings_count_rank"] = (
+                    pd.to_numeric(ranked_catalog["ratings_count"], errors="coerce").fillna(0)
+                    if "ratings_count" in ranked_catalog.columns
+                    else 0
+                )
+                catalog_matches = (
+                    ranked_catalog.sort_values(
+                        ["_rating_rank", "_ratings_count_rank"],
+                        ascending=False,
+                        kind="stable",
+                    )
+                    .drop(columns=["_rating_rank", "_ratings_count_rank"])
+                    .head(5)
+                    .to_dict(orient="records")
+                )
+
         # Detect if user asks for recommendations similar to a book (seed exclusion invariant)
         is_similar_query = bool(re.search(r"(benzer|benzeyen|similar\s+to|like|recommend\s+based\s+on)", query, re.IGNORECASE))
         seed_titles = [m.get("title") for m in catalog_matches if m.get("title")] if is_similar_query else []
