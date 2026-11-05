@@ -34,7 +34,9 @@ def client(monkeypatch):
     interaction_repo = MagicMock()
     interaction_repo.get_user_interactions.return_value = []
     interaction_repo.get_user_favorites.return_value = []
+    book_data_port = MagicMock()
     monkeypatch.setattr(routes.routes, "_interaction_repo", interaction_repo)
+    monkeypatch.setattr(routes.routes, "_book_data_port", book_data_port)
 
     app = create_app(ParityTestConfig)
     with app.test_client() as c:
