@@ -58,9 +58,9 @@ flowchart TB
     MOBILE <--> LOCAL
     API --> USECASES
     USECASES --> DOMAIN
-    DOMAIN --> ADAPTERS
+    ADAPTERS -. implements contracts .-> DOMAIN
     ADAPTERS --> DB
-    USECASES --> AI
+    ADAPTERS --> AI
 ~~~
 
 ### Main technology choices

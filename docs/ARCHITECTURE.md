@@ -31,9 +31,9 @@ flowchart TB
     MOBILE <--> OUTBOX
     API --> APP
     APP --> DOMAIN
-    APP --> INFRA
+    INFRA -. implements contracts .-> DOMAIN
     INFRA --> SUPA
-    APP --> LLM
+    INFRA --> LLM
 ~~~
 
 ## Backend boundaries
