@@ -10,8 +10,9 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 import psycopg2
-from psycopg2 import extras, sql
 import pytest
+
+from psycopg2 import extras, sql
 
 from backend.app import create_app
 from backend.config import Config
