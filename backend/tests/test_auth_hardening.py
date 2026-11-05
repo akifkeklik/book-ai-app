@@ -231,7 +231,9 @@ def test_ai_chat_query_length_exceeded_rejected_with_400(auth_client):
 def test_misconfiguration_guard_when_libris_key_missing(auth_app):
     auth_app.config["LIBRIS_API_KEY"] = ""
     client = auth_app.test_client()
-    resp = client.get("/api/categories")
+    # Exercise the server-to-server API-key path: a missing server key is a
+    # configuration failure (503), distinct from missing caller credentials (401).
+    resp = client.get("/api/categories", headers={"X-Api-Key": TEST_LIBRIS_API_KEY})
     assert resp.status_code == 503
     data = resp.get_json()
     assert data["error"] == "Server misconfigured"
