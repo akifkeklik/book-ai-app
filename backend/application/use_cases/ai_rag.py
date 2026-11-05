@@ -541,7 +541,7 @@ class ProcessRagQueryUseCase:
         # Anonymous generic recommendations must remain useful without an embedding
         # provider. Seed the deterministic path from the local catalog's best-rated books.
         is_generic_rec = bool(
-            re.search(r"(bana\\s+)?(bir\\s+)?(kitap\\s+)?(öner|tavsiye|recommend|empfehl)", query, re.IGNORECASE)
+            re.search(r"(bana\s+)?(bir\s+)?(kitap\s+)?(öner|tavsiye|recommend|empfehl)", query, re.IGNORECASE)
         )
         if is_generic_rec and user_id is None and not catalog_matches:
             catalog_df = getattr(self._recommender, "df", None)
