@@ -4,6 +4,13 @@ __pycache__/
 *$py.class
 venv/
 .venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Environment files and secrets
 .env
 .env.*
 *.env
@@ -16,23 +23,37 @@ web/.env.*.local
 !backend/.env.example
 !web/.env.example
 
-# Models / Data
+# Node / Next.js
+node_modules/
+web/.next/
+web/out/
+web/coverage/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+build/
+mobile/flutter_app/.dart_tool/
+mobile/flutter_app/build/
+
+# Models / generated data
 backend/saved_model/*.pkl
 backend/data/*backup*.csv
-
-# ── Enrichment Pipeline Artifacts ──────────────────────────────────────────────
-# Generated candidate/rejected files must NOT be committed to main branch.
-# Review them locally, then promote manually after human approval.
 backend/data/enrichment/candidate_books.csv
 backend/data/enrichment/rejected_books.csv
 backend/data/enrichment/api_responses/
 backend/data/enrichment/*.json
 
-# IDE
+# IDE and operating system
 .idea/
 .vscode/
+.DS_Store
+Thumbs.db
 
-# Tmp
+# Local logs, caches and scratch output
+*.log
 tmpclaude*
 checks.json
 ci_logs.txt

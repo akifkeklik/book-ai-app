@@ -1,133 +1,63 @@
-# Supabase Setup Guide
+# Supabase and Database Setup
 
-## Step 1: Create a Supabase Project
+Libris uses Supabase services with PostgreSQL as its relational database. The authoritative application schema is defined by the numbered SQL migrations in backend/scripts/. Do not create a second, hand-maintained schema by copying SQL examples from older documentation.
 
-1. Go to https://supabase.com and sign up / log in
-2. Click **New Project**
-3. Fill in:
-   - **Name**: `book-ai-app`
-   - **Database Password**: choose a strong password
-   - **Region**: pick closest to your users
-4. Click **Create new project** — takes ~2 minutes
+## 1. Create a Supabase project
 
----
+1. Create a project in the Supabase dashboard.
+2. Choose a region appropriate for your deployment and users.
+3. Store the database password securely.
+4. Wait for the project database and API to become available.
 
-## Step 2: Create Database Tables
+## 2. Configure application credentials
 
-1. In your project dashboard, click **SQL Editor** in the left sidebar
-2. Click **New Query**
-3. Paste the following SQL and click **Run**:
+Use the environment templates:
 
-```sql
--- ────────────────────────────────────────────────
--- FAVORITES
--- ────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS favorites (
-  id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id         uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  book_id         text NOT NULL,
-  book_title      text NOT NULL DEFAULT '',
-  book_author     text NOT NULL DEFAULT '',
-  book_image_url  text NOT NULL DEFAULT '',
-  added_at        timestamptz DEFAULT now(),
-  UNIQUE(user_id, book_id)
-);
+- Backend: backend/env.example → backend/.env
+- Web: web/.env.example → web/.env.local
+- Mobile: configure the supported --dart-define values in the Flutter app.
 
--- ────────────────────────────────────────────────
--- USER ACTIVITY
--- ────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS user_activity (
-  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id     uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  book_name   text NOT NULL,
-  action      text NOT NULL DEFAULT 'view',
-  created_at  timestamptz DEFAULT now()
-);
+The backend uses SUPABASE_URL and SUPABASE_ANON_KEY. The web app uses NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
 
--- ────────────────────────────────────────────────
--- ROW LEVEL SECURITY
--- ────────────────────────────────────────────────
-ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_activity ENABLE ROW LEVEL SECURITY;
+The Supabase anon/publishable key is intended for client configuration and must be paired with correct authentication and Row Level Security policies. The SUPABASE_SERVICE_ROLE_KEY bypasses RLS and must remain server-side for tightly controlled administrative scripts only. Never put it in a web or mobile client.
 
-CREATE POLICY "Users manage own favorites"
-  ON favorites
-  FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+## 3. Apply the application migrations
 
-CREATE POLICY "Users manage own activity"
-  ON user_activity
-  FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-```
+The numbered migrations are located at:
 
-4. You should see **Success. No rows returned** — that's correct.
+backend/scripts/00_init_books.sql through backend/scripts/13_learning_outcomes.sql.
 
----
+Apply them in ascending numeric order to a fresh database, using a trusted administrative connection and a reviewed migration procedure. Before applying to an existing database:
 
-## Step 3: Configure Auth
+1. Identify the exact target project and current schema state.
+2. Take and verify a recoverable backup.
+3. Rehearse the migration sequence against a disposable PostgreSQL 16 database.
+4. Validate the resulting tables, indexes, functions, grants and RLS policies.
+5. Apply to staging and run the application integration checks.
+6. Schedule production changes only after staging verification and an approved rollback plan.
 
-1. Go to **Authentication → Settings** in the left sidebar
-2. Under **User Signups**, make sure "Allow new users to sign up" is **enabled**
-3. Optional: Under **Email Auth**, disable "Confirm email" for development
+The CI workflow uses backend/ci_stubs.sql to prepare its disposable PostgreSQL service. That file is a test fixture and must not be treated as an application migration.
 
----
+## 4. Hardening scripts are a separate operator workflow
 
-## Step 4: Get Your API Keys
+The directory backend/scripts/hardening/ contains additional hardening, reconciliation, rollback and verification scripts. Some filenames include DRAFT; others require elevated privileges or explicit operator gates.
 
-1. Go to **Settings → API** (gear icon in left sidebar)
-2. Copy:
-   - **Project URL** → `https://xxxxx.supabase.co`
-   - **anon / public** key → `eyJhbGci...` (long JWT)
+- Do not execute the entire directory recursively.
+- Read the relevant script, preflight checks and rollback procedure before use.
+- Follow [V1_DEPLOYMENT_EXECUTION_CHECKLIST.md](V1_DEPLOYMENT_EXECUTION_CHECKLIST.md).
+- Use staging first and confirm the expected Supabase roles and privileges.
+- Do not assume that a successful local CI rehearsal proves the remote production schema is ready.
 
----
+The preflight SQL at backend/scripts/preflight_database_hardening.sql is a diagnostic/preflight artifact, not a substitute for a migration plan or backup.
 
-## Step 5: Insert Keys into the App
+## 5. Verify the integration
 
-### Flutter (`lib/config.dart`):
-```dart
-static const String supabaseUrl = 'https://YOUR_PROJECT_ID.supabase.co';
-static const String supabaseAnonKey = 'YOUR_ANON_PUBLIC_KEY';
-```
+After configuring the project and applying the approved migrations:
 
-### Backend (`.env` at project root):
-```env
-SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
-SUPABASE_ANON_KEY=YOUR_ANON_PUBLIC_KEY
-```
+- Confirm the backend can reach the configured Supabase project.
+- Verify sign-up/sign-in and token validation in the target environment.
+- Verify user-scoped reads and writes with two separate test accounts.
+- Confirm the expected RLS policies are enabled and enforce ownership.
+- Run backend and client tests against non-production test resources.
 
----
-
-## Step 6: Verify
-
-1. Run the Flutter app
-2. Go to **Register** and create an account
-3. In Supabase dashboard → **Authentication → Users** — you should see the new user
-4. Add a book to favorites in the app
-5. In Supabase → **Table Editor → favorites** — you should see the row
-
----
-
-## Table Reference
-
-### `favorites`
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | uuid | Primary key (auto) |
-| `user_id` | uuid | FK to `auth.users` |
-| `book_id` | text | Book identifier (ISBN-13) |
-| `book_title` | text | Cached title for display |
-| `book_author` | text | Cached author name |
-| `book_image_url` | text | Cached cover URL |
-| `added_at` | timestamptz | When saved |
-
-### `user_activity`
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | uuid | Primary key (auto) |
-| `user_id` | uuid | FK to `auth.users` |
-| `book_name` | text | Book title viewed/searched |
-| `action` | text | `view`, `search`, `recommend` |
-| `created_at` | timestamptz | Event timestamp |
+For local development commands, see [setup.md](setup.md). For the overall system design, see [ARCHITECTURE.md](ARCHITECTURE.md).

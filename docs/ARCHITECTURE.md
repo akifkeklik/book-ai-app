@@ -1,56 +1,92 @@
-# 🏛️ Libris Architecture: Strategic System Design
+# Libris Architecture
 
-Bu doküman, Libris ekosisteminin teknik tasarım kararlarını, veri akışını ve mühendislik prensiplerini detaylandırmaktadır.
+This document describes the repository structure as it exists in the current codebase. It is an implementation overview, not a claim that every component has been independently security-audited or production-certified.
 
----
+## System overview
 
-## 1. High-Level Concept
-Libris, **"Intelligence-At-The-Edge"** ve **"Cloud-First Persistence"** prensiplerini birleştirir. Sistem, istemci tarafında maksimum hız (L1 Cache) ve bulut tarafında merkezi tutarlılık (PostgreSQL) sağlar.
+Libris has three application surfaces:
 
-### **📐 System Topology**
-```mermaid
-graph TD
-    subgraph "Client Tier (Mobile)"
-        A[Flutter UI] --> B{Hive L1 Cache}
-    end
-    subgraph "Intelligence Tier (AI/ML)"
-        C[Flask API] --> D[TF-IDF Microservice]
-        D --> E[Cosine Similarity Engine]
-    end
-    subgraph "Infrastructure Tier"
-        F[(Supabase Postgres)]
-        G[Google Books API]
-    end
-    A -- "State Sync" --> F
-    A -- "Inference Req" --> C
-```
+- **Web:** Next.js App Router application in web/.
+- **Mobile:** Flutter application in mobile/flutter_app/.
+- **Backend:** Flask API in backend/.
 
----
+The clients use the backend for application capabilities and use Supabase for the configured authentication and data services. The web application also contains server actions and route handlers that mediate server-side operations.
 
-## 2. Intelligence Core (ML Logic)
-Öneri motoru, **Content-Based Filtering** (İçerik Tabanlı Filtreleme) ve **Hybrid Metadata Weighting** tekniklerini kullanır.
+~~~mermaid
+flowchart TB
+    WEB["Next.js Web"]
+    MOBILE["Flutter Mobile"]
+    WEB_SERVER["Server Actions / Route Handlers"]
+    API["Flask API"]
+    DOMAIN["Domain Models & Ports"]
+    APP["Application Use Cases"]
+    INFRA["Infrastructure Adapters"]
+    SUPA[("Supabase / PostgreSQL")]
+    LLM["LLM & Embedding Providers"]
+    OUTBOX["Mobile Local Storage / Sync"]
 
-### **⚙️ Vector Space Model**
-1. **TF-IDF Vectorization:** Her kitap, açıklaması ve türüne göre (Descriptive + Categorical) bir özellik vektörüne dönüştürülür.
-2. **Cosine Similarity:** İki vektör (kitap) arasındaki benzerlik, aralarındaki açının kosinüsüyle hesaplanır:
-   $$\text{similarity} = \cos(\theta) = \frac{\mathbf{A} \cdot \mathbf{B}}{\|\mathbf{A}\| \|\mathbf{B}\|}$$
-3. **Gaussian Weighting:** Kullanıcının sayfa sayısı tercihi, bir çan eğrisi (Gaussian distribution) üzerinden normalleştirilerek popülerlik puanına eklenir.
+    WEB --> WEB_SERVER
+    WEB_SERVER --> API
+    MOBILE --> API
+    MOBILE <--> OUTBOX
+    API --> APP
+    APP --> DOMAIN
+    APP --> INFRA
+    INFRA --> SUPA
+    APP --> LLM
+~~~
 
----
+## Backend boundaries
 
-## 3. Data Strategy & Persistence
-Veri tutarlılığını sağlamak için **Eşzamanlı (Concurrent) Senkronizasyon** kullanılır.
+| Path | Responsibility |
+|---|---|
+| backend/app.py | Flask application factory and blueprint registration |
+| backend/routes/ | HTTP endpoints, request validation and authentication boundary |
+| backend/application/use_cases/ | Application workflows such as discovery, recommendations, notes, learning paths and knowledge graph operations |
+| backend/domain/ | Domain models, protocols/ports and taxonomy |
+| backend/infrastructure/ | Persistence adapters, AI/ML integrations, logging and security |
+| backend/container.py | Dependency wiring |
+| backend/tests/ | Unit, functional and integration tests |
+| backend/scripts/ | SQL migrations and operational/development scripts |
 
-- **Storage:** Metadata Supabase üzerinde, büyük görseller Google Books API üzerinden yönetilir.
-- **Offline Resilience:** Hive NoSQL veritabanı, internet kesintilerinde UI'ın "frozen" (donmuş) durumda kalmasını engeller.
-- **Sync Cycle:** Uygulama açılışında Supabase'den fark (diff) çekilerek Hive güncellenir.
+The intended dependency direction is from routes to use cases, and from use cases to domain contracts. Infrastructure adapters implement the contracts used by application workflows.
 
----
+## Web application
 
-## 4. Scalability & Engineering Standards
-1. **O(1) Search:** Vektörler bellek içinde indekslendiği için arama süresi veri seti büyüse de sabit kalır.
-2. **Atomic UI Rebuilds:** Flutter `Selector` kullanımı ile sadece değişen widget'ların rebuild edilmesi sağlanır.
-3. **Stateless Backend:** Flask API'si tamamen durumsuz (stateless) olup, talebe göre yatayda (Horizontal Scalability) ölçeklenebilir.
+The web application uses Next.js App Router:
 
----
-**Libris v2.2.0** — *Engineering Excellence.*
+- web/src/app/ contains pages, route handlers and server actions.
+- web/src/components/ contains reusable UI components.
+- web/src/lib/ contains API clients, Supabase helpers, normalizers and localization utilities.
+- web/src/types/ contains shared TypeScript contracts.
+- web/src/__tests__/ contains Node-based tests.
+
+Server-side credentials must remain in server execution contexts. Only intentionally public configuration should use the NEXT_PUBLIC_ prefix.
+
+## Mobile application
+
+The Flutter source is under mobile/flutter_app/lib/. It separates domain entities, data/repository code, application workflows, providers, screens and services. Local storage and the synchronization outbox support selected offline mutations; this does not imply that every feature is fully available offline.
+
+The CI workflow uses Flutter 3.24.3. See the mobile project and its tests for the exact behavior of individual providers and sync operations.
+
+## Persistence and AI
+
+PostgreSQL is the relational data store, with Supabase providing the configured platform services and pgvector used for vector-related functionality. SQL migrations are versioned in backend/scripts/ and numbered from 00 to 13.
+
+AI-assisted discovery and recommendation workflows are implemented in backend use cases and infrastructure adapters. Provider credentials belong on the server and should never be embedded in client bundles.
+
+## Data and security boundaries
+
+- Protected API routes validate authentication and derive the effective user identity from the verified token.
+- User-scoped database access depends on the deployed schema, grants and Row Level Security policies; verify those policies in the target Supabase project.
+- Tests should use in-memory adapters, mocks or disposable PostgreSQL databases.
+- Never use production credentials or a production database URL in automated tests.
+- Hardening scripts are separate from the numbered application migrations. Review their preflight requirements and deployment checklist before running them.
+
+## Change and verification workflow
+
+1. Branch from the latest main.
+2. Make a focused change within the appropriate application boundary.
+3. Run the backend, web or mobile checks affected by the change.
+4. Review the GitHub Actions run for the pull request.
+5. Apply database changes only through a reviewed, ordered migration process with staging validation and a verified backup.
