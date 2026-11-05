@@ -26,7 +26,6 @@ class MockUser:
 
 @pytest.fixture
 def client(monkeypatch):
-    from unittest.mock import MagicMock
     from backend import routes
 
     # These contract tests exercise authenticated response schemas, not persistence.
