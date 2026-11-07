@@ -40,6 +40,19 @@ def _normalize_text(s: str) -> str:
     return " ".join(s.split()).strip()
 
 
+def _is_generic_recommendation_query(query: str) -> bool:
+    """Return True only for unqualified requests for any book recommendation."""
+    normalized = _normalize_text(query)
+    generic_patterns = (
+        r"(?:bana\s+)?(?:bir\s+)?kitap\s+(?:öner(?:ir\s+misin)?|tavsiye(?:\s+et(?:er\s+misin)?)?)",
+        r"(?:please\s+)?recommend(?:\s+me)?\s+(?:a\s+)?book",
+        r"(?:please\s+)?(?:give|show)\s+me\s+(?:a\s+)?book\s+recommendation",
+        r"(?:bitte\s+)?empfiehl(?:\s+mir)?\s+(?:ein\s+)?buch",
+        r"(?:bitte\s+)?(?:ein\s+)?buch\s+empfehlen",
+    )
+    return any(re.fullmatch(pattern, normalized, flags=re.IGNORECASE) for pattern in generic_patterns)
+
+
 def _clean_book_dict(book: Dict[str, Any]) -> Dict[str, Any]:
     """Cleans NaN and invalid types from pandas records so Pydantic validation succeeds."""
     clean = dict(book)
@@ -538,36 +551,8 @@ class ProcessRagQueryUseCase:
         catalog_matches = self._lookup_catalog_candidates(query)
         cat_latency = round((time.time() - t_cat_start) * 1000, 2)
 
-        # Anonymous generic recommendations must remain useful without an embedding
-        # provider. Seed the deterministic path from the local catalog's best-rated books.
-        is_generic_rec = bool(
-            re.search(r"(bana\s+)?(bir\s+)?(kitap\s+)?(öner|tavsiye|recommend|empfehl)", query, re.IGNORECASE)
-        )
-        if is_generic_rec and user_id is None and not catalog_matches:
-            catalog_df = getattr(self._recommender, "df", None)
-            if catalog_df is not None and not catalog_df.empty and {"isbn13", "title"}.issubset(catalog_df.columns):
-                ranked_catalog = catalog_df.copy()
-                ranked_catalog["_rating_rank"] = (
-                    pd.to_numeric(ranked_catalog["average_rating"], errors="coerce").fillna(0)
-                    if "average_rating" in ranked_catalog.columns
-                    else 0
-                )
-                ranked_catalog["_ratings_count_rank"] = (
-                    pd.to_numeric(ranked_catalog["ratings_count"], errors="coerce").fillna(0)
-                    if "ratings_count" in ranked_catalog.columns
-                    else 0
-                )
-                catalog_matches = (
-                    ranked_catalog.sort_values(
-                        ["_rating_rank", "_ratings_count_rank"],
-                        ascending=False,
-                        kind="stable",
-                    )
-                    .drop(columns=["_rating_rank", "_ratings_count_rank"])
-                    .head(5)
-                    .to_dict(orient="records")
-                )
-
+        # Only unqualified requests may use the deterministic popular-books fallback.
+        is_generic_rec = _is_generic_recommendation_query(query)
         # Detect if user asks for recommendations similar to a book (seed exclusion invariant)
         is_similar_query = bool(re.search(r"(benzer|benzeyen|similar\s+to|like|recommend\s+based\s+on)", query, re.IGNORECASE))
         seed_titles = [m.get("title") for m in catalog_matches if m.get("title")] if is_similar_query else []
@@ -796,11 +781,8 @@ class ProcessRagQueryUseCase:
             combined_books = self._enrichment_service.enrich(combined_books)
         enrichment_latency = round((time.time() - t_enr_start) * 1000, 2)
 
-        # Check for general recommendation query when unauthenticated or without reading history
-        is_generic_rec = bool(
-            re.search(r"(bana\s+)?(bir\s+)?(kitap\s+)?(öner|tavsiye|recommend|empfehl)", query, re.IGNORECASE)
-            and not is_similar_query
-        )
+        # Check for a truly generic request without a book/topic constraint.
+        is_generic_rec = _is_generic_recommendation_query(query) and not is_similar_query
         if is_generic_rec and user_id is None and combined_books:
             if lang == "tr":
                 rec_msg = "Henüz oturum açmadığınız ve geçmiş okuma tercihlerinize erişim olmadığı için, Libris kataloğundaki en yüksek puanlı popüler eserlerden bir seçki sunuyorum:"
