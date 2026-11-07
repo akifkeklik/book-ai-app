@@ -2,7 +2,10 @@ from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
-from backend.application.use_cases.ai_rag import ProcessRagQueryUseCase, _is_generic_recommendation_query
+from backend.application.use_cases.ai_rag import (
+    ProcessRagQueryUseCase,
+    _is_generic_recommendation_query,
+)
 from backend.domain.ports import (
     BookDataPort,
     EmbeddingPort,
