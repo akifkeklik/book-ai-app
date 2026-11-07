@@ -1,7 +1,8 @@
 from unittest.mock import MagicMock
 
+import pandas as pd
 import pytest
-from backend.application.use_cases.ai_rag import ProcessRagQueryUseCase
+from backend.application.use_cases.ai_rag import ProcessRagQueryUseCase, _is_generic_recommendation_query
 from backend.domain.ports import (
     BookDataPort,
     EmbeddingPort,
@@ -267,3 +268,63 @@ def test_process_rag_query_user_signal_isolation_and_dislikes():
     )
     assert response["status"] == "success"
 
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ("bana bir kitap öner", True),
+        ("kitap tavsiye et", True),
+        ("recommend a book", True),
+        ("empfiehl mir ein Buch", True),
+        ("recommend a fantasy book", False),
+        ("bana fantastik türünde bir kitap öner", False),
+        ("recommend a book about space", False),
+    ],
+)
+def test_generic_recommendation_intent_excludes_topic_constraints(query, expected):
+    assert _is_generic_recommendation_query(query) is expected
+
+
+@pytest.mark.unit
+def test_anonymous_topic_recommendation_keeps_semantic_retrieval():
+    mock_embedding = MagicMock()
+    mock_embedding.generate_embedding.return_value = [0.1, 0.2, 0.3]
+    mock_data_port = MagicMock()
+    mock_data_port.match_query_embeddings.return_value = {"fantasy-isbn": 0.99}
+    mock_recommender = MagicMock()
+    mock_recommender.df = pd.DataFrame(
+        [
+            {
+                "isbn13": "popular-isbn",
+                "title": "Popular Romance",
+                "authors": "Popular Author",
+                "average_rating": 4.9,
+                "ratings_count": 10000,
+            }
+        ]
+    )
+    mock_recommender.recommend.return_value = [
+        {"isbn13": "fantasy-isbn", "title": "Fantasy Book", "authors": "Fantasy Author"}
+    ]
+    mock_enrichment = MagicMock()
+    mock_enrichment.enrich.side_effect = lambda books: books
+    mock_llm = MagicMock()
+    mock_llm.generate_response.return_value = "Here is a fantasy book grounded in your request."
+
+    use_case = ProcessRagQueryUseCase(
+        embedding_port=mock_embedding,
+        book_data_port=mock_data_port,
+        interaction_repo=None,
+        recommender=mock_recommender,
+        enrichment_service=mock_enrichment,
+        llm_port=mock_llm,
+    )
+
+    response = use_case.execute("recommend a fantasy book")
+
+    assert response["status"] == "success"
+    assert response["answer"] == "Here is a fantasy book grounded in your request."
+    assert [book["title"] for book in response["referenced_books"]] == ["Fantasy Book"]
+    assert response["metrics"]["source"] == "rag_llm"
+    mock_llm.generate_response.assert_called_once()
