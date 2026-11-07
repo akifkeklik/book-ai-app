@@ -45,12 +45,36 @@ def _is_generic_recommendation_query(query: str) -> bool:
     normalized = _normalize_text(query)
     generic_patterns = (
         r"(?:bana\s+)?(?:bir\s+)?kitap\s+(?:öner(?:ir\s+misin)?|tavsiye(?:\s+et(?:er\s+misin)?)?)",
-        r"(?:please\s+)?recommend(?:\s+me)?\s+(?:a\s+)?book",
+        r"(?:please\s+)?recommend(?:\s+me)?\s+(?:(?:a|some)\s+)?books?",
         r"(?:please\s+)?(?:give|show)\s+me\s+(?:a\s+)?book\s+recommendation",
         r"(?:bitte\s+)?empfiehl(?:\s+mir)?\s+(?:ein\s+)?buch",
         r"(?:bitte\s+)?(?:ein\s+)?buch\s+empfehlen",
     )
     return any(re.fullmatch(pattern, normalized, flags=re.IGNORECASE) for pattern in generic_patterns)
+
+
+def _rank_popular_books(books: pd.DataFrame) -> pd.DataFrame:
+    """Rank catalog books with a Bayesian rating that discounts low-vote outliers."""
+    ranked = books.copy()
+    ratings = pd.to_numeric(ranked["average_rating"], errors="coerce").fillna(0.0)
+    if "ratings_count" in ranked.columns:
+        vote_counts = pd.to_numeric(ranked["ratings_count"], errors="coerce").fillna(0).clip(lower=0)
+    else:
+        vote_counts = pd.Series(0, index=ranked.index, dtype="int64")
+
+    prior_mean = ratings[ratings > 0].mean()
+    if pd.isna(prior_mean):
+        return ranked.iloc[0:0]
+
+    prior_count = 100
+    ranked["_popularity_score"] = (
+        vote_counts * ratings + prior_count * prior_mean
+    ) / (vote_counts + prior_count)
+    ranked["_popularity_votes"] = vote_counts
+    return ranked.sort_values(
+        ["_popularity_score", "_popularity_votes", "average_rating"],
+        ascending=False,
+    ).drop(columns=["_popularity_score", "_popularity_votes"])
 
 
 def _clean_book_dict(book: Dict[str, Any]) -> Dict[str, Any]:
@@ -746,17 +770,9 @@ class ProcessRagQueryUseCase:
                         & popular_df["isbn13"].notna()
                         & popular_df["isbn13"].astype(str).str.strip().ne("")
                     ]
-                    sort_columns = ["average_rating"]
-                    ascending = [False]
-                    if "ratings_count" in popular_df.columns:
-                        popular_df["ratings_count"] = pd.to_numeric(
-                            popular_df["ratings_count"], errors="coerce"
-                        ).fillna(0)
-                        sort_columns.append("ratings_count")
-                        ascending.append(False)
-                    popular_books = popular_df.sort_values(
-                        sort_columns, ascending=ascending
-                    ).head(5).to_dict(orient="records")
+                    popular_books = _rank_popular_books(popular_df).head(5).to_dict(
+                        orient="records"
+                    )
                     if popular_books:
                         if lang == "tr":
                             answer = "Henüz oturum açmadığınız ve okuma geçmişinize erişim olmadığı için, kataloğumuzdaki yüksek puanlı popüler kitapları öneriyorum:"
