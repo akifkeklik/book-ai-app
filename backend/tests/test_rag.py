@@ -5,6 +5,7 @@ import pytest
 from backend.application.use_cases.ai_rag import (
     ProcessRagQueryUseCase,
     _is_generic_recommendation_query,
+    _rank_popular_books,
 )
 from backend.domain.ports import (
     BookDataPort,
@@ -279,6 +280,8 @@ def test_process_rag_query_user_signal_isolation_and_dislikes():
         ("bana bir kitap öner", True),
         ("kitap tavsiye et", True),
         ("recommend a book", True),
+        ("recommend books", True),
+        ("recommend some books", True),
         ("empfiehl mir ein Buch", True),
         ("recommend a fantasy book", False),
         ("bana fantastik türünde bir kitap öner", False),
@@ -331,3 +334,20 @@ def test_anonymous_topic_recommendation_keeps_semantic_retrieval():
     assert [book["title"] for book in response["referenced_books"]] == ["Fantasy Book"]
     assert response["metrics"]["source"] == "rag_llm"
     mock_llm.generate_response.assert_called_once()
+
+
+@pytest.mark.unit
+def test_popular_book_ranking_discounts_low_vote_rating_outliers():
+    catalog = pd.DataFrame(
+        [
+            {"title": "Five-star outlier", "average_rating": 5.0, "ratings_count": 2},
+            {"title": "Well-rated popular book", "average_rating": 4.8, "ratings_count": 5000},
+            {"title": "Catalog book A", "average_rating": 3.8, "ratings_count": 300},
+            {"title": "Catalog book B", "average_rating": 3.6, "ratings_count": 200},
+        ]
+    )
+
+    ranked = _rank_popular_books(catalog)
+
+    assert ranked.iloc[0]["title"] == "Well-rated popular book"
+    assert "_popularity_score" not in ranked.columns
