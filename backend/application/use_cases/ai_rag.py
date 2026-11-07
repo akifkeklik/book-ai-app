@@ -729,6 +729,64 @@ class ProcessRagQueryUseCase:
         else:
             retrieval_latency = 0.0
 
+        if embedding is None and not catalog_matches and is_generic_rec and user_id is None:
+            # Generic anonymous recommendations must remain available when the
+            # embedding provider is temporarily unavailable. Use only catalog data.
+            catalog_df = getattr(self._recommender, "df", None)
+            if catalog_df is not None and not catalog_df.empty and "average_rating" in catalog_df.columns:
+                popular_df = catalog_df.copy()
+                popular_df["average_rating"] = pd.to_numeric(
+                    popular_df["average_rating"], errors="coerce"
+                )
+                popular_df = popular_df[popular_df["average_rating"] > 0]
+                if "title" in popular_df.columns and "isbn13" in popular_df.columns:
+                    popular_df = popular_df[
+                        popular_df["title"].notna()
+                        & popular_df["title"].astype(str).str.strip().ne("")
+                        & popular_df["isbn13"].notna()
+                        & popular_df["isbn13"].astype(str).str.strip().ne("")
+                    ]
+                    sort_columns = ["average_rating"]
+                    ascending = [False]
+                    if "ratings_count" in popular_df.columns:
+                        popular_df["ratings_count"] = pd.to_numeric(
+                            popular_df["ratings_count"], errors="coerce"
+                        ).fillna(0)
+                        sort_columns.append("ratings_count")
+                        ascending.append(False)
+                    popular_books = popular_df.sort_values(
+                        sort_columns, ascending=ascending
+                    ).head(5).to_dict(orient="records")
+                    if popular_books:
+                        if lang == "tr":
+                            answer = "Henüz oturum açmadığınız ve okuma geçmişinize erişim olmadığı için, kataloğumuzdaki yüksek puanlı popüler kitapları öneriyorum:"
+                        elif lang == "de":
+                            answer = "Da Sie nicht angemeldet sind, empfehle ich Ihnen gut bewertete beliebte Bücher aus unserem Katalog:"
+                        else:
+                            answer = "Since you are browsing anonymously, here are highly rated popular books from our catalog:"
+                        enriched = (
+                            self._enrichment_service.enrich(popular_books)
+                            if self._enrichment_service
+                            else popular_books
+                        )
+                        lat = round((time.time() - t_total_start) * 1000, 2)
+                        return RAGResponse(
+                            answer=answer,
+                            referenced_books=[
+                                Recommendation(**_clean_book_dict(book))
+                                for book in enriched
+                            ],
+                            status="success",
+                            action=None,
+                            latency_ms=lat,
+                            metrics={
+                                "source": "curated_anonymous_rec",
+                                "candidate_count": len(enriched),
+                                "embedding_latency_ms": emb_latency,
+                                "total_rag_latency_ms": lat,
+                            },
+                        ).model_dump()
+
         if embedding is None and not catalog_matches:
             lat = round((time.time() - t_total_start) * 1000, 2)
             logger.warning(
