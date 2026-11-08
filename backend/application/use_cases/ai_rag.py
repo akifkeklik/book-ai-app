@@ -40,6 +40,43 @@ def _normalize_text(s: str) -> str:
     return " ".join(s.split()).strip()
 
 
+def _is_generic_recommendation_query(query: str) -> bool:
+    """Return True only for unqualified requests for any book recommendation."""
+    normalized = _normalize_text(query)
+    generic_patterns = (
+        r"(?:bana\s+)?(?:bir\s+)?kitap\s+(?:öner(?:ir\s+misin)?|tavsiye(?:\s+et(?:er\s+misin)?)?)",
+        r"(?:please\s+)?recommend(?:\s+me)?\s+(?:(?:a|some)\s+)?books?",
+        r"(?:please\s+)?(?:give|show)\s+me\s+(?:a\s+)?book\s+recommendation",
+        r"(?:bitte\s+)?empfiehl(?:\s+mir)?\s+(?:ein\s+)?buch",
+        r"(?:bitte\s+)?(?:ein\s+)?buch\s+empfehlen",
+    )
+    return any(re.fullmatch(pattern, normalized, flags=re.IGNORECASE) for pattern in generic_patterns)
+
+
+def _rank_popular_books(books: pd.DataFrame) -> pd.DataFrame:
+    """Rank catalog books with a Bayesian rating that discounts low-vote outliers."""
+    ranked = books.copy()
+    ratings = pd.to_numeric(ranked["average_rating"], errors="coerce").fillna(0.0)
+    if "ratings_count" in ranked.columns:
+        vote_counts = pd.to_numeric(ranked["ratings_count"], errors="coerce").fillna(0).clip(lower=0)
+    else:
+        vote_counts = pd.Series(0, index=ranked.index, dtype="int64")
+
+    prior_mean = ratings[ratings > 0].mean()
+    if pd.isna(prior_mean):
+        return ranked.iloc[0:0]
+
+    prior_count = 100
+    ranked["_popularity_score"] = (
+        vote_counts * ratings + prior_count * prior_mean
+    ) / (vote_counts + prior_count)
+    ranked["_popularity_votes"] = vote_counts
+    return ranked.sort_values(
+        ["_popularity_score", "_popularity_votes", "average_rating"],
+        ascending=False,
+    ).drop(columns=["_popularity_score", "_popularity_votes"])
+
+
 def _clean_book_dict(book: Dict[str, Any]) -> Dict[str, Any]:
     """Cleans NaN and invalid types from pandas records so Pydantic validation succeeds."""
     clean = dict(book)
@@ -538,6 +575,8 @@ class ProcessRagQueryUseCase:
         catalog_matches = self._lookup_catalog_candidates(query)
         cat_latency = round((time.time() - t_cat_start) * 1000, 2)
 
+        # Only unqualified requests may use the deterministic popular-books fallback.
+        is_generic_rec = _is_generic_recommendation_query(query)
         # Detect if user asks for recommendations similar to a book (seed exclusion invariant)
         is_similar_query = bool(re.search(r"(benzer|benzeyen|similar\s+to|like|recommend\s+based\s+on)", query, re.IGNORECASE))
         seed_titles = [m.get("title") for m in catalog_matches if m.get("title")] if is_similar_query else []
@@ -714,6 +753,56 @@ class ProcessRagQueryUseCase:
         else:
             retrieval_latency = 0.0
 
+        if embedding is None and not catalog_matches and is_generic_rec and user_id is None:
+            # Generic anonymous recommendations must remain available when the
+            # embedding provider is temporarily unavailable. Use only catalog data.
+            catalog_df = getattr(self._recommender, "df", None)
+            if catalog_df is not None and not catalog_df.empty and "average_rating" in catalog_df.columns:
+                popular_df = catalog_df.copy()
+                popular_df["average_rating"] = pd.to_numeric(
+                    popular_df["average_rating"], errors="coerce"
+                )
+                popular_df = popular_df[popular_df["average_rating"] > 0]
+                if "title" in popular_df.columns and "isbn13" in popular_df.columns:
+                    popular_df = popular_df[
+                        popular_df["title"].notna()
+                        & popular_df["title"].astype(str).str.strip().ne("")
+                        & popular_df["isbn13"].notna()
+                        & popular_df["isbn13"].astype(str).str.strip().ne("")
+                    ]
+                    popular_books = _rank_popular_books(popular_df).head(5).to_dict(
+                        orient="records"
+                    )
+                    if popular_books:
+                        if lang == "tr":
+                            answer = "Henüz oturum açmadığınız ve okuma geçmişinize erişim olmadığı için, kataloğumuzdaki yüksek puanlı popüler kitapları öneriyorum:"
+                        elif lang == "de":
+                            answer = "Da Sie nicht angemeldet sind, empfehle ich Ihnen gut bewertete beliebte Bücher aus unserem Katalog:"
+                        else:
+                            answer = "Since you are browsing anonymously, here are highly rated popular books from our catalog:"
+                        enriched = (
+                            self._enrichment_service.enrich(popular_books)
+                            if self._enrichment_service
+                            else popular_books
+                        )
+                        lat = round((time.time() - t_total_start) * 1000, 2)
+                        return RAGResponse(
+                            answer=answer,
+                            referenced_books=[
+                                Recommendation(**_clean_book_dict(book))
+                                for book in enriched
+                            ],
+                            status="success",
+                            action=None,
+                            latency_ms=lat,
+                            metrics={
+                                "source": "curated_anonymous_rec",
+                                "candidate_count": len(enriched),
+                                "embedding_latency_ms": emb_latency,
+                                "total_rag_latency_ms": lat,
+                            },
+                        ).model_dump()
+
         if embedding is None and not catalog_matches:
             lat = round((time.time() - t_total_start) * 1000, 2)
             logger.warning(
@@ -766,11 +855,8 @@ class ProcessRagQueryUseCase:
             combined_books = self._enrichment_service.enrich(combined_books)
         enrichment_latency = round((time.time() - t_enr_start) * 1000, 2)
 
-        # Check for general recommendation query when unauthenticated or without reading history
-        is_generic_rec = bool(
-            re.search(r"(bana\s+)?(bir\s+)?(kitap\s+)?(öner|tavsiye|recommend|empfehl)", query, re.IGNORECASE)
-            and not is_similar_query
-        )
+        # Check for a truly generic request without a book/topic constraint.
+        is_generic_rec = _is_generic_recommendation_query(query) and not is_similar_query
         if is_generic_rec and user_id is None and combined_books:
             if lang == "tr":
                 rec_msg = "Henüz oturum açmadığınız ve geçmiş okuma tercihlerinize erişim olmadığı için, Libris kataloğundaki en yüksek puanlı popüler eserlerden bir seçki sunuyorum:"
