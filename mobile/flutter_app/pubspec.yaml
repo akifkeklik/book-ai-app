@@ -34,7 +34,7 @@ dependencies:
   shared_preferences: ^2.2.3
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  workmanager: ^0.7.0
+  workmanager: ^0.10.10
 
   # ── Utils ───────────────────────────────────────────────────────────────────
   intl: ^0.19.0
