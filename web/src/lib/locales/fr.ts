@@ -534,4 +534,5 @@ export const fr: Record<TranslationKey, string> = {
   spot_tip_isbn: 'Recherchez par ISBN (ex. « 9780451524935 »)',
   spot_tip_keys: 'Utilisez ↑ ↓ pour naviguer et Entrée pour ouvrir',
   ai_no_referenced_desc: "Aucun livre du catalogue n'a été cité pour cette question. Essayez un genre, un thème ou un titre.",
+  nav_review: 'Réviser',
 };

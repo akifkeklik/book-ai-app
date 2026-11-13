@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { usePreferences } from './PreferencesProvider';
-import { BookOpen, LogOut, Compass, Sparkles, Bookmark, Settings, Globe, Search, Network, Brain } from 'lucide-react';
+import { BookOpen, LogOut, Compass, Sparkles, Bookmark, Settings, Globe, Search, Brain } from 'lucide-react';
 import { LANGUAGES } from '@/lib/preferences';
 
 export function Navbar() {
@@ -94,20 +94,12 @@ export function Navbar() {
           </Link>
 
           <Link
-            href="/knowledge-graph"
-            id="nav-knowledge-graph-link"
-            className={`nav-link ${isActive("/knowledge-graph") ? "active" : ""}`}
-          >
-            <Network size={18} color="var(--primary)" />
-            <span className="nav-link-text">{t('nav_knowledge_graph')}</span>
-          </Link>
-          <Link
             href="/learning"
             id="nav-learning-link"
             className={`nav-link ${isActive("/learning") ? "active" : ""}`}
           >
             <Brain size={18} color="var(--primary)" />
-            <span className="nav-link-text">{t('nav_learning')}</span>
+            <span className="nav-link-text">{t('nav_review')}</span>
           </Link>
 
 
