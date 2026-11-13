@@ -553,5 +553,6 @@
   "ui_user": "Kullanıcı",
   "ui_app_version": "Libris v{version}",
   "ui_splash_tagline": "Okuduğunu unutma",
-  "no_response": "AI kütüphaneci bir yanıt vermedi. Lütfen tekrar dene."
+  "no_response": "AI kütüphaneci bir yanıt vermedi. Lütfen tekrar dene.",
+  "nav_review": "Tekrar"
 }

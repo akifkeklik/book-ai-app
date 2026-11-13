@@ -553,5 +553,6 @@
   "ui_user": "User",
   "ui_app_version": "Libris v{version}",
   "ui_splash_tagline": "Remember what you read",
-  "no_response": "The AI librarian did not return an answer. Please try again."
+  "no_response": "The AI librarian did not return an answer. Please try again.",
+  "nav_review": "Review"
 }

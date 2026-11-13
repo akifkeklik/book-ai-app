@@ -10,6 +10,7 @@ import { getLibraryBooks } from '@/app/actions/library';
 import { translate, type TranslationKey } from '@/lib/i18n';
 import { type Language, resolveLanguage } from '@/lib/preferences';
 import type { Book, LibraryItem } from '@/types';
+import { SmartReviewWidget } from '@/components/SmartReviewWidget';
 
 export const dynamic = 'force-dynamic';
 
@@ -215,6 +216,13 @@ export default async function Home({
           ))}
         </div>
       </div>
+
+      {/* Today's review: the core remember-what-you-read loop comes first */}
+      {session && (
+        <section id="today-review" style={{ marginBottom: '3rem' }}>
+          <SmartReviewWidget />
+        </section>
+      )}
 
       {/* Authenticated Taste Profile Banner / Customizer */}
       {session && (

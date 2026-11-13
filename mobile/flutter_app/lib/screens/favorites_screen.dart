@@ -635,13 +635,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 ),
                 const SizedBox(width: 8),
                 ActionChip(
-                  key: const Key('learning_paths_hub_chip'),
-                  avatar: const Icon(Icons.explore_outlined, size: 16),
-                  label: Text(context.tr('learning_paths_title')),
-                  onPressed: () => context.push('/learning-paths'),
-                ),
-                const SizedBox(width: 8),
-                ActionChip(
                   key: const Key('learning_outcomes_hub_chip'),
                   avatar: const Icon(Icons.psychology_outlined, size: 16),
                   label: Text(context.tr('nav_learning')),

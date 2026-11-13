@@ -31,7 +31,7 @@ Libris is also where I practised building a product end to end: one backend serv
 4. **Review at the right time.** A spaced-repetition schedule (1, 3, 7, ... days) brings cards back when they are due and moves them according to how well you recalled them.
 5. **See what you actually know.** A learning dashboard shows retention and difficult concepts, and a personal knowledge graph links books, notes, and concepts.
 
-Also included: reading shelves and favorites, learning paths, note export, English/Turkish/German localization, and offline queuing of supported changes in the mobile app.
+Also included: reading shelves and favorites, note export, offline queuing of supported changes in the mobile app, and full localization in six languages (English, Turkish, German, Spanish, French, Italian), enforced by tests so no screen ships untranslated. Learning paths and the knowledge graph remain in the codebase but are kept out of the main navigation to keep the product focused on one loop.
 
 > **Project status:** Feature-complete as a portfolio project and no longer under active development. It runs locally with Docker Compose or the dev scripts; it is not deployed as a public service. CI status is shown by the badge above.
 

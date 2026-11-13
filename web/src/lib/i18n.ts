@@ -580,6 +580,7 @@ export const DICTIONARIES = {
     spot_tip_isbn: "Search by ISBN (e.g. “9780451524935”)",
     spot_tip_keys: "Use ↑ ↓ to move and Enter to open",
     ai_no_referenced_desc: "No catalog books were cited for this question. Try a genre, topic, or book title.",
+    nav_review: "Review",
   },
 
   tr: {
@@ -1155,6 +1156,7 @@ export const DICTIONARIES = {
     spot_tip_isbn: "ISBN ile ara (ör. “9780451524935”)",
     spot_tip_keys: "Gezinmek için ↑ ↓, açmak için Enter kullan",
     ai_no_referenced_desc: "Bu soru için katalogdan kitap gösterilmedi. Bir tür, konu veya kitap adı dene.",
+    nav_review: "Tekrar",
   },
 
   de: {
@@ -1731,6 +1733,7 @@ export const DICTIONARIES = {
     spot_tip_isbn: "Nach ISBN suchen (z. B. „9780451524935“)",
     spot_tip_keys: "Mit ↑ ↓ navigieren und mit Enter öffnen",
     ai_no_referenced_desc: "Für diese Frage wurden keine Katalogbücher genannt. Versuche es mit einem Genre, Thema oder Buchtitel.",
+    nav_review: "Wiederholen",
   },
 } as const;
 

@@ -553,5 +553,6 @@
   "ui_user": "Benutzer",
   "ui_app_version": "Libris v{version}",
   "ui_splash_tagline": "Behalte, was du liest",
-  "no_response": "Der KI-Bibliothekar hat keine Antwort geliefert. Bitte versuche es erneut."
+  "no_response": "Der KI-Bibliothekar hat keine Antwort geliefert. Bitte versuche es erneut.",
+  "nav_review": "Wiederholen"
 }

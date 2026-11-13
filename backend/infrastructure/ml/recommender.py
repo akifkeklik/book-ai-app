@@ -56,6 +56,13 @@ def _normalize_category_text(value: Any) -> str:
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
+def _optional_column_contains(df, column: str, query: str):
+    """Case-insensitive substring match on an optional ISBN column."""
+    if column not in df.columns:
+        return pd.Series(False, index=df.index)
+    return df[column].astype(str).str.contains(query, case=False, na=False, regex=False)
+
+
 class EngineConfig:
     """Typed configuration for the recommendation engine."""
 
@@ -974,7 +981,19 @@ class BookRecommender:
                     if "isbn10" in df.columns
                     else False
                 )
-                df = df[title_mask | author_mask | desc_mask | isbn13_mask | isbn10_mask]
+                df = df[title_mask | author_mask | desc_mask | isbn13_mask | isbn10_mask].copy()
+                # Relevance tiers: exact title > title > author/ISBN > description-only.
+                title_lower = df["title"].astype(str).str.strip().str.lower()
+                q_lower = q_clean.lower()
+                relevance = pd.Series(1, index=df.index)
+                relevance = relevance.mask(_optional_column_contains(df, "isbn13", q_clean), 3)
+                relevance = relevance.mask(_optional_column_contains(df, "isbn10", q_clean), 3)
+                relevance = relevance.mask(
+                    df["authors"].astype(str).str.contains(q_clean, case=False, na=False, regex=False), 3
+                )
+                relevance = relevance.mask(title_lower.str.contains(q_lower, na=False, regex=False), 4)
+                relevance = relevance.mask(title_lower == q_lower, 5)
+                df["_relevance"] = relevance
 
         if category:
             cat = category.strip()
@@ -1029,7 +1048,11 @@ class BookRecommender:
                 if published_to is not None:
                     df = df[years <= published_to]
 
-        if sort:
+        if "_relevance" in df.columns and (not sort or sort == "popularity"):
+            # With a search query, the default ordering is relevance first, then popularity.
+            by = ["_relevance"] + (["popularity_score"] if "popularity_score" in df.columns else [])
+            df = df.sort_values(by=by, ascending=False, na_position="last", kind="stable")
+        elif sort:
             ascending = order.lower() == "asc"
             if sort == "rating" and "average_rating" in df.columns:
                 df = df.sort_values(by="average_rating", ascending=ascending, na_position="last")
@@ -1051,7 +1074,7 @@ class BookRecommender:
         total = len(df)
         total_pages = math.ceil(total / per_page) if per_page else 1
 
-        paginated_df = df.iloc[start:end]
+        paginated_df = df.iloc[start:end].drop(columns=["_relevance"], errors="ignore")
         return {
             "books": paginated_df.to_dict(orient="records"),
             "total": total,
