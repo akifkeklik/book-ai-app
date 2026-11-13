@@ -263,6 +263,7 @@ class Container:
             note_repo=self.note_repo,
             learning_path_repo=self.learning_path_repo,
             book_data_port=self.book_data_port,
+            llm_port=self.llm_port,
         )
         self.submit_review_attempt_uc = SubmitReviewAttemptUseCase(
             learning_repo=self.learning_outcomes_repo,
