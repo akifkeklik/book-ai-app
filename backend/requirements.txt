@@ -4,7 +4,7 @@ scikit-learn~=1.9.1
 numpy~=1.26.4
 pandas~=2.2.2
 scipy~=1.13.0
-python-dotenv==1.0.1
+python-dotenv==1.2.4
 requests==2.34.2
 gunicorn==21.2.0
 pytest==8.1.1
