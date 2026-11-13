@@ -343,6 +343,29 @@ class Container:
             llm_port=self.llm_port,
         )
 
+        volatile = self.in_memory_repositories()
+        if volatile:
+            logger.warning(
+                "Non-persistent in-memory repositories are active (data is lost on restart): %s",
+                ", ".join(volatile),
+            )
+
+    _REPOSITORY_ATTRS = (
+        "note_repo",
+        "note_review_repo",
+        "knowledge_repo",
+        "learning_outcomes_repo",
+        "learning_path_repo",
+    )
+
+    def in_memory_repositories(self) -> list[str]:
+        """Names of user-data repositories backed by volatile in-memory adapters."""
+        return [
+            name
+            for name in self._REPOSITORY_ATTRS
+            if type(getattr(self, name, None)).__name__.startswith("InMemory")
+        ]
+
 
 # Global container instance
 container = Container()

@@ -67,6 +67,17 @@ def create_app(config_class=Config) -> Flask:
                 "Critical Security Misconfiguration: ALLOWED_ORIGINS must contain explicit trusted "
                 "origins in production; wildcard origins are not permitted."
             )
+        if not app.config.get("ALLOW_IN_MEMORY_REPOSITORIES"):
+            from .container import container as _container
+
+            volatile_repos = _container.in_memory_repositories()
+            if volatile_repos:
+                raise ValueError(
+                    "Critical Data Integrity Misconfiguration: production would store user data in "
+                    f"volatile in-memory repositories ({', '.join(volatile_repos)}). Configure Supabase "
+                    "(SUPABASE_URL + SUPABASE_ANON_KEY) so these repositories are persistent, or set "
+                    "ALLOW_IN_MEMORY_REPOSITORIES=true for disposable local/demo stacks only."
+                )
 
     app.config["ALLOWED_ORIGINS"] = allowed_origins
 
