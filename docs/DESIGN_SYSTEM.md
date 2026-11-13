@@ -1,5 +1,5 @@
 # 🎨 Libris Design System
-**Unified Cross-Platform Design Specifications for Mobile (Flutter) & Web (Next.js 16)**
+**Design specifications for the Libris web client (Next.js 16)**
 
 ---
 
@@ -16,34 +16,34 @@ Libris is an editorial book discovery and personal learning platform designed ar
 
 ## 2. Color Palette & Semantic Tokens
 
-### 2.1 Complete Semantic Color Roles (Web & Flutter Parity)
+### 2.1 Semantic Color Roles
 
-| Semantic Role | Web CSS Variable | Mobile Flutter Token | Role / Semantic Meaning |
-| :--- | :--- | :--- | :--- |
-| `background` | `--background` | `palette.backgroundDark` / `Light` | Root application canvas |
-| `surface` | `--surface` | `palette.surfaceDark` / `Light` | Standard card and container surface |
-| `surfaceElevated`| `--surface-elevated` | `palette.surfaceDarkHighlight` | Elevated sheets, floating modals, dropdowns |
-| `surfaceSubtle` | `--surface-subtle` | `palette.surfaceDarkHighlight` (0.5 op) | Input fields, search bars, subtle chips |
-| `textPrimary` | `--text-primary` | `DesignSystem.textDarkPrimary` / `Light` | Primary titles, headlines, high-contrast labels |
-| `textSecondary` | `--text-secondary` | `DesignSystem.textDarkSecondary` / `Light`| Subtitles, body descriptions, authors |
-| `textMuted` | `--text-muted` | `DesignSystem.textDarkSecondary` (muted) | Captions, timestamps, secondary metadata |
-| `border` | `--border` | `DesignSystem.borderDark` / `Light` | Card borders and visual delimiters |
-| `divider` | `--divider` | `Theme.colorScheme.outline` (0.1 op) | Thin separation lines |
-| `accent` | `--accent` | `palette.accent` | Discovery highlights, AI badge, sparks |
-| `accentForeground`| `--accent-foreground`| `DesignSystem.accentForeground` | Text on top of accent surfaces |
-| `focus` | `--focus` | `DesignSystem.focus` | Focus-visible keyboard outlines |
-| `link` | `--link` | `DesignSystem.link` | Hyperlinks and interactive text |
-| `success` | `--success` | `DesignSystem.success` | Successful operations and toasts |
-| `warning` | `--warning` | `DesignSystem.warning` | Warnings and cautions |
-| `error` | `--error` | `DesignSystem.error` | Error states and destructive alerts |
-| `favorite` | `--favorite` | `DesignSystem.favorite` | Heart icon, favorites collection |
-| `reading` | `--reading` | `DesignSystem.statusReading` | Currently reading badge (Amber) |
+| Semantic Role | Web CSS Variable | Role / Semantic Meaning |
+| :--- | :--- | :--- |
+| `background` | `--background` | Root application canvas |
+| `surface` | `--surface` | Standard card and container surface |
+| `surfaceElevated`| `--surface-elevated` | Elevated sheets, floating modals, dropdowns |
+| `surfaceSubtle` | `--surface-subtle` | Input fields, search bars, subtle chips |
+| `textPrimary` | `--text-primary` | Primary titles, headlines, high-contrast labels |
+| `textSecondary` | `--text-secondary` | Subtitles, body descriptions, authors |
+| `textMuted` | `--text-muted` | Captions, timestamps, secondary metadata |
+| `border` | `--border` | Card borders and visual delimiters |
+| `divider` | `--divider` | Thin separation lines |
+| `accent` | `--accent` | Discovery highlights, AI badge, sparks |
+| `accentForeground`| `--accent-foreground`| Text on top of accent surfaces |
+| `focus` | `--focus` | Focus-visible keyboard outlines |
+| `link` | `--link` | Hyperlinks and interactive text |
+| `success` | `--success` | Successful operations and toasts |
+| `warning` | `--warning` | Warnings and cautions |
+| `error` | `--error` | Error states and destructive alerts |
+| `favorite` | `--favorite` | Heart icon, favorites collection |
+| `reading` | `--reading` | Currently reading badge (Amber) |
 | `wantToRead` | `--wantToRead` | `DesignSystem.statusWantToRead` | Reading queue badge (Sky blue) |
-| `finished` | `--finished` | `DesignSystem.statusFinished` | Completed reading badge (Emerald) |
-| `like` | `--like` | `DesignSystem.statusLike` | Recommendation seed signal (Indigo) |
-| `dislike` | `--dislike` | `DesignSystem.statusDislike` | Recommendation exclusion signal (Slate) |
-| `disabled` | `--disabled` | `DesignSystem.disabled` | Inactive controls and disabled buttons |
-| `overlay` | `--overlay` | `DesignSystem.overlay` | Modal backdrops and drawer scrims |
+| `finished` | `--finished` | Completed reading badge (Emerald) |
+| `like` | `--like` | Recommendation seed signal (Indigo) |
+| `dislike` | `--dislike` | Recommendation exclusion signal (Slate) |
+| `disabled` | `--disabled` | Inactive controls and disabled buttons |
+| `overlay` | `--overlay` | Modal backdrops and drawer scrims |
 
 ---
 
@@ -62,16 +62,11 @@ Libris is an editorial book discovery and personal learning platform designed ar
 
 ## 4. Typography System & Scalability
 
-### 4.1 Cross-Platform Font Families
+### 4.1 Font Families
 - **Web:**
   - `serif`: `'Playfair Display', Georgia, serif`
   - `sans`: `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
   - `mono`: `'JetBrains Mono', ui-monospace, monospace`
-- **Mobile (Flutter):**
-  - `editorial` / `sans`: `GoogleFonts.outfit` (display) + `GoogleFonts.inter` (body)
-  - `serif`: `GoogleFonts.playfairDisplay`
-  - `mono`: `GoogleFonts.jetBrainsMono`
-  - Offline testing safety: `DesignSystem.disableGoogleFontsInTests` prevents network lockups.
 
 ### 4.2 Typographic Hierarchy & Scale Factors
 - `scale_small` (0.9x): Compact density for high-information reading.
@@ -104,10 +99,6 @@ Both Web and Mobile store and validate the identical schema:
 - An inline script in `<head>` reads `localStorage` before paint and applies attributes to `document.documentElement` (`data-theme`, `data-palette`, `data-font`, `data-scale`, `data-contrast`, `data-spacing`, `data-motion`, `lang`).
 - React `PreferencesProvider` provides reactive state, system media-query subscriptions, and live updates.
 - Robust corruption recovery: any invalid or unparsable JSON falls back gracefully to `DEFAULT_PREFERENCES`.
-
-### 5.3 Mobile Flutter Implementation
-- `ThemeProvider` persists preferences to `SharedPreferences` with safe try/catch error handling.
-- `LanguageProvider` manages `assets/lang/{locale}.json` with 100% key parity (233 keys across `en.json`, `tr.json`, `de.json`).
 
 ---
 

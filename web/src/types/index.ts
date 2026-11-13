@@ -134,108 +134,6 @@ export interface ExportNotesResult {
   total: number;
 }
 
-export interface LearningPathItem {
-  bookId: string;
-  orderIndex: number;
-  addedAt?: string;
-  book?: Book;
-  readingStatus?: 'want_to_read' | 'reading' | 'finished' | null;
-  notesCount?: number;
-  hasDueReview?: boolean;
-}
-
-export interface LearningPath {
-  id: string;
-  userId: string;
-  title: string;
-  description?: string;
-  category?: string;
-  status: 'active' | 'completed' | 'archived';
-  books: LearningPathItem[];
-  createdAt: string;
-  updatedAt: string;
-  totalBooks?: number;
-  completedBooks?: number;
-  readingBooks?: number;
-  notStartedBooks?: number;
-  progressPercent?: number;
-  totalNotesCount?: number;
-  totalReviewsDue?: number;
-  nextBookId?: string | null;
-}
-
-export interface CreateLearningPathInput {
-  title: string;
-  description?: string;
-  category?: string;
-  bookIds?: string[];
-}
-
-
-export type KnowledgeNodeType = 'book' | 'concept' | 'note' | 'learning_path';
-export type KnowledgeRelationshipType =
-  | 'covers_concept'
-  | 'reinforces_concept'
-  | 'relates_to'
-  | 'builds_upon'
-  | 'curates_book'
-  | 'references_book'
-  | 'derived_from'
-  | 'contrasts_with'
-  | 'prerequisite_for';
-
-export type KnowledgeRelationshipSource =
-  | 'user_explicit'
-  | 'reading_note'
-  | 'book_metadata'
-  | 'system_inference';
-
-export interface KnowledgeNode {
-  id: string;
-  label: string;
-  type: KnowledgeNodeType;
-  data: Record<string, unknown>;
-  degree: number;
-}
-
-export interface KnowledgeEdge {
-  id?: string;
-  userId: string;
-  sourceId: string;
-  sourceType: KnowledgeNodeType;
-  targetId: string;
-  targetType: KnowledgeNodeType;
-  relationshipType: KnowledgeRelationshipType | string;
-  source: KnowledgeRelationshipSource | string;
-  evidenceRef?: string | null;
-  confidence: 'high' | 'medium' | 'suggested';
-  metadata: Record<string, unknown>;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface KnowledgeGraphData {
-  nodes: KnowledgeNode[];
-  edges: KnowledgeEdge[];
-  totalNodes: number;
-  totalEdges: number;
-  focusId?: string | null;
-  depth: number;
-}
-
-export interface CreateRelationshipInput {
-  sourceId: string;
-  sourceType: KnowledgeNodeType;
-  targetId: string;
-  targetType: KnowledgeNodeType;
-  relationshipType: KnowledgeRelationshipType | string;
-  source?: KnowledgeRelationshipSource | string;
-  evidenceRef?: string;
-  confidence?: 'high' | 'medium' | 'suggested';
-  metadata?: Record<string, unknown>;
-}
-
-
 // ── Sprint 28: Learning Outcomes Intelligence ───────────────────────────
 
 export interface ReviewItem {
@@ -249,7 +147,6 @@ export interface ReviewItem {
   sourceType: 'user_note' | 'key_takeaway' | 'concept' | 'learning_path' | 'user_created' | 'book' | string;
   sourceId?: string | null;
   bookId?: string | null;
-  pathId?: string | null;
   stage: number;
   intervalDays: number;
   nextReviewAt?: string;
@@ -319,7 +216,6 @@ export interface CreateReviewItemInput {
   sourceType?: string;
   sourceId?: string;
   bookId?: string;
-  pathId?: string;
   metadata?: Record<string, unknown>;
 }
 

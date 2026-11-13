@@ -12,7 +12,6 @@ export interface CreateReviewItemModalProps {
   onCreated: (item: ReviewItem) => void;
   initialConcept?: string;
   initialBookId?: string;
-  initialPathId?: string;
 }
 
 export function CreateReviewItemModal({
@@ -21,7 +20,6 @@ export function CreateReviewItemModal({
   onCreated,
   initialConcept = '',
   initialBookId,
-  initialPathId,
 }: CreateReviewItemModalProps) {
   const { t } = usePreferences();
   const [title, setTitle] = useState('');
@@ -52,7 +50,6 @@ export function CreateReviewItemModal({
         answer: answer.trim(),
         explanation: explanation.trim(),
         bookId: initialBookId,
-        pathId: initialPathId,
         sourceType: 'user_created',
       });
 

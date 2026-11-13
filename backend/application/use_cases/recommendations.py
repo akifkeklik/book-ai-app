@@ -8,7 +8,6 @@ from ...domain.models import Recommendation, UserPreferenceProfile
 from ...domain.ports import (
     BookDataPort,
     EnrichmentPort,
-    LearningPathRepository,
     NoteReviewRepository,
     RecommenderPort,
     UserInteractionRepository,
@@ -83,7 +82,6 @@ class GetPersonalizedRecommendationsUseCase:
         enrichment_service: EnrichmentPort,
         note_repo: Optional[UserNoteRepository] = None,
         review_repo: Optional[NoteReviewRepository] = None,
-        learning_path_repo: Optional[LearningPathRepository] = None,
     ):
         self._recommender = recommender
         self._interaction_repo = interaction_repo
@@ -91,7 +89,6 @@ class GetPersonalizedRecommendationsUseCase:
         self._enrichment_service = enrichment_service
         self._note_repo = note_repo
         self._review_repo = review_repo
-        self._learning_path_repo = learning_path_repo
 
     def build_user_preference_profile(self, user_id: str) -> UserPreferenceProfile:
         """
@@ -202,34 +199,12 @@ class GetPersonalizedRecommendationsUseCase:
             except Exception as e:
                 logger.debug(f"Could not load review stats: {e}")
 
-        # Active learning paths
-        active_paths_count = 0
-        path_categories = []
-        path_book_ids: Set[str] = set()
-        if self._learning_path_repo:
-            try:
-                user_paths = self._learning_path_repo.get_user_paths(user_id=user_id) or []
-                for p in user_paths:
-                    if p.get("status") == "active":
-                        active_paths_count += 1
-                        cat = str(p.get("category", "")).strip()
-                        if cat:
-                            path_categories.append(cat)
-                        for pb in p.get("books", []):
-                            pbid = str(pb.get("book_id", "")).strip()
-                            if pbid and pbid not in dislikes_set:
-                                path_book_ids.add(pbid)
-            except Exception as e:
-                logger.debug(f"Could not load learning paths: {e}")
-
         # Compute Category Affinities
         category_counts: Dict[str, float] = {}
         for g in preferred_genres:
             category_counts[g.lower()] = category_counts.get(g.lower(), 0.0) + 3.0
-        for pc in path_categories:
-            category_counts[pc.lower()] = category_counts.get(pc.lower(), 0.0) + 2.0
 
-        all_pos_isbns = list(favorites_set | finished_set | reading_set | likes_set | note_book_ids | path_book_ids)
+        all_pos_isbns = list(favorites_set | finished_set | reading_set | likes_set | note_book_ids)
         if all_pos_isbns and self._book_data_port:
             try:
                 raw_books = self._book_data_port.get_books_by_isbns(all_pos_isbns[:50]) or []
@@ -252,7 +227,7 @@ class GetPersonalizedRecommendationsUseCase:
         pos_signal_count = len(favorites_set) + len(finished_set) + len(reading_set) + len(likes_set) + len(want_to_read_set)
         neg_signal_count = len(dislikes_set)
 
-        if pos_signal_count == 0 and len(preferred_genres) == 0 and len(note_book_ids) == 0 and active_paths_count == 0:
+        if pos_signal_count == 0 and len(preferred_genres) == 0 and len(note_book_ids) == 0:
             evidence_coverage = "cold_start"
         elif pos_signal_count < 3 and len(preferred_genres) < 2 and len(note_book_ids) < 2:
             evidence_coverage = "emerging"
@@ -270,7 +245,6 @@ class GetPersonalizedRecommendationsUseCase:
             total_notes_count=total_notes,
             takeaway_count=takeaway_count,
             retention_summary=retention_summary,
-            active_learning_paths_count=active_paths_count,
             disliked_isbns=sorted(dislikes_set),
             completed_isbns=sorted(finished_set),
             reading_isbns=sorted(reading_set),
@@ -288,7 +262,6 @@ class GetPersonalizedRecommendationsUseCase:
         limit: int = 10,
         category: Optional[str] = None,
         exclude_completed: bool = False,
-        path_id: Optional[str] = None,
         include_diagnostics: bool = False,
     ) -> Any:
         """
@@ -331,23 +304,7 @@ class GetPersonalizedRecommendationsUseCase:
                 else set()
             )
 
-            # If path_id is supplied, resolve path books for exclusion and topic guidance
-            path_books_clean: Set[str] = set()
-            path_title = ""
             effective_category = category
-            if path_id and self._learning_path_repo:
-                try:
-                    path_obj = self._learning_path_repo.get_path_by_id(path_id=path_id, user_id=user_id)
-                    if path_obj:
-                        path_title = path_obj.get("title", "")
-                        if not effective_category and path_obj.get("category"):
-                            effective_category = path_obj.get("category")
-                        for pb in path_obj.get("books", []):
-                            p_isbn = str(pb.get("book_id", "")).strip().replace("-", "").lower()
-                            if p_isbn:
-                                path_books_clean.add(p_isbn)
-                except Exception as pe:
-                    logger.warning(f"Could not load learning path {path_id} for recommendations: {pe}")
 
             # Cold start fallback with zero positive signals and zero profile preferences
             if profile.evidence_coverage == "cold_start":
@@ -355,7 +312,6 @@ class GetPersonalizedRecommendationsUseCase:
                     limit=limit,
                     dislikes=profile.disliked_isbns,
                     completed=profile.completed_isbns if exclude_completed else None,
-                    path_books=list(path_books_clean),
                     category=effective_category,
                 )
                 if include_diagnostics:
@@ -449,7 +405,6 @@ class GetPersonalizedRecommendationsUseCase:
                     limit=limit,
                     dislikes=profile.disliked_isbns,
                     completed=profile.completed_isbns if exclude_completed else None,
-                    path_books=list(path_books_clean),
                     category=effective_category,
                 )
                 if include_diagnostics:
@@ -518,11 +473,6 @@ class GetPersonalizedRecommendationsUseCase:
                     filtered_count += 1
                     continue
 
-                # Target learning path exclusion
-                if path_books_clean and (r_isbn in path_books_clean or r_title in path_books_clean):
-                    filtered_count += 1
-                    continue
-
                 # Deduplication by canonical identity
                 if (r_isbn and r_isbn in seen_isbns) or (r_title and r_title in seen_titles):
                     filtered_count += 1
@@ -549,7 +499,6 @@ class GetPersonalizedRecommendationsUseCase:
                         limit=limit * 2 + 10,
                         dislikes=profile.disliked_isbns,
                         completed=profile.completed_isbns if exclude_completed else None,
-                        path_books=list(path_books_clean),
                         category=effective_category,
                     )
                     for b in fill_recs:
@@ -558,8 +507,6 @@ class GetPersonalizedRecommendationsUseCase:
                         if (b_isbn and b_isbn in seen_isbns) or (b_title and b_title in seen_titles):
                             continue
                         if b_isbn in dislikes_clean or (exclude_completed and b_isbn in completed_clean):
-                            continue
-                        if path_books_clean and b_isbn in path_books_clean:
                             continue
                         if b_isbn:
                             seen_isbns.add(b_isbn)
@@ -578,24 +525,11 @@ class GetPersonalizedRecommendationsUseCase:
                     limit=limit,
                     dislikes=profile.disliked_isbns,
                     completed=profile.completed_isbns if exclude_completed else None,
-                    path_books=list(path_books_clean),
                     category=effective_category,
                 )
 
             # Enrich and ensure typed explanation contract on all recommendations
             for r in final_recs:
-                # If path_id is supplied, customize explanation for learning path continuity
-                if path_id:
-                    if not r.get("explanation_type") or r.get("explanation_type") in ("trending_catalog", "category_affinity"):
-                        r["explanation_type"] = "learning_path_continuity"
-                        r["recommendation_reason"] = (
-                            f"For your learning path '{path_title}'"
-                            if path_title
-                            else "Recommended for your learning path"
-                        )
-                        r["confidence"] = "high"
-                        r["is_cold_start"] = False
-
                 # Ensure non-null explanation fields
                 if "explanation_type" not in r or not r.get("explanation_type"):
                     r["explanation_type"] = (
@@ -649,7 +583,6 @@ class GetPersonalizedRecommendationsUseCase:
                 limit=limit,
                 dislikes=list(profile.disliked_isbns) if 'profile' in locals() else None,
                 completed=list(profile.completed_isbns) if 'profile' in locals() and exclude_completed else None,
-                path_books=list(path_books_clean) if 'path_books_clean' in locals() else None,
                 category=category,
             )
             if include_diagnostics:
@@ -676,13 +609,12 @@ class GetPersonalizedRecommendationsUseCase:
         limit: int,
         dislikes: Optional[List[str]] = None,
         completed: Optional[List[str]] = None,
-        path_books: Optional[List[str]] = None,
         category: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Deterministic, safe catalog-backed fallback respecting all exclusion rules.
         """
-        extra = (len(dislikes or []) + len(completed or []) + len(path_books or [])) * 2 + 30
+        extra = (len(dislikes or []) + len(completed or [])) * 2 + 30
         books = []
         if self._recommender and hasattr(self._recommender, "get_popular_books"):
             try:
@@ -723,12 +655,6 @@ class GetPersonalizedRecommendationsUseCase:
                 if c_str:
                     exclusion_set.add(c_str)
                     exclusion_set.add(c_str.replace("-", ""))
-        if path_books:
-            for p in path_books:
-                p_str = str(p).strip().lower()
-                if p_str:
-                    exclusion_set.add(p_str)
-                    exclusion_set.add(p_str.replace("-", ""))
 
         if exclusion_set:
             books = [

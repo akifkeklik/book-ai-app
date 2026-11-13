@@ -396,9 +396,8 @@ class QualityReport:
             self.soft_warnings.append("missing_published_date")
         if not book.get("ratings_count"):
             self.soft_warnings.append("ratings_count_zero_or_missing")
-        # SOFT WARNING: Flutter has 3-tier fallback
+        # SOFT WARNING: the web client has a cover fallback
         # thumbnail -> openLibraryCoverUrl (isbn based) -> BookCoverFallback widget
-        # See: mobile/flutter_app/lib/widgets/book_card.dart NetworkCoverWithFallback
         if not book.get("thumbnail", "").strip():
             self.soft_warnings.append("missing_thumbnail")
 
@@ -601,7 +600,7 @@ def print_quality_report(
 
     logger.info(f"  Invalid ISBN          : {invalid_isbn}")
     logger.info(f"  Missing description   : {missing_desc}  {_D}(soft warning){_X}")
-    logger.info(f"  Missing thumbnail     : {missing_thumb}  {_D}(soft warning - Flutter 3-tier fallback){_X}")
+    logger.info(f"  Missing thumbnail     : {missing_thumb}  {_D}(soft warning - client cover fallback){_X}")
     logger.info(f"  Missing rating        : {missing_rating}  {_D}(soft warning){_X}")
     logger.info(f"  Missing page count    : {missing_pages}  {_D}(soft warning){_X}")
     logger.info(f"  Missing published date: {missing_date}  {_D}(soft warning){_X}")

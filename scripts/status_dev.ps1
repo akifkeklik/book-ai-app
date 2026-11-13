@@ -91,15 +91,12 @@ function Check-ServiceStatus ($serviceName, $procInfo, $probeUrl, $readyUrl = $n
 
 $bPort = $pidData.backend.port
 $wPort = $pidData.web.port
-$fPort = $pidData.flutter.port
 
 $bUrl = "http://127.0.0.1:" + $bPort + "/api/health"
 $bReadyUrl = "http://127.0.0.1:" + $bPort + "/api/health/ready"
 $wUrl = "http://127.0.0.1:" + $wPort
-$fUrl = "http://127.0.0.1:" + $fPort
 
 Check-ServiceStatus "Backend (Flask API)" $pidData.backend $bUrl $bReadyUrl
 Check-ServiceStatus "Web Application (Next.js)" $pidData.web $wUrl
-Check-ServiceStatus "Mobile Application (Flutter Web)" $pidData.flutter $fUrl
 
 Write-Host ""

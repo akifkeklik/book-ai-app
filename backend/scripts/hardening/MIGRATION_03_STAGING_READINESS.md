@@ -349,7 +349,7 @@ WHERE relname = '_archived_user_interactions_duplicate_backup';
 
 ---
 
-## 7. Web ve Flutter Smoke Test Planı
+## 7. Web Smoke Test Planı
 
 Migration sonrasında staging ortamında iki istemci için aşağıdaki işlevsel test senaryoları koşulur:
 
@@ -359,13 +359,6 @@ Migration sonrasında staging ortamında iki istemci için aşağıdaki işlevse
 3. **Favoriden Çıkarma**: Kitap favorilerden çıkarılır. `favorites` tablosundan silindiği, ancak `user_interactions` tablosundaki `reading` durumunun **silinmediği** doğrulanır.
 4. **Kitap Bitirme**: Kitap `finished` olarak işaretlenir. `user_interactions` tablosunda `finished` olduğu doğrulanır.
 5. **Beğeni ('like') Sinyali Koruma**: Bir kitap için `like` feedback'i verilir. Kitap favorilere eklenip daha sonra favorilerden çıkarıldığında, `user_interactions` tablosundaki `like` sinyalinin **kesinlikle silinmediği** (`like` olarak kaldığı) doğrulanır.
-
-### Flutter İstemcisi Smoke Testleri (`mobile/flutter_app/lib/services/supabase_service.dart`):
-1. **Favorileri Listeleme**: `getFavorites` çağrısının kullanıcının güncel favori kitaplarını eksiksiz listelediği doğrulanır.
-2. **Mobil Favori Ekleme**: Mobil uygulamadan yeni bir kitap favorilenir. Hem `favorites` tablosuna yazıldığı hem de trigger aracılığıyla `user_interactions` tablosuna `favorite` olarak yansıdığı görülür.
-3. **Mobil Favori Kaldırma**: Mobil uygulamadan favori kaldırılır. `favorites` tablosundan silindiği ve okuma durumu olmayan saf favorinin `user_interactions`'tan temizlendiği görülür.
-
----
 
 ## 8. Rollback Tetikleyicileri, Bilgi Kaybı Sınırları ve İleri Kurtarma (Forward-Recovery)
 
@@ -469,7 +462,7 @@ stateDiagram-v2
 
 | # | Durum Kodu | Gerekli Kanıt | Yetkili Operatör | Doğrulama Komutu / Gözlem | Hata / Başarısızlık Davranışı | Kanıt Dosyası / Zaman Damgası | İlerlemeyi Engelleyen Koşul (Blocker) |
 | :-: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **G1** | `LOCAL_VERIFICATION_PASS` | 43+ senaryolu yerel PostgreSQL provası, backend/web/flutter testleri PASS | Kıdemli Veritabanı / Güvenlik Müh. | `python backend/tests/run_real_pg_migration_03_rehearsal.py` | Kod ve şema düzeltmesi döngüsü | `rehearsal_03_evidence.json` / UTC | Tek bir başarısız yerel assertion veya test |
+| **G1** | `LOCAL_VERIFICATION_PASS` | 43+ senaryolu yerel PostgreSQL provası, backend/web testleri PASS | Kıdemli Veritabanı / Güvenlik Müh. | `python backend/tests/run_real_pg_migration_03_rehearsal.py` | Kod ve şema düzeltmesi döngüsü | `rehearsal_03_evidence.json` / UTC | Tek bir başarısız yerel assertion veya test |
 | **G2** | `STAGING_PRECONDITIONS_PENDING` | Hedef sunucu doğrulaması, STAGING_DB_URL fail-closed kontrolü, yetkili insan onayı | Release Reliability Engineer | `echo $STAGING_DB_URL` host/db maskeli teyidi | Fail-closed durdurma (`exit 1`) | `staging_env_validation.log` / UTC | Tanımsız STAGING_DB_URL, localhost/loopback adresi, operatör ret cevabı |
 | **G3** | `STAGING_BACKUP_VERIFIED` | Güncel custom-format dump (`-Fc`), non-empty dosya boyutu (>0 byte), 64-karakter SHA-256 sağlama | Veritabanı Yöneticisi (DBA) | `pg_dump -Fc ... && sha256sum ...` | Yedekleme tekrarlanır; ilerleme durdurulur | `staging_backup_sha256.txt` / UTC | Boş dosya, bayat yedek (bakım öncesi alınmış), checksum uyuşmazlığı |
 | **G4** | `STAGING_RESTORE_VERIFIED` | İzole sandbox veritabanına tam restore başarısı (exit code `0`), tablo/nesne sayısı denkliği | Veritabanı Yöneticisi (DBA) | `createdb sandbox && pg_restore -d sandbox ...` | Sandbox incelenir; restore başarısızsa operasyon iptal | `sandbox_restore_verification.log` / UTC | `pg_restore` ölümcül hata (`exit != 0`), eksik tablo/kısıt/indeks |

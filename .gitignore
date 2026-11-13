@@ -29,14 +29,8 @@ web/.next/
 web/out/
 web/coverage/
 
-# Flutter / Dart
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.pub-cache/
+# Build output
 build/
-mobile/flutter_app/.dart_tool/
-mobile/flutter_app/build/
 
 # Models / generated data
 backend/saved_model/*.pkl

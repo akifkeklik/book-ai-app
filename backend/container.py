@@ -16,13 +16,6 @@ from backend.application.use_cases.interactions import (
     TrackUserActivityUseCase,
     UpdateUserPreferencesUseCase,
 )
-from backend.application.use_cases.knowledge_graph import (
-    CreateRelationshipUseCase,
-    DeleteRelationshipUseCase,
-    GetNeighborsUseCase,
-    GetPersonalKnowledgeGraphUseCase,
-    UpdateRelationshipUseCase,
-)
 from backend.application.use_cases.learning_notes import (
     CreateNoteUseCase,
     DeleteNoteUseCase,
@@ -40,17 +33,6 @@ from backend.application.use_cases.learning_outcomes import (
     SubmitReviewAttemptUseCase,
     UpdateReviewItemUseCase,
 )
-from backend.application.use_cases.learning_paths import (
-    AddBookToLearningPathUseCase,
-    CreateLearningPathUseCase,
-    DeleteLearningPathUseCase,
-    GeneratePathSuggestionsUseCase,
-    GetLearningPathDetailUseCase,
-    GetUserLearningPathsUseCase,
-    RemoveBookFromLearningPathUseCase,
-    ReorderLearningPathBooksUseCase,
-    UpdateLearningPathUseCase,
-)
 from backend.application.use_cases.recommendations import (
     GetPersonalizedRecommendationsUseCase,
     GetRecommendationsUseCase,
@@ -65,14 +47,10 @@ from backend.config import Config
 from backend.infrastructure.adapters.enrichment_adapter import GoogleBooksEnrichmentAdapter
 from backend.infrastructure.llm.adapters import GenericLlmAdapter
 from backend.infrastructure.ml.recommender import BookRecommender
-from backend.infrastructure.persistence.in_memory_knowledge_repository import (
-    InMemoryKnowledgeRepository,
-)
 from backend.infrastructure.persistence.in_memory_learning_repository import (
     InMemoryLearningOutcomesRepository,
 )
 from backend.infrastructure.persistence.in_memory_note_repository import (
-    InMemoryLearningPathRepository,
     InMemoryNoteRepository,
     InMemoryNoteReviewRepository,
 )
@@ -80,9 +58,7 @@ from backend.infrastructure.persistence.supabase_adapters import (
     SupabaseAuthPort,
     SupabaseBookDataPort,
     SupabaseInteractionRepository,
-    SupabaseKnowledgeGraphRepository,
     SupabaseLearningOutcomesRepository,
-    SupabaseLearningPathRepository,
     SupabaseNoteRepository,
     SupabaseNoteReviewRepository,
 )
@@ -102,7 +78,6 @@ class Container:
         auth_port=None,
         recommender=None,
         note_repo=None,
-        knowledge_repo=None,
         learning_outcomes_repo=None,
         database_url=None,
     ):
@@ -151,15 +126,6 @@ class Container:
         else:
             self.note_review_repo = InMemoryNoteReviewRepository()
 
-        if knowledge_repo is not None:
-            self.knowledge_repo = knowledge_repo
-        elif hasattr(self, "knowledge_repo") and self.knowledge_repo is not None:
-            pass
-        elif self.supabase:
-            self.knowledge_repo = SupabaseKnowledgeGraphRepository(self.supabase)
-        else:
-            self.knowledge_repo = InMemoryKnowledgeRepository()
-
         if learning_outcomes_repo is not None:
             self.learning_outcomes_repo = learning_outcomes_repo
         elif hasattr(self, "learning_outcomes_repo") and self.learning_outcomes_repo is not None:
@@ -168,13 +134,6 @@ class Container:
             self.learning_outcomes_repo = SupabaseLearningOutcomesRepository(self.supabase)
         else:
             self.learning_outcomes_repo = InMemoryLearningOutcomesRepository()
-
-        if hasattr(self, "learning_path_repo") and self.learning_path_repo is not None:
-            pass
-        elif self.supabase:
-            self.learning_path_repo = SupabaseLearningPathRepository(self.supabase)
-        else:
-            self.learning_path_repo = InMemoryLearningPathRepository()
 
         if book_data_port is not None:
             self.book_data_port = book_data_port
@@ -235,7 +194,6 @@ class Container:
             enrichment_service=self.enrichment_service,
             note_repo=self.note_repo,
             review_repo=getattr(self, "note_review_repo", None),
-            learning_path_repo=getattr(self, "learning_path_repo", None),
         )
         self.submit_onboarding_uc = SubmitOnboardingUseCase(self.interaction_repo)
         self.get_preferences_uc = GetUserPreferencesUseCase(self.interaction_repo)
@@ -261,7 +219,6 @@ class Container:
         self.get_review_queue_uc = GetReviewQueueUseCase(
             learning_repo=self.learning_outcomes_repo,
             note_repo=self.note_repo,
-            learning_path_repo=self.learning_path_repo,
             book_data_port=self.book_data_port,
             llm_port=self.llm_port,
         )
@@ -291,50 +248,6 @@ class Container:
         # Notes Export Use Case
         self.export_notes_uc = ExportNotesUseCase(self.note_repo, self.book_data_port)
 
-        # Learning Paths & Progress Intelligence Use Cases
-        self.create_learning_path_uc = CreateLearningPathUseCase(self.learning_path_repo, self.book_data_port)
-        self.get_user_learning_paths_uc = GetUserLearningPathsUseCase(
-            self.learning_path_repo, self.interaction_repo, self.note_repo, self.note_review_repo
-        )
-        self.get_learning_path_detail_uc = GetLearningPathDetailUseCase(
-            self.learning_path_repo, self.book_data_port, self.interaction_repo, self.note_repo, self.note_review_repo
-        )
-        self.update_learning_path_uc = UpdateLearningPathUseCase(self.learning_path_repo)
-        self.delete_learning_path_uc = DeleteLearningPathUseCase(self.learning_path_repo)
-        self.add_book_to_path_uc = AddBookToLearningPathUseCase(self.learning_path_repo, self.book_data_port)
-        self.remove_book_from_path_uc = RemoveBookFromLearningPathUseCase(self.learning_path_repo)
-        self.reorder_path_books_uc = ReorderLearningPathBooksUseCase(self.learning_path_repo)
-        self.generate_path_suggestions_uc = GeneratePathSuggestionsUseCase(
-            book_data_port=self.book_data_port,
-            interaction_repo=self.interaction_repo,
-            catalog_port=getattr(self, "get_books_uc", None),
-            personalized_recs_uc=self.get_personalized_recs_uc,
-            path_repo=self.learning_path_repo,
-        )
-
-        # Personal Knowledge Graph Use Cases
-        self.get_knowledge_graph_uc = GetPersonalKnowledgeGraphUseCase(
-            knowledge_repo=self.knowledge_repo,
-            interaction_repo=self.interaction_repo,
-            note_repo=self.note_repo,
-            learning_path_repo=self.learning_path_repo,
-            catalog_port=self.book_service,
-        )
-        self.create_relationship_uc = CreateRelationshipUseCase(
-            knowledge_repo=self.knowledge_repo,
-            note_repo=self.note_repo,
-            learning_path_repo=self.learning_path_repo,
-        )
-        self.update_relationship_uc = UpdateRelationshipUseCase(
-            knowledge_repo=self.knowledge_repo,
-        )
-        self.delete_relationship_uc = DeleteRelationshipUseCase(
-            knowledge_repo=self.knowledge_repo,
-        )
-        self.get_neighbors_uc = GetNeighborsUseCase(
-            get_graph_uc=self.get_knowledge_graph_uc,
-        )
-
         self.process_rag_query_uc = ProcessRagQueryUseCase(
             embedding_port=self.embedding_service,
             book_data_port=self.book_data_port,
@@ -354,9 +267,7 @@ class Container:
     _REPOSITORY_ATTRS = (
         "note_repo",
         "note_review_repo",
-        "knowledge_repo",
         "learning_outcomes_repo",
-        "learning_path_repo",
     )
 
     def in_memory_repositories(self) -> list[str]:

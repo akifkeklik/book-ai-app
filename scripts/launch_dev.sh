@@ -8,16 +8,15 @@ PID_FILE="${REPO_ROOT}/.libris_pids.json"
 
 BACKEND_PORT="${1:-5000}"
 WEB_PORT="${2:-3000}"
-FLUTTER_PORT="${3:-5001}"
-TIMEOUT_SEC="${4:-60}"
+TIMEOUT_SEC="${3:-60}"
 
 mkdir -p "${LOG_DIR}"
 
 echo "=== LIBRIS SPRINT 15 — FULL-STACK DEVELOPMENT LAUNCHER (BASH) ==="
-echo "Target Ports: Backend=${BACKEND_PORT}, Web=${WEB_PORT}, FlutterWeb=${FLUTTER_PORT}"
+echo "Target Ports: Backend=${BACKEND_PORT}, Web=${WEB_PORT}"
 
 # Port check
-for PORT in ${BACKEND_PORT} ${WEB_PORT} ${FLUTTER_PORT}; do
+for PORT in ${BACKEND_PORT} ${WEB_PORT}; do
     if lsof -Pi :${PORT} -sTCP:LISTEN -t >/dev/null 2>&1 ; then
         echo "[FAIL] Port ${PORT} is already occupied."
         exit 1
@@ -45,21 +44,12 @@ echo "[INFO] Starting Next.js Web on 127.0.0.1:${WEB_PORT}..."
 ) &
 WEB_PID=$!
 
-# Start Flutter Web
-echo "[INFO] Starting Flutter Web on 127.0.0.1:${FLUTTER_PORT}..."
-(
-    cd "${REPO_ROOT}/mobile/flutter_app"
-    flutter run -d web-server --web-port ${FLUTTER_PORT} --web-hostname 127.0.0.1 --dart-define=BACKEND_URL="http://127.0.0.1:${BACKEND_PORT}" > "${LOG_DIR}/flutter.log" 2>&1
-) &
-FLUTTER_PID=$!
-
 # Record PIDs
 cat <<EOF > "${PID_FILE}"
 {
   "started_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
   "backend": { "pid": ${BACKEND_PID}, "port": ${BACKEND_PORT}, "log": "${LOG_DIR}/backend.log" },
-  "web": { "pid": ${WEB_PID}, "port": ${WEB_PORT}, "log": "${LOG_DIR}/web.log" },
-  "flutter": { "pid": ${FLUTTER_PID}, "port": ${FLUTTER_PORT}, "log": "${LOG_DIR}/flutter.log" }
+  "web": { "pid": ${WEB_PID}, "port": ${WEB_PORT}, "log": "${LOG_DIR}/web.log" }
 }
 EOF
 
@@ -86,13 +76,11 @@ poll_url() {
 }
 
 poll_url "http://127.0.0.1:${BACKEND_PORT}/api/health" "Backend" 30
-poll_url "http://127.0.0.1:${WEB_PORT}" "Web" 30
-poll_url "http://127.0.0.1:${FLUTTER_PORT}" "Flutter Web" ${TIMEOUT_SEC}
+poll_url "http://127.0.0.1:${WEB_PORT}" "Web" ${TIMEOUT_SEC}
 
 echo ""
-echo "=== LIBRIS — THREE-LINK LOCAL SHOWROOM ==="
+echo "=== LIBRIS — LOCAL DEVELOPMENT STACK ==="
 echo "1. Backend health:               http://127.0.0.1:${BACKEND_PORT}/api/health"
 echo "2. Web application:              http://127.0.0.1:${WEB_PORT}"
-echo "3. Mobile application in Chrome: http://127.0.0.1:${FLUTTER_PORT}"
 echo ""
 echo "To stop: ./scripts/stop_dev.sh"

@@ -14,7 +14,7 @@ import {
   Layers,
   Loader2,
   Sparkles,
-  Compass,
+ 
 } from 'lucide-react';
 import { usePreferences } from '@/components/PreferencesProvider';
 import {
@@ -31,7 +31,6 @@ export interface LearningDashboardProps {
   initialQueue?: ReviewItem[];
   initialHistory?: ReviewAttempt[];
   initialConceptFilter?: string;
-  initialPathId?: string;
 }
 
 export function LearningDashboard({
@@ -39,24 +38,22 @@ export function LearningDashboard({
   initialQueue,
   initialHistory,
   initialConceptFilter,
-  initialPathId,
 }: LearningDashboardProps) {
   const { t } = usePreferences();
   const [progress, setProgress] = useState<LearningProgress | undefined>(initialProgress);
   const [queue, setQueue] = useState<ReviewItem[]>(initialQueue || []);
   const [history, setHistory] = useState<ReviewAttempt[]>(initialHistory || []);
   const [selectedConcept, setSelectedConcept] = useState<string | undefined>(initialConceptFilter);
-  const [selectedPathId, setSelectedPathId] = useState<string | undefined>(initialPathId);
   const [loading, setLoading] = useState<boolean>(!initialProgress || !initialQueue);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'queue' | 'difficult' | 'history'>('queue');
 
-  const loadData = async (conceptFilter?: string, pathFilter?: string) => {
+  const loadData = async (conceptFilter?: string) => {
     try {
       setLoading(true);
       const [progRes, queueRes, histRes] = await Promise.all([
         getLearningOverviewAction(),
-        getLearningQueueAction({ concept: conceptFilter, pathId: pathFilter }),
+        getLearningQueueAction({ concept: conceptFilter }),
         getLearningHistoryAction({ limit: 20 }),
       ]);
 
@@ -78,16 +75,16 @@ export function LearningDashboard({
 
   useEffect(() => {
     let ignore = false;
-    if (initialProgress && initialQueue && !initialConceptFilter && !initialPathId) return;
+    if (initialProgress && initialQueue && !initialConceptFilter) return;
     Promise.resolve().then(() => {
       if (!ignore) {
-        loadData(selectedConcept, selectedPathId);
+        loadData(selectedConcept);
       }
     });
     return () => {
       ignore = true;
     };
-  }, [selectedConcept, selectedPathId, initialConceptFilter, initialPathId, initialProgress, initialQueue]);
+  }, [selectedConcept, initialConceptFilter, initialProgress, initialQueue]);
 
   const handleAttemptSubmitted = (itemId: string) => {
     // Optimistically update queue & refresh progress
@@ -331,7 +328,6 @@ export function LearningDashboard({
           onClick={() => {
             setActiveTab('queue');
             setSelectedConcept(undefined);
-            setSelectedPathId(undefined);
           }}
           className={`px-4 py-2 text-sm font-semibold rounded-t-xl transition-colors flex items-center gap-2 ${
             activeTab === 'queue'
@@ -395,21 +391,6 @@ export function LearningDashboard({
         </div>
       )}
 
-      {/* Selected Path Filter Chip */}
-      {selectedPathId && (
-        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)] text-xs">
-          <Compass className="w-3.5 h-3.5 text-[var(--accent)]" />
-          <span className="text-[var(--text-secondary)]">{t('filter_by_path')}:</span>
-          <span className="font-bold text-[var(--accent)]">{selectedPathId}</span>
-          <button
-            type="button"
-            onClick={() => setSelectedPathId(undefined)}
-            className="ml-auto text-[var(--text-secondary)] hover:text-[var(--text)] font-semibold"
-          >
-            {t('clear_filter')}
-          </button>
-        </div>
-      )}
 
       {/* Loading state */}
       {loading && (
@@ -556,7 +537,6 @@ export function LearningDashboard({
         onClose={() => setIsCreateModalOpen(false)}
         onCreated={handleQuestionCreated}
         initialConcept={selectedConcept}
-        initialPathId={selectedPathId}
       />
     </div>
   );

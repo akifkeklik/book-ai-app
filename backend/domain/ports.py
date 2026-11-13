@@ -94,50 +94,6 @@ class NoteReviewRepository(Protocol):
     def delete_review_by_note_id(self, note_id: str, user_id: str) -> bool: ...
 
 
-class LearningPathRepository(Protocol):
-    """
-    Port for persisting and retrieving user personalized learning paths and ordered book items.
-    """
-    def create_path(
-        self,
-        user_id: str,
-        title: str,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        book_ids: Optional[List[str]] = None,
-    ) -> Dict[str, Any]: ...
-
-    def get_user_paths(
-        self, user_id: str, status: Optional[str] = None
-    ) -> List[Dict[str, Any]]: ...
-
-    def get_path_by_id(self, path_id: str, user_id: str) -> Optional[Dict[str, Any]]: ...
-
-    def update_path(
-        self,
-        path_id: str,
-        user_id: str,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[str] = None,
-        status: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]: ...
-
-    def delete_path(self, path_id: str, user_id: str) -> bool: ...
-
-    def add_book_to_path(
-        self, path_id: str, user_id: str, book_id: str, order_index: Optional[int] = None
-    ) -> Optional[Dict[str, Any]]: ...
-
-    def remove_book_from_path(
-        self, path_id: str, user_id: str, book_id: str
-    ) -> Optional[Dict[str, Any]]: ...
-
-    def reorder_path_books(
-        self, path_id: str, user_id: str, book_ids: List[str]
-    ) -> Optional[Dict[str, Any]]: ...
-
-
 class BookDataPort(Protocol):
     def get_semantic_candidates(self, likes: List[str], limit: int = 100) -> Dict[str, float]: ...
 
@@ -219,57 +175,6 @@ class CatalogPort(Protocol):
 
 class EnrichmentPort(Protocol):
     def enrich(self, books: List[Dict[str, Any]]) -> List[Dict[str, Any]]: ...
-
-
-class KnowledgeGraphRepository(Protocol):
-    """
-    Port for persisting and querying personal knowledge relationships and graph edges.
-    """
-    def create_relationship(
-        self,
-        user_id: str,
-        source_id: str,
-        source_type: str,
-        target_id: str,
-        target_type: str,
-        relationship_type: str,
-        source: str = "user_explicit",
-        evidence_ref: Optional[str] = None,
-        confidence: str = "high",
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]: ...
-
-    def get_user_relationships(
-        self,
-        user_id: str,
-        entity_id: Optional[str] = None,
-        relationship_type: Optional[str] = None,
-        limit: int = 100,
-        offset: int = 0,
-    ) -> List[Dict[str, Any]]: ...
-
-    def get_relationship_by_id(
-        self, relationship_id: str, user_id: str
-    ) -> Optional[Dict[str, Any]]: ...
-
-    def update_relationship(
-        self,
-        relationship_id: str,
-        user_id: str,
-        relationship_type: Optional[str] = None,
-        confidence: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]: ...
-
-    def delete_relationship(self, relationship_id: str, user_id: str) -> bool: ...
-
-    def find_existing_relationship(
-        self,
-        user_id: str,
-        source_id: str,
-        target_id: str,
-        relationship_type: str,
-    ) -> Optional[Dict[str, Any]]: ...
 
 
 class LearningOutcomesRepository(Protocol):

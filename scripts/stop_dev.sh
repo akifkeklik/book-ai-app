@@ -28,11 +28,9 @@ stop_pid() {
 
 BACKEND_PID=$(grep -o '"backend": *{[^}]*' "${PID_FILE}" | grep -o '"pid": *[0-9]*' | grep -o '[0-9]*' || true)
 WEB_PID=$(grep -o '"web": *{[^}]*' "${PID_FILE}" | grep -o '"pid": *[0-9]*' | grep -o '[0-9]*' || true)
-FLUTTER_PID=$(grep -o '"flutter": *{[^}]*' "${PID_FILE}" | grep -o '"pid": *[0-9]*' | grep -o '[0-9]*' || true)
 
 stop_pid "$BACKEND_PID" "Backend"
 stop_pid "$WEB_PID" "Web"
-stop_pid "$FLUTTER_PID" "Flutter Web"
 
 rm -f "${PID_FILE}"
 echo "[PASS] All Libris development services stopped safely."

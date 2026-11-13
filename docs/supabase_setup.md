@@ -15,7 +15,6 @@ Use the environment templates:
 
 - Backend: backend/env.example → backend/.env
 - Web: web/.env.example → web/.env.local
-- Mobile: configure the supported --dart-define values in the Flutter app.
 
 The backend uses SUPABASE_URL and SUPABASE_ANON_KEY. The web app uses NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
 

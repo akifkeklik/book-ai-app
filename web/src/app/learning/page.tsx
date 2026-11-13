@@ -11,12 +11,10 @@ import { Lock, Loader2 } from 'lucide-react';
 function LearningDashboardWithParams() {
   const searchParams = useSearchParams();
   const concept = searchParams.get('concept') || undefined;
-  const pathId = searchParams.get('path_id') || undefined;
 
   return (
     <LearningDashboard
       initialConceptFilter={concept}
-      initialPathId={pathId}
     />
   );
 }

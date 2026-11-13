@@ -11,10 +11,9 @@ This document is the canonical, repository-specific deployment guide for launchi
 | **Backend API** | Render (Free Tier) | [`backend/`](file:///c:/Users/akifk/Desktop/book-ai-app/backend) | Python 3.12 / Flask / Gunicorn |
 | **Web Client** | Netlify (Free Tier) | [`web/`](file:///c:/Users/akifk/Desktop/book-ai-app/web) | Next.js 16 (Turbopack, Server Actions) |
 | **Database & Auth** | Supabase (PostgreSQL 15+) | [`backend/scripts/`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts) | PostgreSQL + `pgvector` (`>= 0.7.0`) |
-| **Mobile App** | Android Release APK | [`mobile/flutter_app/`](file:///c:/Users/akifk/Desktop/book-ai-app/mobile/flutter_app) | Flutter 3.24.3 / Dart |
 
 - **Baseline Commit:** [`6dbac4b638241c40469f6c74655a3dc2f9b1005c`](file:///c:/Users/akifk/Desktop/book-ai-app) (`main`).
-- **CI Status:** 100% passing across all 6 validation pipelines (Docker build, backend tests, web build & lint, mobile analysis, migration validation).
+- **CI Status:** 100% passing across all 6 validation pipelines (Docker build, backend tests, web build & lint, migration validation).
 
 ---
 
@@ -27,7 +26,6 @@ graph LR
     A[1. Supabase Migrations & Backup] --> B[2. Render Backend API]
     B --> C[3. Netlify Web Frontend]
     C --> D[4. Render CORS Sync]
-    B --> E[5. Flutter Android Build]
 ```
 
 1. **Step 1: Supabase Database Verification & Migration**
@@ -45,8 +43,6 @@ graph LR
    - Trigger build and obtain public subdomain (`https://<site-name>.netlify.app`).
 4. **Step 4: Synchronize Backend CORS**
    - In Render dashboard, add the Netlify URL to `ALLOWED_ORIGINS`.
-5. **Step 5: Compile Flutter Android APK**
-   - Run `flutter build apk --release` with compile-time `--dart-define` parameters pointing to the live Render and Supabase URLs.
 
 ---
 
@@ -124,15 +120,12 @@ Generate two distinct tokens:
 | `LIBRIS_API_KEY` | Web | **Yes** | Netlify Environment | `libris_sec_...` (matches Backend) | Backend returns `401 Unauthorized` on server requests. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Web | No | Netlify Environment | `https://<ref>.supabase.co` | Browser client authentication fails. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Web | No (Public JWT) | Netlify Environment | `eyJhbGciOi...` | Browser client authentication fails. |
-| `BACKEND_URL` | Mobile | No | `--dart-define` flag | `https://<app>.onrender.com` | **Fatal Launch Crash**: Throws `StateError` on release launch. |
-| `SUPABASE_URL` | Mobile | No | `--dart-define` flag | `https://<ref>.supabase.co` | **Fatal Launch Crash**: Throws `StateError` on release launch. |
-| `SUPABASE_ANON_KEY` | Mobile | No (Public JWT) | `--dart-define` flag | `eyJhbGciOi...` | **Fatal Launch Crash**: Throws `StateError` on release launch. |
 | `SUPABASE_DB_URL` | Local Dev / Scripts | **Yes** | Local workstation only | `postgresql://postgres:<pw>@aws-0-<region>.pooler.supabase.com:6543/postgres` | Required only when running developer scripts ([`backend/scripts/backfill_embeddings.py`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/backfill_embeddings.py)). **Never** commit to Git or add to Render/Netlify console. |
 
 > [!CAUTION]
 > **Strict `service_role` Secret Isolation:**
 > - The Supabase `service_role` key grants complete administrative bypass over all Row Level Security (RLS) policies.
-> - **NEVER** configure `service_role` in Netlify environment variables (`NEXT_PUBLIC_SUPABASE_ANON_KEY`), mobile builds (`--dart-define SUPABASE_ANON_KEY`), or Render backend environment variables. Exposing it to Netlify or Flutter exposes full database control directly to end users and browsers.
+> - **NEVER** configure `service_role` in Netlify environment variables (`NEXT_PUBLIC_SUPABASE_ANON_KEY`), or Render backend environment variables. Exposing it to Netlify exposes full database control directly to end users and browsers.
 > - Use `service_role` exclusively within a private local terminal session for initial one-off catalog seeding, and ensure it is never persisted to files or version control.
 
 ---
@@ -172,7 +165,7 @@ Execute each file in the Supabase SQL Editor in exact order:
    ```sql
    DO $$
    BEGIN
-       -- 1. Ensure book_title column exists (required by Next.js SSR and Flutter upsert)
+       -- 1. Ensure book_title column exists (required by Next.js SSR and upserts)
        IF NOT EXISTS (
            SELECT 1 FROM information_schema.columns
            WHERE table_schema = 'public' AND table_name = 'favorites' AND column_name = 'book_title'
@@ -335,5 +328,4 @@ Do not invite public beta testers until every gate is verified:
 - [ ] **Gate C (Web):** Netlify deployment active; Next.js 16 SSR and Server Actions execute without browser console errors.
 - [ ] **Gate D (CORS):** Netlify origin configured in Render `ALLOWED_ORIGINS`.
 - [ ] **Gate E (Auth & Sync):** User registration and login succeed; adding a favorite records in `favorites` and triggers synchronization into `user_interactions`.
-- [ ] **Gate F (Mobile):** Android APK built with valid `--dart-define` parameters boots without `StateError` and connects to live services.
 - [ ] **Gate G (Security):** No raw credentials committed to Git or printed in client logs; production `SECRET_KEY` and `LIBRIS_API_KEY` active.

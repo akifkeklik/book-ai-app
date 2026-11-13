@@ -14,7 +14,6 @@ import { usePreferences } from '@/components/PreferencesProvider';
 import { localizeRecommendationReason } from '@/lib/i18n';
 import { SmartReviewWidget } from './SmartReviewWidget';
 import { NotesExportModal } from './NotesExportModal';
-import { LearningPathsDashboard } from './LearningPathsDashboard';
 import {
   BookOpen,
   Trophy,
@@ -632,10 +631,6 @@ export function ReadingJourneyDashboard({
         <SmartReviewWidget />
       </div>
 
-      {/* ── Personalized Learning Paths ───────────────────────────────── */}
-      <div style={{ marginBottom: '1.75rem' }}>
-        <LearningPathsDashboard />
-      </div>
 
       {/* ── Reading Journey Shelves (Tabs & Content) ─────────────────────── */}
       <div>

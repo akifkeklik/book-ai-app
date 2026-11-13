@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { cookies } from "next/headers";
+import { translate } from "@/lib/i18n";
+import { resolveLanguage } from "@/lib/preferences";
 import { AuthProvider } from "@/components/AuthProvider";
 import { PreferencesProvider } from "@/components/PreferencesProvider";
 import { Navbar } from "@/components/Navbar";
@@ -57,20 +60,21 @@ const themeInitScript = `
 })();
 `;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const lang = resolveLanguage((await cookies()).get("libris_lang")?.value);
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={lang} suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0f172a" />
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
-        <a href="#main-content" className="skip-link">Skip to main content</a>
+        <a href="#main-content" className="skip-link">{translate(lang, "skip_content")}</a>
         <PreferencesProvider>
           <AuthProvider>
             <SpotlightSearch />
