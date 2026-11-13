@@ -511,7 +511,7 @@
   "learning_notes": "Notes d'apprentissage",
   "empty_notes_all": "Aucune note pour le moment. Ajoutez une note à un livre pour commencer à bâtir vos connaissances.",
   "note_content_placeholder": "Écrivez votre note...",
-  "delete_note_confirm": "Supprimer cette note ? Cette action est irréversible.",
+  "delete_note_confirm": "Supprimer définitivement cette note ?",
   "settings_language_es": "Espagnol",
   "settings_language_fr": "Français",
   "settings_language_it": "Italien",

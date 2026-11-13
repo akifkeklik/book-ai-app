@@ -511,7 +511,7 @@
   "learning_notes": "Learning Notes",
   "empty_notes_all": "No notes yet. Add a note from any book to start building your knowledge.",
   "note_content_placeholder": "Write your note...",
-  "delete_note_confirm": "Delete this note? This cannot be undone.",
+  "delete_note_confirm": "Permanently delete this note?",
   "settings_language_es": "Spanish",
   "settings_language_fr": "French",
   "settings_language_it": "Italian",

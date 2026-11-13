@@ -511,7 +511,7 @@
   "learning_notes": "Öğrenme Notları",
   "empty_notes_all": "Henüz not yok. Bilgini oluşturmaya başlamak için herhangi bir kitaba not ekle.",
   "note_content_placeholder": "Notunu yaz...",
-  "delete_note_confirm": "Bu not silinsin mi? Bu işlem geri alınamaz.",
+  "delete_note_confirm": "Bu not kalıcı olarak silinsin mi?",
   "settings_language_es": "İspanyolca",
   "settings_language_fr": "Fransızca",
   "settings_language_it": "İtalyanca",

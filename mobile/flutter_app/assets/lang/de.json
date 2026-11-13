@@ -511,7 +511,7 @@
   "learning_notes": "Lernnotizen",
   "empty_notes_all": "Noch keine Notizen. Füge einem Buch eine Notiz hinzu, um dein Wissen aufzubauen.",
   "note_content_placeholder": "Schreibe deine Notiz...",
-  "delete_note_confirm": "Diese Notiz löschen? Dies kann nicht rückgängig gemacht werden.",
+  "delete_note_confirm": "Diese Notiz endgültig löschen?",
   "settings_language_es": "Spanisch",
   "settings_language_fr": "Französisch",
   "settings_language_it": "Italienisch",

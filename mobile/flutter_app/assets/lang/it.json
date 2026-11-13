@@ -511,7 +511,7 @@
   "learning_notes": "Note di apprendimento",
   "empty_notes_all": "Nessuna nota. Aggiungi una nota a un libro per iniziare a costruire la tua conoscenza.",
   "note_content_placeholder": "Scrivi la tua nota...",
-  "delete_note_confirm": "Eliminare questa nota? L'azione non può essere annullata.",
+  "delete_note_confirm": "Eliminare definitivamente questa nota?",
   "settings_language_es": "Spagnolo",
   "settings_language_fr": "Francese",
   "settings_language_it": "Italiano",

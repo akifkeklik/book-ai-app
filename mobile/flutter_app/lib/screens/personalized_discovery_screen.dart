@@ -1316,41 +1316,48 @@ class _PersonalizedDiscoveryScreenState
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     if (_activeJourneyShelfTab == 'want_to_read')
-                      InkWell(
+                      Flexible(child: InkWell(
                         onTap: () => _updateReadingStatus(book, 'reading'),
                         child: Text(
                           context.tr('start_reading'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: theme.colorScheme.primary,
                           ),
                         ),
-                      )
+                      ))
                     else if (_activeJourneyShelfTab == 'reading')
-                      InkWell(
+                      Flexible(child: InkWell(
                         onTap: () => _updateReadingStatus(book, 'finished'),
                         child: Text(
                           context.tr('mark_as_finished_action'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: DesignSystem.statusFinished,
                           ),
                         ),
-                      )
+                      ))
                     else
-                      InkWell(
+                      Flexible(child: InkWell(
                         onTap: () => _updateReadingStatus(book, 'reading'),
                         child: Text(
                           context.tr('re_read'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: theme.colorScheme.primary,
                           ),
                         ),
-                      ),
+                      )),
+                    const SizedBox(width: 6),
                     InkWell(
                       onTap: () => _updateReadingStatus(book, 'clear'),
                       child: Icon(
