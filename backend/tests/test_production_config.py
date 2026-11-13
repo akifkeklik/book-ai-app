@@ -26,6 +26,10 @@ class ValidProdConfig(Config):
     LIBRIS_API_KEY = "test-api-key"
     NUM_PROXIES = 1
     ALLOWED_ORIGINS = ["https://app.example.com"]
+    ALLOW_IN_MEMORY_REPOSITORIES = True
+
+class VolatileRepositoriesProdConfig(ValidProdConfig):
+    ALLOW_IN_MEMORY_REPOSITORIES = False
 
 class WildcardCorsProdConfig(ValidProdConfig):
     ALLOWED_ORIGINS = ["*"]
@@ -102,6 +106,31 @@ def test_production_fails_when_api_key_is_dev_secret():
 def test_production_rejects_wildcard_cors_origins():
     with pytest.raises(ValueError, match="ALLOWED_ORIGINS must contain explicit trusted origins"):
         create_app(WildcardCorsProdConfig)
+
+def test_production_rejects_in_memory_repositories(monkeypatch):
+    from backend.container import container
+    from backend.infrastructure.persistence.in_memory_note_repository import (
+        InMemoryNoteReviewRepository,
+    )
+
+    monkeypatch.setattr(container, "note_review_repo", InMemoryNoteReviewRepository())
+    with pytest.raises(ValueError, match="volatile in-memory repositories.*note_review_repo"):
+        create_app(VolatileRepositoriesProdConfig)
+
+def test_production_permits_in_memory_repositories_only_with_explicit_opt_in(monkeypatch):
+    from backend.container import container
+    from backend.infrastructure.persistence.in_memory_note_repository import (
+        InMemoryNoteReviewRepository,
+    )
+
+    monkeypatch.setattr(container, "note_review_repo", InMemoryNoteReviewRepository())
+    assert create_app(ValidProdConfig) is not None
+
+def test_production_starts_when_all_repositories_are_persistent(monkeypatch):
+    from backend.container import container
+
+    monkeypatch.setattr(container, "in_memory_repositories", lambda: [])
+    assert create_app(VolatileRepositoriesProdConfig) is not None
 
 def test_production_succeeds_with_strong_secret():
     app = create_app(ValidProdConfig)

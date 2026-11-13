@@ -10,7 +10,9 @@ from dotenv import load_dotenv
 
 # Always load .env from the backend directory, regardless of CWD
 _ENV_FILE = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=_ENV_FILE, override=True)
+# Real environment variables (platform/CI/shell) take precedence over the local .env file,
+# so a stray .env in a deployed image can never override platform configuration.
+load_dotenv(dotenv_path=_ENV_FILE, override=False)
 
 
 class Config:
@@ -67,6 +69,10 @@ class Config:
 
     # ── Direct PostgreSQL / Local Integration ─────────────────────────────────
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+
+    # Volatile in-memory repositories lose user data on restart. Production startup refuses
+    # them unless this is explicitly enabled (disposable local/demo stacks only).
+    ALLOW_IN_MEMORY_REPOSITORIES: bool = os.getenv("ALLOW_IN_MEMORY_REPOSITORIES", "False").lower() == "true"
 
     # ── ML Settings ───────────────────────────────────────────────────────────
     TOP_N_RECOMMENDATIONS: int = int(os.getenv("TOP_N_RECOMMENDATIONS", "10"))
