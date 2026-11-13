@@ -6,7 +6,7 @@ pandas~=2.2.2
 scipy~=1.17.1
 python-dotenv==1.2.4
 requests==2.34.2
-gunicorn==21.2.0
+gunicorn==27.0.0
 pytest==8.1.1
 supabase~=2.3.0
 psycopg2-binary~=2.9.9
