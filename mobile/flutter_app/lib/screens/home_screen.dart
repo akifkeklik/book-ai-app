@@ -15,6 +15,7 @@ import '../widgets/book_card.dart';
 import '../widgets/skeleton_loader.dart';
 import '../widgets/saas_widgets.dart';
 import '../providers/language_provider.dart';
+import '../providers/learning_provider.dart';
 import '../theme/design_system.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -58,6 +59,8 @@ class _HomeScreenState extends State<HomeScreen> {
     catalog.fetchPopular();
     if (auth.isLoggedIn && auth.currentUser != null) {
       final uid = auth.currentUser!.id;
+      // Due-review count drives the home card and the bottom-nav badge.
+      context.read<LearningProvider>().loadOverview();
       await favs.loadFavorites(uid);
       if (!mounted || auth.currentUser?.id != uid) return;
 
@@ -196,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         tooltip: context.tr('nav_learning'),
                         onPressed: () {
                           HapticFeedback.lightImpact();
-                          context.push('/learning');
+                          context.go('/learning');
                         },
                       ),
                       const SizedBox(width: DesignSystem.spacing8),
@@ -211,6 +214,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: DesignSystem.spacing16),
                     ],
                   ),
+
+                  // ── Today's Review (core loop) ─────────────────────────────────
+                  if (auth.isLoggedIn)
+                    const SliverToBoxAdapter(child: _TodayReviewCard()),
 
                   // ── AI Discovery Banner ────────────────────────────────────────
                   SliverToBoxAdapter(
@@ -758,6 +765,63 @@ class _HorizontalRecs extends StatelessWidget {
                 const SizedBox(width: DesignSystem.spacing16),
             ]
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Puts the core habit first: how many recall cards are due today, one tap to start.
+class _TodayReviewCard extends StatelessWidget {
+  const _TodayReviewCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final due = context.watch<LearningProvider>().reviewsDue;
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Material(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          key: const Key('today_review_card'),
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => context.go('/learning'),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.psychology, color: scheme.onPrimaryContainer, size: 32),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    due > 0
+                        ? context.tr('smart_review_due_count', args: {'count': '$due'})
+                        : context.tr('smart_review_empty'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: scheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+                if (due > 0) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      context.tr('start_review_button'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: scheme.onPrimaryContainer),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );

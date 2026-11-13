@@ -553,5 +553,6 @@
   "ui_user": "Utente",
   "ui_app_version": "Libris v{version}",
   "ui_splash_tagline": "Ricorda ciò che leggi",
-  "no_response": "Il bibliotecario IA non ha restituito alcuna risposta. Riprova."
+  "no_response": "Il bibliotecario IA non ha restituito alcuna risposta. Riprova.",
+  "nav_review": "Ripassa"
 }

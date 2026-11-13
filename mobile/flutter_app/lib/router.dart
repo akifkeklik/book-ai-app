@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import 'domain/entities/book.dart';
 import 'providers/auth_provider.dart';
 import 'providers/language_provider.dart';
+import 'providers/learning_provider.dart';
 import 'screens/categories_screen.dart';
 import 'screens/category_timeline_screen.dart';
 import 'screens/detail_screen.dart';
@@ -91,6 +93,15 @@ class AppRouter {
               ),
             ),
             GoRoute(
+              path: '/learning',
+              pageBuilder: (context, state) => CustomTransitionPage(
+                child: const LearningScreen(),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) =>
+                        FadeTransition(opacity: animation, child: child),
+              ),
+            ),
+            GoRoute(
               path: '/favorites',
               pageBuilder: (context, state) => CustomTransitionPage(
                 child: const FavoritesScreen(),
@@ -112,10 +123,6 @@ class AppRouter {
         GoRoute(
           path: '/knowledge-graph',
           builder: (context, state) => const KnowledgeGraphScreen(),
-        ),
-        GoRoute(
-          path: '/learning',
-          builder: (context, state) => const LearningScreen(),
         ),
         GoRoute(
           path: '/settings',
@@ -168,8 +175,8 @@ class _ScaffoldWithNav extends StatelessWidget {
   final Widget child;
 
   int _indexFor(String location) {
-    if (location.startsWith('/categories')) return 1;
-    if (location.startsWith('/search')) return 2;
+    if (location.startsWith('/search') || location.startsWith('/categories')) return 1;
+    if (location.startsWith('/learning')) return 2;
     if (location.startsWith('/favorites')) return 3;
     return 0;
   }
@@ -189,10 +196,10 @@ class _ScaffoldWithNav extends StatelessWidget {
               context.go('/');
               break;
             case 1:
-              context.go('/categories');
+              context.go('/search');
               break;
             case 2:
-              context.go('/search');
+              context.go('/learning');
               break;
             case 3:
               context.go('/favorites');
@@ -206,14 +213,14 @@ class _ScaffoldWithNav extends StatelessWidget {
             label: context.tr('home'),
           ),
           NavigationDestination(
-            icon: const Icon(Icons.explore_outlined),
-            selectedIcon: const Icon(Icons.explore),
-            label: context.tr('categories'),
-          ),
-          NavigationDestination(
             icon: const Icon(Icons.search_outlined),
             selectedIcon: const Icon(Icons.search),
             label: context.tr('search'),
+          ),
+          NavigationDestination(
+            icon: const _ReviewBadge(child: Icon(Icons.psychology_outlined)),
+            selectedIcon: const _ReviewBadge(child: Icon(Icons.psychology)),
+            label: context.tr('nav_review'),
           ),
           NavigationDestination(
             icon: const Icon(Icons.bookmark_outline),
@@ -222,6 +229,22 @@ class _ScaffoldWithNav extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Shows how many recall reviews are due, so the core habit is always one tap away.
+class _ReviewBadge extends StatelessWidget {
+  const _ReviewBadge({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final due = context.watch<LearningProvider>().reviewsDue;
+    return Badge(
+      isLabelVisible: due > 0,
+      label: Text(due > 99 ? '99+' : '$due'),
+      child: child,
     );
   }
 }
