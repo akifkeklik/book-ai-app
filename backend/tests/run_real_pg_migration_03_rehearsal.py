@@ -688,45 +688,45 @@ def main():
         )
 
         # ----------------------------------------------------------------------
-        # STEP 11: FLUTTER MOBILE CLIENT CONTRACT SIMULATION (supabase_service.dart)
+        # STEP 11: DIRECT SUPABASE CLIENT CONTRACT SIMULATION
         # ----------------------------------------------------------------------
-        print("\n[11. FLUTTER MOBILE CLIENT CONTRACT SIMULATION] Testing mobile client favorites data flow...")
-        u_flutter = "88888888-8888-8888-8888-888888888888"
-        b_flut1 = "9783000000001"
-        b_flut2 = "9783000000002"
-        cur.execute(f"INSERT INTO auth.users (id, email) VALUES ('{u_flutter}', 'flutter@libris.test');")
+        print("\n[11. DIRECT SUPABASE CLIENT CONTRACT SIMULATION] Testing direct-client favorites data flow...")
+        u_direct = "88888888-8888-8888-8888-888888888888"
+        b_direct1 = "9783000000001"
+        b_direct2 = "9783000000002"
+        cur.execute(f"INSERT INTO auth.users (id, email) VALUES ('{u_direct}', 'direct@libris.test');")
         cur.execute(f"""
             INSERT INTO public.books (isbn13, title) VALUES
-                ('{b_flut1}', 'Flutter Book 1'),
-                ('{b_flut2}', 'Flutter Book 2')
+                ('{b_direct1}', 'Direct Book 1'),
+                ('{b_direct2}', 'Direct Book 2')
             ON CONFLICT DO NOTHING;
         """)
 
-        # User is reading Flutter Book 2
-        cur.execute(f"INSERT INTO public.user_interactions (user_id, book_id, interaction_type) VALUES ('{u_flutter}', '{b_flut2}', 'reading');")
+        # User is reading Direct Book 2
+        cur.execute(f"INSERT INTO public.user_interactions (user_id, book_id, interaction_type) VALUES ('{u_direct}', '{b_direct2}', 'reading');")
 
-        # Flutter calls addFavorite(b_flut1) and addFavorite(b_flut2)
+        # Client calls addFavorite(b_direct1) and addFavorite(b_direct2)
         cur.execute(f"""
             INSERT INTO public.favorites (user_id, book_id, book_title) VALUES
-                ('{u_flutter}', '{b_flut1}', 'Flutter Book 1'),
-                ('{u_flutter}', '{b_flut2}', 'Flutter Book 2')
+                ('{u_direct}', '{b_direct1}', 'Direct Book 1'),
+                ('{u_direct}', '{b_direct2}', 'Direct Book 2')
             ON CONFLICT (user_id, book_id) DO NOTHING;
         """)
 
-        # Flutter queries favorites (supabase_service.dart getFavorites)
-        cur.execute(f"SELECT book_id FROM public.favorites WHERE user_id = '{u_flutter}' ORDER BY book_id;")
+        # Client queries favorites
+        cur.execute(f"SELECT book_id FROM public.favorites WHERE user_id = '{u_direct}' ORDER BY book_id;")
         flut_favs = [r[0] for r in cur.fetchall()]
 
-        # Flutter calls removeFavorite(b_flut2)
-        cur.execute(f"DELETE FROM public.favorites WHERE user_id = '{u_flutter}' AND book_id = '{b_flut2}';")
+        # Client calls removeFavorite(b_direct2)
+        cur.execute(f"DELETE FROM public.favorites WHERE user_id = '{u_direct}' AND book_id = '{b_direct2}';")
 
-        # Verify b_flut2 in user_interactions remains 'reading'
-        cur.execute(f"SELECT interaction_type FROM public.user_interactions WHERE user_id = '{u_flutter}' AND book_id = '{b_flut2}';")
+        # Verify b_direct2 in user_interactions remains 'reading'
+        cur.execute(f"SELECT interaction_type FROM public.user_interactions WHERE user_id = '{u_direct}' AND book_id = '{b_direct2}';")
         flut_rem_b2 = cur.fetchone()[0]
 
         record(
-            "Flutter Mobile Contract & Trigger Interop",
-            flut_favs == [b_flut1, b_flut2] and flut_rem_b2 == 'reading',
+            "Direct Client Contract & Trigger Interop",
+            flut_favs == [b_direct1, b_direct2] and flut_rem_b2 == 'reading',
             f"Favorites queried={flut_favs}; removing favorite from mobile preserved user_interactions status='{flut_rem_b2}'!"
         )
 

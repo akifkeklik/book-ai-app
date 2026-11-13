@@ -68,12 +68,6 @@ def test_pid_file_structure_validation():
             "port": 3000,
             "log": ".logs/web.log",
             "url": "http://127.0.0.1:3000"
-        },
-        "flutter": {
-            "pid": 9012,
-            "port": 5001,
-            "log": ".logs/flutter.log",
-            "url": "http://127.0.0.1:5001"
         }
     }
 
@@ -82,7 +76,7 @@ def test_pid_file_structure_validation():
 
     assert "backend" in deserialized
     assert "web" in deserialized
-    assert "flutter" in deserialized
+    assert "flutter" not in deserialized  # web-only stack
     assert deserialized["backend"]["pid"] == 1234
     assert deserialized["backend"]["port"] == 5000
     assert "book-ai-api" not in deserialized  # PIDs only, no leaked secrets or configs

@@ -55,21 +55,7 @@ _get_review_stats_uc = getattr(container, "get_review_stats_uc", None)
 _process_review_uc = getattr(container, "process_review_uc", None)
 _update_review_settings_uc = getattr(container, "update_review_settings_uc", None)
 _export_notes_uc = getattr(container, "export_notes_uc", None)
-_create_learning_path_uc = getattr(container, "create_learning_path_uc", None)
-_get_user_learning_paths_uc = getattr(container, "get_user_learning_paths_uc", None)
-_get_learning_path_detail_uc = getattr(container, "get_learning_path_detail_uc", None)
-_update_learning_path_uc = getattr(container, "update_learning_path_uc", None)
-_delete_learning_path_uc = getattr(container, "delete_learning_path_uc", None)
-_add_book_to_path_uc = getattr(container, "add_book_to_path_uc", None)
-_remove_book_from_path_uc = getattr(container, "remove_book_from_path_uc", None)
-_reorder_path_books_uc = getattr(container, "reorder_path_books_uc", None)
-_generate_path_suggestions_uc = getattr(container, "generate_path_suggestions_uc", None)
 _reset_preferences_uc = getattr(container, "reset_preferences_uc", None)
-_get_knowledge_graph_uc = getattr(container, "get_knowledge_graph_uc", None)
-_create_relationship_uc = getattr(container, "create_relationship_uc", None)
-_update_relationship_uc = getattr(container, "update_relationship_uc", None)
-_delete_relationship_uc = getattr(container, "delete_relationship_uc", None)
-_get_neighbors_uc = getattr(container, "get_neighbors_uc", None)
 _get_review_queue_uc = getattr(container, "get_review_queue_uc", None)
 _submit_review_attempt_uc = getattr(container, "submit_review_attempt_uc", None)
 _get_learning_overview_uc = getattr(container, "get_learning_overview_uc", None)
@@ -88,10 +74,7 @@ def rebind_container(new_container):
     global _update_preferences_uc, _submit_feedback_uc, _track_activity_uc, _process_rag_query_uc
     global _create_note_uc, _get_notes_uc, _get_note_by_id_uc, _update_note_uc, _delete_note_uc
     global _get_due_reviews_uc, _get_review_stats_uc, _process_review_uc, _update_review_settings_uc, _export_notes_uc
-    global _create_learning_path_uc, _get_user_learning_paths_uc, _get_learning_path_detail_uc
-    global _update_learning_path_uc, _delete_learning_path_uc, _add_book_to_path_uc
-    global _remove_book_from_path_uc, _reorder_path_books_uc, _generate_path_suggestions_uc, _reset_preferences_uc
-    global _get_knowledge_graph_uc, _create_relationship_uc, _update_relationship_uc, _delete_relationship_uc, _get_neighbors_uc
+    global _reset_preferences_uc
     global _get_review_queue_uc, _submit_review_attempt_uc, _get_learning_overview_uc
     global _get_review_history_uc, _create_review_item_uc, _update_review_item_uc
     global _delete_review_item_uc, _get_concept_outcomes_uc
@@ -121,21 +104,7 @@ def rebind_container(new_container):
     _process_review_uc = getattr(new_container, "process_review_uc", None)
     _update_review_settings_uc = getattr(new_container, "update_review_settings_uc", None)
     _export_notes_uc = getattr(new_container, "export_notes_uc", None)
-    _create_learning_path_uc = getattr(new_container, "create_learning_path_uc", None)
-    _get_user_learning_paths_uc = getattr(new_container, "get_user_learning_paths_uc", None)
-    _get_learning_path_detail_uc = getattr(new_container, "get_learning_path_detail_uc", None)
-    _update_learning_path_uc = getattr(new_container, "update_learning_path_uc", None)
-    _delete_learning_path_uc = getattr(new_container, "delete_learning_path_uc", None)
-    _add_book_to_path_uc = getattr(new_container, "add_book_to_path_uc", None)
-    _remove_book_from_path_uc = getattr(new_container, "remove_book_from_path_uc", None)
-    _reorder_path_books_uc = getattr(new_container, "reorder_path_books_uc", None)
-    _generate_path_suggestions_uc = getattr(new_container, "generate_path_suggestions_uc", None)
     _reset_preferences_uc = getattr(new_container, "reset_preferences_uc", None)
-    _get_knowledge_graph_uc = getattr(new_container, "get_knowledge_graph_uc", None)
-    _create_relationship_uc = getattr(new_container, "create_relationship_uc", None)
-    _update_relationship_uc = getattr(new_container, "update_relationship_uc", None)
-    _delete_relationship_uc = getattr(new_container, "delete_relationship_uc", None)
-    _get_neighbors_uc = getattr(new_container, "get_neighbors_uc", None)
     _get_review_queue_uc = getattr(new_container, "get_review_queue_uc", None)
     _submit_review_attempt_uc = getattr(new_container, "submit_review_attempt_uc", None)
     _get_learning_overview_uc = getattr(new_container, "get_learning_overview_uc", None)
@@ -411,7 +380,6 @@ def _safe_execute_personalized_recommendations(
     limit: int,
     category=None,
     exclude_completed: bool = False,
-    path_id=None,
     include_diagnostics: bool = True,
 ):
     """
@@ -440,7 +408,6 @@ def _safe_execute_personalized_recommendations(
                 limit=limit,
                 category=category,
                 exclude_completed=exclude_completed,
-                path_id=path_id,
                 include_diagnostics=include_diagnostics,
             )
 
@@ -450,7 +417,6 @@ def _safe_execute_personalized_recommendations(
             "limit": limit,
             "category": category,
             "exclude_completed": exclude_completed,
-            "path_id": path_id,
             "include_diagnostics": include_diagnostics,
         }
         for k, v in target_kwargs.items():
@@ -466,7 +432,6 @@ def _safe_execute_personalized_recommendations(
             limit=limit,
             category=category,
             exclude_completed=exclude_completed,
-            path_id=path_id,
             include_diagnostics=include_diagnostics,
         )
     except TypeError as exc:
@@ -488,7 +453,6 @@ def get_personalized():
         if category:
             category = category.strip()
         exclude_completed = request.args.get("exclude_completed", "false").lower() in ("true", "1", "yes")
-        path_id = request.args.get("path_id", "").strip() or None
         include_diagnostics = request.args.get("diagnostics", "false").lower() in ("true", "1", "yes")
 
         result = _safe_execute_personalized_recommendations(
@@ -497,7 +461,6 @@ def get_personalized():
             limit=limit,
             category=category,
             exclude_completed=exclude_completed,
-            path_id=path_id,
             include_diagnostics=True,
         )
 
@@ -1386,455 +1349,6 @@ def export_notes():
 
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Personalized Learning Paths & Progress Intelligence Endpoints
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-@activity_bp.route("/learning-paths", methods=["GET"])
-@require_auth
-def get_learning_paths():
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    status = request.args.get("status")
-    try:
-        paths = _get_user_learning_paths_uc.execute(user_id=user_id, status=status)
-        return jsonify({"status": "success", "paths": paths, "total": len(paths)}), 200
-    except Exception as exc:
-        logger.error(f"Error fetching learning paths for {user_id}: {exc}")
-        return jsonify({"error": "Failed to fetch learning paths"}), 500
-
-
-@activity_bp.route("/learning-paths", methods=["POST"])
-@require_auth
-def create_learning_path():
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    payload = request.get_json(silent=True) or {}
-    if not isinstance(payload, dict):
-        return jsonify({"error": "JSON body required"}), 400
-    title = payload.get("title")
-    if not title or not str(title).strip():
-        return jsonify({"error": "title is required"}), 400
-
-    description = payload.get("description", "")
-    category = payload.get("category", "")
-    book_ids = payload.get("book_ids", [])
-    if not isinstance(book_ids, list):
-        return jsonify({"error": "book_ids must be a list"}), 400
-    if len(book_ids) > 100:
-        return jsonify({"error": "book_ids list exceeds maximum allowed length of 100"}), 400
-
-    try:
-        created = _create_learning_path_uc.execute(
-            user_id=user_id,
-            title=title,
-            description=description,
-            category=category,
-            book_ids=book_ids,
-        )
-        return jsonify({"status": "success", "path": created}), 201
-    except ValueError as val_err:
-        return jsonify({"error": str(val_err)}), 400
-    except Exception as exc:
-        logger.error(f"Error creating learning path: {exc}")
-        return jsonify({"error": "Failed to create learning path"}), 500
-
-
-@activity_bp.route("/learning-paths/<path_id>", methods=["GET"])
-@require_auth
-def get_learning_path(path_id):
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    try:
-        path = _get_learning_path_detail_uc.execute(path_id=path_id, user_id=user_id)
-        if not path:
-            return jsonify({"error": "Learning path not found"}), 404
-        return jsonify({"status": "success", "path": path}), 200
-    except Exception as exc:
-        logger.error(f"Error fetching path {path_id}: {exc}")
-        return jsonify({"error": "Failed to fetch learning path"}), 500
-
-
-@activity_bp.route("/learning-paths/<path_id>", methods=["PUT"])
-@require_auth
-def update_learning_path(path_id):
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    payload = request.get_json(silent=True) or {}
-    title = payload.get("title")
-    description = payload.get("description")
-    category = payload.get("category")
-    status = payload.get("status")
-
-    try:
-        updated = _update_learning_path_uc.execute(
-            path_id=path_id,
-            user_id=user_id,
-            title=title,
-            description=description,
-            category=category,
-            status=status,
-        )
-        if not updated:
-            return jsonify({"error": "Learning path not found or access denied"}), 404
-        return jsonify({"status": "success", "path": updated}), 200
-    except ValueError as val_err:
-        return jsonify({"error": str(val_err)}), 400
-    except Exception as exc:
-        logger.error(f"Error updating path {path_id}: {exc}")
-        return jsonify({"error": "Failed to update learning path"}), 500
-
-
-@activity_bp.route("/learning-paths/<path_id>", methods=["DELETE"])
-@require_auth
-def delete_learning_path(path_id):
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    try:
-        deleted = _delete_learning_path_uc.execute(path_id=path_id, user_id=user_id)
-        if not deleted:
-            return jsonify({"error": "Learning path not found or access denied"}), 404
-        return jsonify({"status": "success", "deleted": True}), 200
-    except Exception as exc:
-        logger.error(f"Error deleting path {path_id}: {exc}")
-        return jsonify({"error": "Failed to delete learning path"}), 500
-
-
-@activity_bp.route("/learning-paths/<path_id>/books", methods=["POST"])
-@require_auth
-def add_book_to_learning_path(path_id):
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    payload = request.get_json(silent=True) or {}
-    if not isinstance(payload, dict):
-        return jsonify({"error": "JSON body required"}), 400
-    book_id = payload.get("book_id")
-    if not book_id or not str(book_id).strip():
-        return jsonify({"error": "book_id is required"}), 400
-    if len(str(book_id).strip()) > 64:
-        return jsonify({"error": "book_id exceeds maximum length of 64"}), 400
-    order_index = payload.get("order_index")
-
-    try:
-        updated = _add_book_to_path_uc.execute(
-            path_id=path_id,
-            user_id=user_id,
-            book_id=book_id,
-            order_index=order_index,
-        )
-        if not updated:
-            return jsonify({"error": "Learning path not found or access denied"}), 404
-        return jsonify({"status": "success", "path": updated}), 200
-    except ValueError as val_err:
-        return jsonify({"error": str(val_err)}), 400
-    except Exception as exc:
-        logger.error(f"Error adding book to path {path_id}: {exc}")
-        return jsonify({"error": "Failed to add book to learning path"}), 500
-
-
-@activity_bp.route("/learning-paths/<path_id>/books/<book_id>", methods=["DELETE"])
-@require_auth
-def remove_book_from_learning_path(path_id, book_id):
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    try:
-        updated = _remove_book_from_path_uc.execute(
-            path_id=path_id,
-            user_id=user_id,
-            book_id=book_id,
-        )
-        if not updated:
-            return jsonify({"error": "Learning path not found or access denied"}), 404
-        return jsonify({"status": "success", "path": updated}), 200
-    except Exception as exc:
-        logger.error(f"Error removing book {book_id} from path {path_id}: {exc}")
-        return jsonify({"error": "Failed to remove book from learning path"}), 500
-
-
-@activity_bp.route("/learning-paths/<path_id>/reorder", methods=["PUT"])
-@require_auth
-def reorder_learning_path_books(path_id):
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    payload = request.get_json(silent=True) or {}
-    if not isinstance(payload, dict):
-        return jsonify({"error": "JSON body required"}), 400
-    book_ids = payload.get("book_ids")
-    if not isinstance(book_ids, list):
-        return jsonify({"error": "book_ids list is required"}), 400
-    if len(book_ids) > 100:
-        return jsonify({"error": "book_ids list exceeds maximum allowed length of 100"}), 400
-
-    try:
-        updated = _reorder_path_books_uc.execute(
-            path_id=path_id,
-            user_id=user_id,
-            book_ids=book_ids,
-        )
-        if not updated:
-            return jsonify({"error": "Learning path not found or access denied"}), 404
-        return jsonify({"status": "success", "path": updated}), 200
-    except ValueError as val_err:
-        return jsonify({"error": str(val_err)}), 400
-    except Exception as exc:
-        logger.error(f"Error reordering books for path {path_id}: {exc}")
-        return jsonify({"error": "Failed to reorder books"}), 500
-
-
-@activity_bp.route("/learning-paths/<path_id>/recommendations", methods=["GET"])
-@require_auth
-def get_learning_path_recommendations(path_id):
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    limit = _parse_int_param(request.args.get("limit"), default=10, min_val=1, max_val=50)
-    exclude_completed = request.args.get("exclude_completed", "true").lower() in ("true", "1", "yes")
-
-    try:
-        suggestions = _generate_path_suggestions_uc.execute(
-            user_id=user_id,
-            path_id=path_id,
-            limit=limit,
-            exclude_completed=exclude_completed,
-        )
-        return jsonify({
-            "status": "success",
-            "path_id": path_id,
-            "suggestions": suggestions,
-            "total": len(suggestions),
-        }), 200
-    except Exception as exc:
-        logger.error(f"Error generating learning path recommendations: {exc}")
-        return jsonify({"error": "Failed to generate path recommendations"}), 500
-
-
-@activity_bp.route("/learning-paths/suggestions", methods=["GET"])
-@require_auth
-def get_learning_path_suggestions():
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    category = request.args.get("category")
-    query = request.args.get("q")
-    path_id = request.args.get("path_id")
-    limit = _parse_int_param(request.args.get("limit"), default=10, min_val=1, max_val=50)
-    exclude_completed = request.args.get("exclude_completed", "true").lower() in ("true", "1", "yes")
-
-    try:
-        suggestions = _generate_path_suggestions_uc.execute(
-            user_id=user_id,
-            category=category,
-            query=query,
-            limit=limit,
-            path_id=path_id,
-            exclude_completed=exclude_completed,
-        )
-        return jsonify({"status": "success", "suggestions": suggestions, "total": len(suggestions)}), 200
-    except Exception as exc:
-        logger.error(f"Error generating learning path suggestions: {exc}")
-        return jsonify({"error": "Failed to generate suggestions"}), 500
-
-
-# =============================================================================
-# Personal Knowledge Graph Endpoints
-# =============================================================================
-
-
-@activity_bp.route("/knowledge-graph", methods=["GET"])
-@require_auth
-def get_personal_knowledge_graph():
-    """
-    Returns the authenticated reader's personal knowledge graph.
-    Supports focus_id (neighborhood subgraph), depth (1-3), limit, and type filters.
-    """
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    focus_id = request.args.get("focus_id")
-    depth = _parse_int_param(request.args.get("depth"), default=1, min_val=1, max_val=3)
-    limit = _parse_int_param(request.args.get("limit"), default=100, min_val=1, max_val=300)
-    node_type_filter = request.args.get("type") or request.args.get("node_type")
-    relationship_type_filter = request.args.get("relationship_type")
-
-    try:
-        graph_data = _get_knowledge_graph_uc.execute(
-            user_id=user_id,
-            focus_id=focus_id,
-            depth=depth,
-            limit=limit,
-            node_type_filter=node_type_filter,
-            relationship_type_filter=relationship_type_filter,
-        )
-        return jsonify({"status": "success", **graph_data.model_dump()}), 200
-    except Exception as exc:
-        logger.error(f"Error fetching knowledge graph for user {user_id}: {exc}")
-        return jsonify({"error": "Failed to fetch knowledge graph"}), 500
-
-
-@activity_bp.route("/knowledge-graph/relationships", methods=["POST"])
-@require_auth
-def create_knowledge_relationship():
-    """
-    Creates an evidence-backed relationship between two knowledge entities.
-    Strictly validates user ownership, prevent cycles, and ensures idempotency.
-    """
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    payload = request.get_json(silent=True)
-    if not payload or not isinstance(payload, dict):
-        return jsonify({"error": "JSON body required"}), 400
-
-    source_id = payload.get("source_id")
-    source_type = payload.get("source_type")
-    target_id = payload.get("target_id")
-    target_type = payload.get("target_type")
-    relationship_type = payload.get("relationship_type")
-    source = payload.get("source", "user_explicit")
-    evidence_ref = payload.get("evidence_ref")
-    confidence = payload.get("confidence", "high")
-    metadata = payload.get("metadata", {})
-
-    if not source_id or not target_id or not source_type or not target_type or not relationship_type:
-        return jsonify({"error": "source_id, source_type, target_id, target_type, and relationship_type are required"}), 400
-
-    try:
-        created = _create_relationship_uc.execute(
-            user_id=user_id,
-            source_id=source_id,
-            source_type=source_type,
-            target_id=target_id,
-            target_type=target_type,
-            relationship_type=relationship_type,
-            source=source,
-            evidence_ref=evidence_ref,
-            confidence=confidence,
-            metadata=metadata,
-        )
-        return jsonify({"status": "success", "relationship": created}), 201
-    except ValueError as val_err:
-        return jsonify({"error": str(val_err)}), 400
-    except PermissionError as perm_err:
-        return jsonify({"error": str(perm_err)}), 403
-    except Exception as exc:
-        logger.error(f"Error creating relationship: {exc}")
-        return jsonify({"error": "Failed to create relationship"}), 500
-
-
-@activity_bp.route("/knowledge-graph/relationships/<relationship_id>", methods=["GET"])
-@require_auth
-def get_knowledge_relationship(relationship_id: str):
-    """
-    Fetches a single relationship by ID with strict ownership validation.
-    """
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    rel = container.knowledge_repo.get_relationship_by_id(relationship_id, user_id)
-    if not rel:
-        return jsonify({"error": "Relationship not found"}), 404
-
-    return jsonify({"status": "success", "relationship": rel}), 200
-
-
-@activity_bp.route("/knowledge-graph/relationships/<relationship_id>", methods=["PUT", "PATCH"])
-@require_auth
-def update_knowledge_relationship(relationship_id: str):
-    """
-    Updates relationship properties (relationship_type, confidence, metadata).
-    """
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    payload = request.get_json(silent=True) or {}
-    relationship_type = payload.get("relationship_type")
-    confidence = payload.get("confidence")
-    metadata = payload.get("metadata")
-
-    try:
-        updated = _update_relationship_uc.execute(
-            relationship_id=relationship_id,
-            user_id=user_id,
-            relationship_type=relationship_type,
-            confidence=confidence,
-            metadata=metadata,
-        )
-        return jsonify({"status": "success", "relationship": updated}), 200
-    except KeyError:
-        return jsonify({"error": "Relationship not found"}), 404
-    except ValueError as val_err:
-        return jsonify({"error": str(val_err)}), 400
-    except Exception as exc:
-        logger.error(f"Error updating relationship: {exc}")
-        return jsonify({"error": "Failed to update relationship"}), 500
-
-
-@activity_bp.route("/knowledge-graph/relationships/<relationship_id>", methods=["DELETE"])
-@require_auth
-def delete_knowledge_relationship(relationship_id: str):
-    """
-    Deletes a user's custom relationship.
-    """
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    try:
-        deleted = _delete_relationship_uc.execute(relationship_id=relationship_id, user_id=user_id)
-        if deleted:
-            return jsonify({"status": "success", "message": "Relationship deleted successfully"}), 200
-        return jsonify({"error": "Relationship not found"}), 404
-    except KeyError:
-        return jsonify({"error": "Relationship not found"}), 404
-    except Exception as exc:
-        logger.error(f"Error deleting relationship: {exc}")
-        return jsonify({"error": "Failed to delete relationship"}), 500
-
-
-@activity_bp.route("/knowledge-graph/nodes/<node_id>/neighbors", methods=["GET"])
-@require_auth
-def get_node_neighbors(node_id: str):
-    """
-    Returns 1-hop or 2-hop neighborhood surrounding a specific node in user's knowledge graph.
-    """
-    user_id = g.user_id
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    depth = _parse_int_param(request.args.get("depth"), default=1, min_val=1, max_val=2)
-    limit = _parse_int_param(request.args.get("limit"), default=50, min_val=1, max_val=100)
-
-    try:
-        subgraph = _get_neighbors_uc.execute(user_id=user_id, node_id=node_id, depth=depth, limit=limit)
-        return jsonify({"status": "success", **subgraph.model_dump()}), 200
-    except Exception as exc:
-        logger.error(f"Error fetching node neighbors for {node_id}: {exc}")
-        return jsonify({"error": "Failed to fetch node neighbors"}), 500
-
-
 # =============================================================================
 # Learning Outcomes Intelligence Endpoints
 # =============================================================================
@@ -1863,14 +1377,12 @@ def get_learning_queue():
         return jsonify({"error": "Unauthorized"}), 401
 
     concept = request.args.get("concept")
-    path_id = request.args.get("path_id")
     limit = _parse_int_param(request.args.get("limit"), default=20, min_val=1, max_val=100)
 
     try:
         queue = _get_review_queue_uc.execute(
             user_id=user_id,
             concept=concept,
-            path_id=path_id,
             limit=limit,
         )
         return jsonify({"status": "success", "queue": queue, "total": len(queue)}), 200
@@ -1923,7 +1435,6 @@ def create_learning_item():
             source_type=str(data.get("source_type", "user_created")),
             source_id=data.get("source_id"),
             book_id=data.get("book_id"),
-            path_id=data.get("path_id"),
             metadata=data.get("metadata"),
         )
         return jsonify({"status": "success", "item": item}), 201

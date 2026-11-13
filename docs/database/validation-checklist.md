@@ -56,7 +56,7 @@
 ---
 
 ### Senaryo 4: Profil Yönetimi (Aşamalı Çift-Kolon Uyumluluğu)
-- **Amaç:** Flutter ve Flask'in `user_id` alanı üzerinden sorgu ve upsert yapabilmesi, eski istemcilerin `id` ile çalışabilmesi.
+- **Amaç:** Web istemcisinin ve Flask'in `user_id` alanı üzerinden sorgu ve upsert yapabilmesi, eski istemcilerin `id` ile çalışabilmesi.
 - **Doğrulama Adımı:**
   ```sql
   -- 1. user_id ile sorgu

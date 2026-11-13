@@ -46,7 +46,7 @@ function Stop-ManagedProcess ($procInfo, $serviceName) {
     $proc = Get-Process -Id $targetPid -ErrorAction SilentlyContinue
     if ($proc) {
         Write-Info "Terminating $serviceName process tree (PID $targetPid)..."
-        # taskkill /T /F terminates the process and any spawned child processes (cmd, python, node, dart)
+        # taskkill /T /F terminates the process and any spawned child processes (cmd, python, node)
         & taskkill /PID $targetPid /T /F 2>&1 | Out-Null
         Start-Sleep -Milliseconds 500
         $check = Get-Process -Id $targetPid -ErrorAction SilentlyContinue
@@ -76,7 +76,6 @@ function Stop-ManagedProcess ($procInfo, $serviceName) {
 
 Stop-ManagedProcess $pidData.backend "Backend (Flask)"
 Stop-ManagedProcess $pidData.web "Web (Next.js)"
-Stop-ManagedProcess $pidData.flutter "Flutter Web"
 
 # Clean up PID tracking file
 Remove-Item $PidFile -Force -ErrorAction SilentlyContinue

@@ -30,7 +30,7 @@ class Recommendation(Book):
     recommendation_reason: Optional[str] = Field(default=None)
     explanation_type: Optional[str] = Field(
         default=None,
-        description="liked_book, favorite_book, finished_book, reading_journey, takeaway_affinity, category_affinity, author_affinity, learning_path_continuity, trending_catalog",
+        description="liked_book, favorite_book, finished_book, reading_journey, takeaway_affinity, category_affinity, author_affinity, trending_catalog",
     )
     confidence: Optional[str] = Field(default="medium", description="high, medium, cold_start")
     is_cold_start: bool = Field(default=False)
@@ -67,7 +67,6 @@ class UserPreferenceProfile(BaseModel):
     total_notes_count: int = 0
     takeaway_count: int = 0
     retention_summary: Dict[str, int] = Field(default_factory=dict)
-    active_learning_paths_count: int = 0
     disliked_isbns: List[str] = Field(default_factory=list)
     completed_isbns: List[str] = Field(default_factory=list)
     reading_isbns: List[str] = Field(default_factory=list)
@@ -113,37 +112,6 @@ class UserNote(BaseModel):
     book: Optional[dict] = None
 
 
-class LearningPathItem(BaseModel):
-    book_id: str
-    order_index: int = 0
-    added_at: Optional[str] = None
-    book: Optional[dict] = None
-    reading_status: Optional[str] = None
-    notes_count: int = 0
-    has_due_review: bool = False
-
-
-class LearningPath(BaseModel):
-    id: Optional[str] = None
-    user_id: str
-    title: str = Field(..., min_length=1, max_length=150)
-    description: Optional[str] = ""
-    category: Optional[str] = ""
-    status: str = Field(default="active", description="active, completed, archived")
-    books: List[LearningPathItem] = Field(default_factory=list)
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-    # Progress intelligence fields
-    total_books: int = 0
-    completed_books: int = 0
-    reading_books: int = 0
-    not_started_books: int = 0
-    progress_percent: int = 0
-    total_notes_count: int = 0
-    total_reviews_due: int = 0
-    next_book_id: Optional[str] = None
-
-
 class RAGResponse(BaseModel):
     """
     Discovery Context Entity for AI Chat response.
@@ -154,54 +122,6 @@ class RAGResponse(BaseModel):
     action: Optional[dict] = Field(default=None)
     latency_ms: Optional[float] = Field(default=None)
     metrics: Optional[dict] = Field(default=None)
-
-
-class KnowledgeNode(BaseModel):
-    """
-    Graph vertex representing a Book, Concept/Topic, Reading Note, or Learning Path.
-    """
-    id: str
-    label: str
-    type: str = Field(..., description="book, concept, note, learning_path")
-    data: Dict[str, Any] = Field(default_factory=dict)
-    degree: int = 0
-
-
-class KnowledgeEdge(BaseModel):
-    """
-    Evidence-backed directed edge connecting two entities in the personal knowledge graph.
-    """
-    id: Optional[str] = None
-    user_id: str
-    source_id: str
-    source_type: str = Field(..., description="book, concept, note, learning_path")
-    target_id: str
-    target_type: str = Field(..., description="book, concept, note, learning_path")
-    relationship_type: str = Field(
-        ...,
-        description="covers_concept, reinforces_concept, relates_to, builds_upon, curates_book, references_book, derived_from",
-    )
-    source: str = Field(
-        default="user_explicit",
-        description="user_explicit, reading_note, book_metadata, system_inference",
-    )
-    evidence_ref: Optional[str] = None
-    confidence: str = Field(default="high", description="high, medium, suggested")
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-
-
-class KnowledgeGraphData(BaseModel):
-    """
-    Composite Personal Knowledge Graph response.
-    """
-    nodes: List[KnowledgeNode] = Field(default_factory=list)
-    edges: List[KnowledgeEdge] = Field(default_factory=list)
-    total_nodes: int = 0
-    total_edges: int = 0
-    focus_id: Optional[str] = None
-    depth: int = 1
 
 
 class ReviewItem(BaseModel):
@@ -217,7 +137,7 @@ class ReviewItem(BaseModel):
     explanation: Optional[str] = Field(default="", max_length=3000)
     source_type: str = Field(
         default="user_created",
-        description="user_note, key_takeaway, concept, learning_path, user_created, book",
+        description="user_note, key_takeaway, concept, user_created, book",
     )
     source_id: Optional[str] = None
     book_id: Optional[str] = None

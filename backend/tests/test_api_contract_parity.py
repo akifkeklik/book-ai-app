@@ -1,5 +1,5 @@
 """
-Contract Parity Tests across Flask Backend, Next.js Web, and Flutter Mobile.
+Contract Parity Tests between the Flask backend and the Next.js web client.
 Validates structural schema, required fields, nullability, and status enums
 for all prioritized cross-platform capabilities.
 """
@@ -75,7 +75,7 @@ def test_contract_favorites_and_reading_status_feedback(client):
 
 
 def test_contract_unified_library_items(client):
-    """Verifies GET /api/library schema matches Web LibraryItem and Flutter LibraryItem."""
+    """Verifies GET /api/library schema matches the web LibraryItem type."""
     mock_book_dict = {
         "isbn13": "9780007111503",
         "title": "Partners in Crime",
@@ -185,88 +185,6 @@ def test_contract_ai_discovery_response(client):
         assert "referenced_books" in data
         assert isinstance(data["referenced_books"], list)
         assert data["status"] == "success"
-
-
-def test_contract_learning_paths(client):
-    """Verifies GET /api/learning-paths contract schema."""
-    mock_paths = [
-        {
-            "id": "path-alpha",
-            "user_id": "11111111-1111-4111-8111-111111111111",
-            "title": "Mastering Classical Mystery",
-            "description": "Historical detective classics",
-            "category": "Mystery",
-            "status": "active",
-            "books": [
-                {"book_id": "9780007111503", "order_index": 0, "reading_status": "reading"}
-            ],
-            "total_books": 1,
-            "completed_books": 0,
-            "reading_books": 1,
-            "not_started_books": 0,
-            "progress_percent": 0,
-            "next_book_id": "9780007111503",
-        }
-    ]
-
-    with patch("backend.routes.routes._auth_port.verify_token", return_value=MockUser()):
-        with patch("backend.routes.routes._get_user_learning_paths_uc.execute", return_value=mock_paths):
-            res = client.get(
-                "/api/learning-paths",
-                headers={"Authorization": "Bearer valid-token"}
-            )
-            assert res.status_code == 200
-            data = res.get_json()
-            assert data["status"] == "success"
-            assert "paths" in data
-            assert len(data["paths"]) == 1
-            path = data["paths"][0]
-            assert path["id"] == "path-alpha"
-            assert path["title"] == "Mastering Classical Mystery"
-            assert "progress_percent" in path
-
-
-def test_contract_knowledge_graph(client):
-    """Verifies GET /api/knowledge-graph composite graph contract schema."""
-    mock_graph_model = MagicMock()
-    mock_graph_model.model_dump.return_value = {
-        "nodes": [
-            {"id": "9780007111503", "label": "Partners in Crime", "type": "book", "degree": 1, "data": {}},
-            {"id": "concept:mystery", "label": "Mystery", "type": "concept", "degree": 1, "data": {}},
-        ],
-        "edges": [
-            {
-                "id": "edge-1",
-                "user_id": "11111111-1111-4111-8111-111111111111",
-                "source_id": "9780007111503",
-                "source_type": "book",
-                "target_id": "concept:mystery",
-                "target_type": "concept",
-                "relationship_type": "covers_concept",
-                "source": "book_metadata",
-                "confidence": "high",
-            }
-        ],
-        "total_nodes": 2,
-        "total_edges": 1,
-        "depth": 1,
-        "focus_id": None,
-    }
-
-    with patch("backend.routes.routes._auth_port.verify_token", return_value=MockUser()):
-        with patch("backend.routes.routes._get_knowledge_graph_uc.execute", return_value=mock_graph_model):
-            res = client.get(
-                "/api/knowledge-graph",
-                headers={"Authorization": "Bearer valid-token"}
-            )
-            assert res.status_code == 200
-            data = res.get_json()
-            assert "nodes" in data
-            assert "edges" in data
-            assert "total_nodes" in data
-            assert "total_edges" in data
-            assert len(data["nodes"]) == 2
-            assert len(data["edges"]) == 1
 
 
 def test_contract_smart_reviews_due(client):

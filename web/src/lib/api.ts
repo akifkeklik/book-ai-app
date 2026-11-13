@@ -11,13 +11,7 @@ import type {
   NoteReview,
   NoteReviewStats,
   ExportNotesResult,
-  LearningPath,
-  LearningPathItem,
-  CreateLearningPathInput,
   UserTasteProfile,
-  KnowledgeEdge,
-  KnowledgeGraphData,
-  CreateRelationshipInput,
   ReviewItem,
   ReviewAttempt,
   LearningProgress,
@@ -25,7 +19,7 @@ import type {
   CreateReviewItemInput,
   SubmitReviewAttemptInput,
 } from '@/types';
-import { normalizeBook, normalizeBooks, normalizeKnowledgeGraph, normalizeKnowledgeEdge, normalizeReviewItem, normalizeReviewAttempt, normalizeLearningProgress } from './normalizers';
+import { normalizeBook, normalizeBooks, normalizeReviewItem, normalizeReviewAttempt, normalizeLearningProgress } from './normalizers';
 
 const API_URL = process.env.BACKEND_URL || 'http://localhost:5000';
 export const DEFAULT_API_TIMEOUT_MS = 10000;
@@ -80,7 +74,6 @@ export function isValidIsbn(isbn: string): boolean {
   return normalizeIsbn(isbn) !== null;
 }
 
-
 function normalizeLearningNote(raw: Record<string, unknown>): LearningNote {
   const rawBook = (raw?.book && typeof raw.book === 'object') ? (raw.book as Record<string, unknown>) : undefined;
   return {
@@ -104,42 +97,6 @@ function normalizeLearningNote(raw: Record<string, unknown>): LearningNote {
   };
 }
 
-
-function normalizeLearningPathItem(raw: Record<string, unknown>): LearningPathItem {
-  const rawBook = (raw?.book && typeof raw.book === 'object') ? (raw.book as Record<string, unknown>) : undefined;
-  return {
-    bookId: String(raw?.book_id || raw?.bookId || ''),
-    orderIndex: typeof raw?.order_index === 'number' ? raw.order_index : (typeof raw?.orderIndex === 'number' ? raw.orderIndex : 0),
-    addedAt: raw?.added_at ? String(raw.added_at) : undefined,
-    book: rawBook ? normalizeBook(rawBook) : undefined,
-    readingStatus: (raw?.reading_status || raw?.readingStatus || null) as ('want_to_read' | 'reading' | 'finished' | null),
-    notesCount: typeof raw?.notes_count === 'number' ? raw.notes_count : (typeof raw?.notesCount === 'number' ? raw.notesCount : 0),
-    hasDueReview: Boolean(raw?.has_due_review || raw?.hasDueReview),
-  };
-}
-
-function normalizeLearningPath(raw: Record<string, unknown>): LearningPath {
-  const rawBooks = Array.isArray(raw?.books) ? raw.books : [];
-  return {
-    id: String(raw?.id || ''),
-    userId: String(raw?.user_id || raw?.userId || ''),
-    title: String(raw?.title || ''),
-    description: String(raw?.description || ''),
-    category: String(raw?.category || ''),
-    status: (raw?.status as 'active' | 'completed' | 'archived') || 'active',
-    books: rawBooks.map((b: Record<string, unknown>) => normalizeLearningPathItem(b)),
-    createdAt: String(raw?.created_at || raw?.createdAt || new Date().toISOString()),
-    updatedAt: String(raw?.updated_at || raw?.updatedAt || new Date().toISOString()),
-    totalBooks: typeof raw?.total_books === 'number' ? raw.total_books : (typeof raw?.totalBooks === 'number' ? raw.totalBooks : rawBooks.length),
-    completedBooks: typeof raw?.completed_books === 'number' ? raw.completed_books : (typeof raw?.completedBooks === 'number' ? raw.completedBooks : 0),
-    readingBooks: typeof raw?.reading_books === 'number' ? raw.reading_books : (typeof raw?.readingBooks === 'number' ? raw.readingBooks : 0),
-    notStartedBooks: typeof raw?.not_started_books === 'number' ? raw.not_started_books : (typeof raw?.notStartedBooks === 'number' ? raw.notStartedBooks : 0),
-    progressPercent: typeof raw?.progress_percent === 'number' ? raw.progress_percent : (typeof raw?.progressPercent === 'number' ? raw.progressPercent : 0),
-    totalNotesCount: typeof raw?.total_notes_count === 'number' ? raw.total_notes_count : (typeof raw?.totalNotesCount === 'number' ? raw.totalNotesCount : 0),
-    totalReviewsDue: typeof raw?.total_reviews_due === 'number' ? raw.total_reviews_due : (typeof raw?.totalReviewsDue === 'number' ? raw.totalReviewsDue : 0),
-    nextBookId: raw?.next_book_id ? String(raw.next_book_id) : (raw?.nextBookId ? String(raw.nextBookId) : null),
-  };
-}
 function normalizeNoteReview(raw: Record<string, unknown>): NoteReview {
   const rawNote = (raw?.note && typeof raw.note === 'object') ? (raw.note as Record<string, unknown>) : undefined;
   return {
@@ -405,7 +362,7 @@ export class ApiService {
   // User-specific personalized recommendations: requires cache: 'no-store'
   static async getPersonalizedRecommendations(
     limit: number = 10,
-    options: { category?: string; excludeCompleted?: boolean; pathId?: string; signal?: AbortSignal } = {}
+    options: { category?: string; excludeCompleted?: boolean; signal?: AbortSignal } = {}
   ): Promise<Book[]> {
     const res = await this.getPersonalizedRecommendationsWithMeta(limit, options);
     return res.books;
@@ -413,7 +370,7 @@ export class ApiService {
 
   static async getPersonalizedRecommendationsWithMeta(
     limit: number = 10,
-    options: { category?: string; excludeCompleted?: boolean; pathId?: string; signal?: AbortSignal } = {}
+    options: { category?: string; excludeCompleted?: boolean; signal?: AbortSignal } = {}
   ): Promise<{
     books: Book[];
     isColdStart: boolean;
@@ -428,9 +385,6 @@ export class ApiService {
     }
     if (options.excludeCompleted !== undefined) {
       url.searchParams.append('exclude_completed', options.excludeCompleted ? 'true' : 'false');
-    }
-    if (options.pathId && options.pathId.trim()) {
-      url.searchParams.append('path_id', options.pathId.trim());
     }
     
     const res = await this.fetchWithTimeout(url.toString(), {
@@ -450,27 +404,6 @@ export class ApiService {
       evidenceCoverage: (data?.evidence_coverage as 'cold_start' | 'emerging' | 'established') || 'cold_start',
       total: typeof data?.total === 'number' ? data.total : (Array.isArray(data?.recommendations) ? data.recommendations.length : 0),
     };
-  }
-
-  static async getLearningPathRecommendations(
-    pathId: string,
-    limit: number = 10,
-    options: { excludeCompleted?: boolean; signal?: AbortSignal } = {}
-  ): Promise<Book[]> {
-    const headers = await this.getHeaders();
-    const url = new URL(`${API_URL}/api/learning-paths/${encodeURIComponent(pathId)}/recommendations`);
-    url.searchParams.append('limit', limit.toString());
-    if (options.excludeCompleted !== undefined) {
-      url.searchParams.append('exclude_completed', options.excludeCompleted ? 'true' : 'false');
-    }
-    const res = await this.fetchWithTimeout(url.toString(), {
-      headers,
-      cache: 'no-store',
-      signal: options.signal,
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return normalizeBooks(data?.suggestions);
   }
 
   static async getUserTasteProfile(
@@ -895,395 +828,6 @@ export class ApiService {
 
   // ── Learning Paths & Progress Intelligence ──────────────────────────────────
 
-  static async getLearningPaths(
-    status?: string,
-    options: { signal?: AbortSignal } = {}
-  ): Promise<LearningPath[]> {
-    const headers = await this.getHeaders();
-    let url = `${API_URL}/api/learning-paths`;
-    if (status) url += `?status=${encodeURIComponent(status)}`;
-    const res = await this.fetchWithTimeout(url, {
-      method: 'GET',
-      headers,
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      if (res.status === 401) throw new Error('Unauthorized');
-      throw new Error(`Failed to fetch learning paths (${res.status})`);
-    }
-
-    const data = await res.json();
-    const rawList = Array.isArray(data?.paths) ? data.paths : [];
-    return rawList.map((p: Record<string, unknown>) => normalizeLearningPath(p));
-  }
-
-  static async getLearningPathById(
-    pathId: string,
-    options: { signal?: AbortSignal } = {}
-  ): Promise<LearningPath> {
-    const headers = await this.getHeaders();
-    const encoded = encodeURIComponent(pathId.trim());
-    const res = await this.fetchWithTimeout(`${API_URL}/api/learning-paths/${encoded}`, {
-      method: 'GET',
-      headers,
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      if (res.status === 401) throw new Error('Unauthorized');
-      if (res.status === 404) throw new Error('Learning path not found');
-      throw new Error(`Failed to fetch learning path (${res.status})`);
-    }
-
-    const data = await res.json();
-    return normalizeLearningPath(data?.path || {});
-  }
-
-  static async createLearningPath(
-    input: CreateLearningPathInput,
-    options: { signal?: AbortSignal } = {}
-  ): Promise<LearningPath> {
-    const headers = await this.getHeaders();
-    const res = await this.fetchWithTimeout(`${API_URL}/api/learning-paths`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        title: input.title.trim(),
-        description: input.description?.trim() || '',
-        category: input.category?.trim() || '',
-        book_ids: input.bookIds || [],
-      }),
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error || `Failed to create learning path (${res.status})`);
-    }
-
-    const data = await res.json();
-    return normalizeLearningPath(data?.path || {});
-  }
-
-  static async updateLearningPath(
-    pathId: string,
-    updates: { title?: string; description?: string; category?: string; status?: string },
-    options: { signal?: AbortSignal } = {}
-  ): Promise<LearningPath> {
-    const headers = await this.getHeaders();
-    const encoded = encodeURIComponent(pathId.trim());
-    const res = await this.fetchWithTimeout(`${API_URL}/api/learning-paths/${encoded}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(updates),
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error || `Failed to update learning path (${res.status})`);
-    }
-
-    const data = await res.json();
-    return normalizeLearningPath(data?.path || {});
-  }
-
-  static async deleteLearningPath(
-    pathId: string,
-    options: { signal?: AbortSignal } = {}
-  ): Promise<boolean> {
-    const headers = await this.getHeaders();
-    const encoded = encodeURIComponent(pathId.trim());
-    const res = await this.fetchWithTimeout(`${API_URL}/api/learning-paths/${encoded}`, {
-      method: 'DELETE',
-      headers,
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      if (res.status === 401) throw new Error('Unauthorized');
-      return false;
-    }
-
-    const data = await res.json().catch(() => ({}));
-    return Boolean(data?.deleted || res.ok);
-  }
-
-  static async addBookToLearningPath(
-    pathId: string,
-    bookId: string,
-    orderIndex?: number,
-    options: { signal?: AbortSignal } = {}
-  ): Promise<LearningPath> {
-    const headers = await this.getHeaders();
-    const encoded = encodeURIComponent(pathId.trim());
-    const res = await this.fetchWithTimeout(`${API_URL}/api/learning-paths/${encoded}/books`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ book_id: bookId.trim(), order_index: orderIndex }),
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error || `Failed to add book to learning path (${res.status})`);
-    }
-
-    const data = await res.json();
-    return normalizeLearningPath(data?.path || {});
-  }
-
-  static async removeBookFromLearningPath(
-    pathId: string,
-    bookId: string,
-    options: { signal?: AbortSignal } = {}
-  ): Promise<LearningPath> {
-    const headers = await this.getHeaders();
-    const encPath = encodeURIComponent(pathId.trim());
-    const encBook = encodeURIComponent(bookId.trim());
-    const res = await this.fetchWithTimeout(`${API_URL}/api/learning-paths/${encPath}/books/${encBook}`, {
-      method: 'DELETE',
-      headers,
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error || `Failed to remove book from learning path (${res.status})`);
-    }
-
-    const data = await res.json();
-    return normalizeLearningPath(data?.path || {});
-  }
-
-  static async reorderLearningPathBooks(
-    pathId: string,
-    bookIds: string[],
-    options: { signal?: AbortSignal } = {}
-  ): Promise<LearningPath> {
-    const headers = await this.getHeaders();
-    const encoded = encodeURIComponent(pathId.trim());
-    const res = await this.fetchWithTimeout(`${API_URL}/api/learning-paths/${encoded}/reorder`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({ book_ids: bookIds }),
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error || `Failed to reorder books (${res.status})`);
-    }
-
-    const data = await res.json();
-    return normalizeLearningPath(data?.path || {});
-  }
-
-  static async getLearningPathSuggestions(
-    category?: string,
-    query?: string,
-    limit: number = 10,
-    options: { signal?: AbortSignal } = {}
-  ): Promise<Book[]> {
-    const headers = await this.getHeaders();
-    const url = new URL(`${API_URL}/api/learning-paths/suggestions`);
-    if (category) url.searchParams.append('category', category.trim());
-    if (query) url.searchParams.append('q', query.trim());
-    url.searchParams.append('limit', String(limit));
-
-    const res = await this.fetchWithTimeout(url.toString(), {
-      method: 'GET',
-      headers,
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      return [];
-    }
-
-    const data = await res.json();
-    const rawList = Array.isArray(data?.suggestions) ? data.suggestions : [];
-    return normalizeBooks(rawList);
-  }
-
-
-  static async getKnowledgeGraph(
-    params?: {
-      focusId?: string;
-      depth?: number;
-      limit?: number;
-      type?: string;
-      relationshipType?: string;
-    },
-    options: { signal?: AbortSignal } = {}
-  ): Promise<KnowledgeGraphData> {
-    const headers = await this.getHeaders();
-    const url = new URL(`${API_URL}/api/knowledge-graph`);
-    if (params?.focusId) url.searchParams.append('focus_id', params.focusId.trim());
-    if (params?.depth) url.searchParams.append('depth', String(params.depth));
-    if (params?.limit) url.searchParams.append('limit', String(params.limit));
-    if (params?.type) url.searchParams.append('type', params.type.trim());
-    if (params?.relationshipType) url.searchParams.append('relationship_type', params.relationshipType.trim());
-
-    const res = await this.fetchWithTimeout(url.toString(), {
-      method: 'GET',
-      headers,
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      throw new Error(`Failed to fetch knowledge graph: ${res.status}`);
-    }
-
-    const data = await res.json();
-    return normalizeKnowledgeGraph(data);
-  }
-
-  static async createRelationship(
-    input: CreateRelationshipInput,
-    options: { signal?: AbortSignal } = {}
-  ): Promise<KnowledgeEdge> {
-    const headers = await this.getHeaders();
-    const url = `${API_URL}/api/knowledge-graph/relationships`;
-
-    const res = await this.fetchWithTimeout(url, {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        source_id: input.sourceId,
-        source_type: input.sourceType,
-        target_id: input.targetId,
-        target_type: input.targetType,
-        relationship_type: input.relationshipType,
-        source: input.source || 'user_explicit',
-        evidence_ref: input.evidenceRef,
-        confidence: input.confidence || 'high',
-        metadata: input.metadata || {},
-      }),
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || `Failed to create relationship: ${res.status}`);
-    }
-
-    const data = await res.json();
-    return normalizeKnowledgeEdge(data.relationship);
-  }
-
-  static async getRelationshipById(
-    id: string,
-    options: { signal?: AbortSignal } = {}
-  ): Promise<KnowledgeEdge | null> {
-    const headers = await this.getHeaders();
-    const url = `${API_URL}/api/knowledge-graph/relationships/${encodeURIComponent(id)}`;
-
-    const res = await this.fetchWithTimeout(url, {
-      method: 'GET',
-      headers,
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (res.status === 404) return null;
-    if (!res.ok) {
-      throw new Error(`Failed to fetch relationship: ${res.status}`);
-    }
-
-    const data = await res.json();
-    return normalizeKnowledgeEdge(data.relationship);
-  }
-
-  static async updateRelationship(
-    id: string,
-    updates: { relationshipType?: string; confidence?: string; metadata?: Record<string, unknown> },
-    options: { signal?: AbortSignal } = {}
-  ): Promise<KnowledgeEdge | null> {
-    const headers = await this.getHeaders();
-    const url = `${API_URL}/api/knowledge-graph/relationships/${encodeURIComponent(id)}`;
-
-    const payload: Record<string, unknown> = {};
-    if (updates.relationshipType) payload.relationship_type = updates.relationshipType;
-    if (updates.confidence) payload.confidence = updates.confidence;
-    if (updates.metadata) payload.metadata = updates.metadata;
-
-    const res = await this.fetchWithTimeout(url, {
-      method: 'PUT',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (res.status === 404) return null;
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || `Failed to update relationship: ${res.status}`);
-    }
-
-    const data = await res.json();
-    return normalizeKnowledgeEdge(data.relationship);
-  }
-
-  static async deleteRelationship(
-    id: string,
-    options: { signal?: AbortSignal } = {}
-  ): Promise<boolean> {
-    const headers = await this.getHeaders();
-    const url = `${API_URL}/api/knowledge-graph/relationships/${encodeURIComponent(id)}`;
-
-    const res = await this.fetchWithTimeout(url, {
-      method: 'DELETE',
-      headers,
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (res.status === 404) return false;
-    if (!res.ok) {
-      throw new Error(`Failed to delete relationship: ${res.status}`);
-    }
-
-    return true;
-  }
-
-  static async getNodeNeighbors(
-    nodeId: string,
-    params?: { depth?: number; limit?: number },
-    options: { signal?: AbortSignal } = {}
-  ): Promise<KnowledgeGraphData> {
-    const headers = await this.getHeaders();
-    const url = new URL(`${API_URL}/api/knowledge-graph/nodes/${encodeURIComponent(nodeId)}/neighbors`);
-    if (params?.depth) url.searchParams.append('depth', String(params.depth));
-    if (params?.limit) url.searchParams.append('limit', String(params.limit));
-
-    const res = await this.fetchWithTimeout(url.toString(), {
-      method: 'GET',
-      headers,
-      cache: 'no-store',
-      signal: options.signal,
-    });
-
-    if (!res.ok) {
-      throw new Error(`Failed to fetch node neighbors: ${res.status}`);
-    }
-
-    const data = await res.json();
-    return normalizeKnowledgeGraph(data);
-  }
   // ── Sprint 28: Learning Outcomes Intelligence ───────────────────────────
 
   static async getLearningOverview(options: { signal?: AbortSignal } = {}): Promise<LearningProgress> {
@@ -1304,13 +848,12 @@ export class ApiService {
   }
 
   static async getLearningQueue(
-    params?: { concept?: string; pathId?: string; limit?: number },
+    params?: { concept?: string; limit?: number },
     options: { signal?: AbortSignal } = {}
   ): Promise<ReviewItem[]> {
     const headers = await this.getHeaders();
     const url = new URL(`${API_URL}/api/learning/queue`);
     if (params?.concept) url.searchParams.append('concept', params.concept);
-    if (params?.pathId) url.searchParams.append('path_id', params.pathId);
     if (params?.limit) url.searchParams.append('limit', String(params.limit));
 
     const res = await this.fetchWithTimeout(url.toString(), {
@@ -1361,7 +904,6 @@ export class ApiService {
       source_type: input.sourceType || 'user_created',
       source_id: input.sourceId,
       book_id: input.bookId,
-      path_id: input.pathId,
       metadata: input.metadata || {},
     };
 

@@ -12,7 +12,6 @@ from backend.infrastructure.persistence.in_memory_learning_repository import (
     InMemoryLearningOutcomesRepository,
 )
 from backend.infrastructure.persistence.in_memory_note_repository import (
-    InMemoryLearningPathRepository,
     InMemoryNoteRepository,
     InMemoryNoteReviewRepository,
 )
@@ -42,7 +41,6 @@ def test_container():
     learning_repo = InMemoryLearningOutcomesRepository()
     note_repo = InMemoryNoteRepository()
     note_review_repo = InMemoryNoteReviewRepository()
-    path_repo = InMemoryLearningPathRepository()
     auth_port = DummyAuthPort()
 
     c = Container(
@@ -51,8 +49,6 @@ def test_container():
         learning_outcomes_repo=learning_repo,
     )
     c.note_review_repo = note_review_repo
-    c.learning_path_repo = path_repo
-    c.get_review_queue_uc._learning_path_repo = path_repo
     c.get_review_queue_uc._note_repo = note_repo
     routes.rebind_container(c)
     return c
@@ -233,55 +229,6 @@ def test_review_queue_prioritization_and_reasons(test_container):
     assert queue[1]["title"] == "CAP Theorem"
     assert queue[1]["priority"] < queue[0]["priority"]
     assert queue[1]["recommendation_reason_key"] == "concept_practice"
-
-
-def test_review_queue_path_filtering_and_continuity_reason(test_container):
-    """Items filtered by path_id must return only matching items, and items connected to active path get continuity reason."""
-    now = datetime.datetime(2026, 10, 28, 12, 0, 0, tzinfo=datetime.timezone.utc)
-    user_id = "user-alice"
-    path_a = "path-systems-101"
-    path_b = "path-algorithms-201"
-
-    # Create active path in repo
-    test_container.learning_path_repo.create_path(
-        user_id=user_id,
-        title="Distributed Systems Path",
-        book_ids=["9780134494166"],
-    )
-
-    # Item attached to path_a
-    test_container.learning_outcomes_repo.create_review_item(
-        user_id=user_id,
-        title="Paxos Basics",
-        concept="Distributed Systems",
-        question="What is consensus?",
-        answer="Agreement among distributed nodes.",
-        path_id=path_a,
-        book_id="9780134494166",
-        next_review_at=(now + datetime.timedelta(days=10)).isoformat(),
-    )
-
-    # Item attached to path_b
-    test_container.learning_outcomes_repo.create_review_item(
-        user_id=user_id,
-        title="Binary Search",
-        concept="Algorithms",
-        question="What is binary search complexity?",
-        answer="O(log n).",
-        path_id=path_b,
-        next_review_at=(now + datetime.timedelta(days=10)).isoformat(),
-    )
-
-    # Filter queue by path_a
-    queue_a = test_container.get_review_queue_uc.execute(user_id=user_id, path_id=path_a, as_of=now)
-    assert len(queue_a) == 1
-    assert queue_a[0]["title"] == "Paxos Basics"
-    assert queue_a[0]["recommendation_reason_key"] == "learning_path_continuity"
-
-    # Filter queue by path_b
-    queue_b = test_container.get_review_queue_uc.execute(user_id=user_id, path_id=path_b, as_of=now)
-    assert len(queue_b) == 1
-    assert queue_b[0]["title"] == "Binary Search"
 
 
 def test_user_isolation_and_cross_user_privacy(test_container):

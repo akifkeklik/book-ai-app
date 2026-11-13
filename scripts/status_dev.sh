@@ -26,4 +26,3 @@ check_status() {
 
 check_status "Backend" "5000" "http://127.0.0.1:5000/api/health"
 check_status "Web" "3000" "http://127.0.0.1:3000"
-check_status "Flutter Web" "5001" "http://127.0.0.1:5001"

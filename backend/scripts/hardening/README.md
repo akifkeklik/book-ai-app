@@ -47,7 +47,7 @@
 
 > [!WARNING]
 > **ROLLBACK DOSYALARI CANLI İSTEMCİLERLE GERİYE DÖNÜK UYUMLU DEĞİLDİR:**
-> - **Rollback 02:** `user_id`, `preferred_authors` ve `preferred_vibe` kolonlarını tablodan siler. Bu durum, canlıda çalışan Flutter mobil uygulamasını (`supabase_service.dart`) ve backend profil sorgularını anında çökertir!
+> - **Rollback 02:** `user_id`, `preferred_authors` ve `preferred_vibe` kolonlarını tablodan siler. Bu durum, web istemcisinin ve backend profil sorgularını anında çökertir!
 > - **Rollback 03:** `user_interactions` kısıtını 4 duruma (`like`, `dislike`, `want_to_read`, `finished`) geri çeker. Canlıda çalışan Web uygulaması (`web/src/app/actions/library.ts:336`) doğrudan `'reading'` ve `'favorite'` yazdığı için web kullanıcıları anında PostgreSQL check constraint hatası alır! Ayrıca 4'lü kısıtın doğası gereği favori silme işlemi `'like'` etkileşimini de sildiğinden bağımsız beğeni tavsiye sinyalleri kaybolur.
 > - **Operasyonel İlke:** Canlıda sorun yaşandığında rastgele rollback çalıştırmak yerine **ileri onarım (forward-fix)** tercih edilmeli veya tam veritabanı yedeğinden kontrollü restore yapılmalıdır.
 

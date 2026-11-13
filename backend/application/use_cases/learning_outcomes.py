@@ -6,7 +6,6 @@ from ...domain.models import LearningProgress
 from ...domain.ports import (
     BookDataPort,
     LearningOutcomesRepository,
-    LearningPathRepository,
     LlmPort,
     NoteReviewRepository,
     UserNoteRepository,
@@ -179,13 +178,11 @@ class GetReviewQueueUseCase:
         self,
         learning_repo: LearningOutcomesRepository,
         note_repo: Optional[UserNoteRepository] = None,
-        learning_path_repo: Optional[LearningPathRepository] = None,
         book_data_port: Optional[BookDataPort] = None,
         llm_port: Optional[LlmPort] = None,
     ):
         self._learning_repo = learning_repo
         self._note_repo = note_repo
-        self._learning_path_repo = learning_path_repo
         self._book_data_port = book_data_port
         self._llm_port = llm_port
 
@@ -218,7 +215,6 @@ class GetReviewQueueUseCase:
         self,
         user_id: str,
         concept: Optional[str] = None,
-        path_id: Optional[str] = None,
         limit: int = 20,
         as_of: Optional[datetime.datetime] = None,
     ) -> List[Dict[str, Any]]:
@@ -233,7 +229,6 @@ class GetReviewQueueUseCase:
         items = self._learning_repo.list_review_items(
             user_id=clean_user_id,
             concept=concept,
-            path_id=path_id,
             status="active",
             limit=200,
         )
@@ -289,25 +284,6 @@ class GetReviewQueueUseCase:
             if c.get("struggled_recalls", 0) >= 2 and (c.get("struggled_recalls", 0) / max(1, c.get("total_attempts", 1))) >= 0.4
         }
 
-        # 4. Identify books in active learning paths
-        path_books = set()
-        if self._learning_path_repo:
-            try:
-                paths = []
-                if hasattr(self._learning_path_repo, "get_user_paths"):
-                    paths = self._learning_path_repo.get_user_paths(clean_user_id)
-                elif hasattr(self._learning_path_repo, "get_user_learning_paths"):
-                    paths = self._learning_path_repo.get_user_learning_paths(clean_user_id)
-
-                for p in paths:
-                    if p.get("status") == "active":
-                        for b in p.get("books", []):
-                            bid = b.get("book_id")
-                            if bid:
-                                path_books.add(bid)
-            except Exception as e:
-                logger.warning(f"Error checking active paths for review queue: {e}")
-
         # 5. Score and explain each review item
         queue: List[Dict[str, Any]] = []
         book_ids_to_fetch = set()
@@ -339,10 +315,6 @@ class GetReviewQueueUseCase:
                 priority = 80
                 reason_key = "previous_incorrect"
                 reason_text = "Needs reinforcement after previous struggle"
-            elif b_id and b_id in path_books:
-                priority = 65
-                reason_key = "learning_path_continuity"
-                reason_text = "Connected to your active learning path"
             else:
                 try:
                     due_dt = datetime.datetime.fromisoformat(next_rev.replace("Z", "+00:00"))
@@ -590,7 +562,6 @@ class CreateReviewItemUseCase:
         source_type: str = "user_created",
         source_id: Optional[str] = None,
         book_id: Optional[str] = None,
-        path_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         if not user_id or not user_id.strip():
@@ -615,7 +586,6 @@ class CreateReviewItemUseCase:
             source_type=source_type,
             source_id=source_id,
             book_id=book_id,
-            path_id=path_id,
             initial_stage=1,
             initial_interval_days=1,
             metadata=metadata,

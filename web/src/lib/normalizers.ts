@@ -1,10 +1,5 @@
 import type {
   Book,
-  KnowledgeEdge,
-  KnowledgeGraphData,
-  KnowledgeNode,
-  KnowledgeNodeType,
-  KnowledgeRelationshipSource,
   ReviewItem,
   ReviewAttempt,
   LearningProgress,
@@ -251,51 +246,6 @@ export function normalizeBooks(rawList: unknown): Book[] {
     .map(normalizeBook);
 }
 
-
-export function normalizeKnowledgeNode(raw: Record<string, unknown> | null | undefined): KnowledgeNode {
-  return {
-    id: String(raw?.id || ''),
-    label: String(raw?.label || raw?.id || ''),
-    type: (raw?.type || 'concept') as KnowledgeNodeType,
-    data: typeof raw?.data === 'object' && raw?.data !== null ? (raw.data as Record<string, unknown>) : {},
-    degree: Number(raw?.degree || 0),
-  };
-}
-
-export function normalizeKnowledgeEdge(raw: Record<string, unknown> | null | undefined): KnowledgeEdge {
-  return {
-    id: raw?.id ? String(raw.id) : undefined,
-    userId: String(raw?.user_id || raw?.userId || ''),
-    sourceId: String(raw?.source_id || raw?.sourceId || ''),
-    sourceType: (raw?.source_type || raw?.sourceType || 'concept') as KnowledgeNodeType,
-    targetId: String(raw?.target_id || raw?.targetId || ''),
-    targetType: (raw?.target_type || raw?.targetType || 'concept') as KnowledgeNodeType,
-    relationshipType: String(raw?.relationship_type || raw?.relationshipType || 'relates_to'),
-    source: (raw?.source || 'user_explicit') as KnowledgeRelationshipSource,
-    evidenceRef: raw?.evidence_ref !== undefined ? (raw.evidence_ref ? String(raw.evidence_ref) : null) : (raw?.evidenceRef ? String(raw.evidenceRef) : null),
-    confidence: (raw?.confidence || 'high') as 'high' | 'medium' | 'suggested',
-    metadata: typeof raw?.metadata === 'object' && raw?.metadata !== null ? (raw.metadata as Record<string, unknown>) : {},
-    createdAt: raw?.created_at ? String(raw.created_at) : (raw?.createdAt ? String(raw.createdAt) : undefined),
-    updatedAt: raw?.updated_at ? String(raw.updated_at) : (raw?.updatedAt ? String(raw.updatedAt) : undefined),
-  };
-}
-
-export function normalizeKnowledgeGraph(raw: Record<string, unknown> | null | undefined): KnowledgeGraphData {
-  const rawNodes = raw?.nodes as unknown;
-  const nodes = Array.isArray(rawNodes) ? (rawNodes as (Record<string, unknown> | null | undefined)[]).map(normalizeKnowledgeNode) : [];
-  const rawEdges = raw?.edges as unknown;
-  const edges = Array.isArray(rawEdges) ? (rawEdges as (Record<string, unknown> | null | undefined)[]).map(normalizeKnowledgeEdge) : [];
-  return {
-    nodes,
-    edges,
-    totalNodes: typeof raw?.total_nodes === 'number' ? raw.total_nodes : nodes.length,
-    totalEdges: typeof raw?.total_edges === 'number' ? raw.total_edges : edges.length,
-    focusId: raw?.focus_id ? String(raw.focus_id) : (raw?.focusId ? String(raw.focusId) : null),
-    depth: typeof raw?.depth === 'number' ? raw.depth : 1,
-  };
-}
-
-
 export function normalizeReviewItem(raw: Record<string, unknown> | null | undefined): ReviewItem {
   return {
     id: String(raw?.id || ''),
@@ -308,7 +258,6 @@ export function normalizeReviewItem(raw: Record<string, unknown> | null | undefi
     sourceType: String(raw?.source_type || raw?.sourceType || 'user_created'),
     sourceId: raw?.source_id !== undefined ? (raw.source_id ? String(raw.source_id) : null) : (raw?.sourceId ? String(raw.sourceId) : null),
     bookId: raw?.book_id !== undefined ? (raw.book_id ? String(raw.book_id) : null) : (raw?.bookId ? String(raw.bookId) : null),
-    pathId: raw?.path_id !== undefined ? (raw.path_id ? String(raw.path_id) : null) : (raw?.pathId ? String(raw.pathId) : null),
     stage: Number(raw?.stage || 1),
     intervalDays: Number(raw?.interval_days || raw?.intervalDays || 1),
     nextReviewAt: raw?.next_review_at ? String(raw.next_review_at) : (raw?.nextReviewAt ? String(raw.nextReviewAt) : undefined),

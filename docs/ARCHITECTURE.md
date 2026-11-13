@@ -7,7 +7,6 @@ This document describes the repository structure as it exists in the current cod
 Libris has three application surfaces:
 
 - **Web:** Next.js App Router application in web/.
-- **Mobile:** Flutter application in mobile/flutter_app/.
 - **Backend:** Flask API in backend/.
 
 The clients use the backend for application capabilities and use Supabase for the configured authentication and data services. The web application also contains server actions and route handlers that mediate server-side operations.
@@ -15,7 +14,6 @@ The clients use the backend for application capabilities and use Supabase for th
 ~~~mermaid
 flowchart TB
     WEB["Next.js Web"]
-    MOBILE["Flutter Mobile"]
     WEB_SERVER["Server Actions / Route Handlers"]
     API["Flask API"]
     DOMAIN["Domain Models & Ports"]
@@ -23,12 +21,9 @@ flowchart TB
     INFRA["Infrastructure Adapters"]
     SUPA[("Supabase / PostgreSQL")]
     LLM["LLM & Embedding Providers"]
-    OUTBOX["Mobile Local Storage / Sync"]
 
     WEB --> WEB_SERVER
     WEB_SERVER --> API
-    MOBILE --> API
-    MOBILE <--> OUTBOX
     API --> APP
     APP --> DOMAIN
     INFRA -. implements contracts .-> DOMAIN
@@ -42,7 +37,7 @@ flowchart TB
 |---|---|
 | backend/app.py | Flask application factory and blueprint registration |
 | backend/routes/ | HTTP endpoints, request validation and authentication boundary |
-| backend/application/use_cases/ | Application workflows such as discovery, recommendations, notes, learning paths and knowledge graph operations |
+| backend/application/use_cases/ | Application workflows such as discovery, recommendations, notes and spaced review |
 | backend/domain/ | Domain models, protocols/ports and taxonomy |
 | backend/infrastructure/ | Persistence adapters, AI/ML integrations, logging and security |
 | backend/container.py | Dependency wiring |
@@ -63,12 +58,6 @@ The web application uses Next.js App Router:
 
 Server-side credentials must remain in server execution contexts. Only intentionally public configuration should use the NEXT_PUBLIC_ prefix.
 
-## Mobile application
-
-The Flutter source is under mobile/flutter_app/lib/. It separates domain entities, data/repository code, application workflows, providers, screens and services. Local storage and the synchronization outbox support selected offline mutations; this does not imply that every feature is fully available offline.
-
-The CI workflow uses Flutter 3.24.3. See the mobile project and its tests for the exact behavior of individual providers and sync operations.
-
 ## Persistence and AI
 
 PostgreSQL is the relational data store, with Supabase providing the configured platform services and pgvector used for vector-related functionality. SQL migrations are versioned in backend/scripts/ and numbered from 00 to 13.
@@ -87,6 +76,6 @@ AI-assisted discovery and recommendation workflows are implemented in backend us
 
 1. Branch from the latest main.
 2. Make a focused change within the appropriate application boundary.
-3. Run the backend, web or mobile checks affected by the change.
+3. Run the backend or web checks affected by the change.
 4. Review the GitHub Actions run for the pull request.
 5. Apply database changes only through a reviewed, ordered migration process with staging validation and a verified backup.

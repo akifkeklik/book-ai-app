@@ -96,7 +96,7 @@ def create_app(config_class=Config) -> Flask:
         )
 
     # ── CORS ──────────────────────────────────────────────────────────────────
-    # Allow Flutter Web / browsers to send API key, auth token, and request tracing headers.
+    # Allow browsers to send API key, auth token, and request tracing headers.
     CORS(
         app,
         origins=allowed_origins,

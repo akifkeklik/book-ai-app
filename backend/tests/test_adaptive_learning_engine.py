@@ -2,7 +2,6 @@ import unittest
 from typing import Any, Dict, List, Optional
 
 from backend.application.use_cases.interactions import ResetPreferencesUseCase
-from backend.application.use_cases.learning_paths import GeneratePathSuggestionsUseCase
 from backend.application.use_cases.recommendations import (
     GetPersonalizedRecommendationsUseCase,
 )
@@ -82,20 +81,6 @@ class MockNoteRepo:
         })
 
 
-class MockLearningPathRepo:
-    def __init__(self):
-        self.paths: Dict[str, Dict[str, Any]] = {}
-
-    def get_user_paths(self, user_id: str, status: Optional[str] = None) -> List[Dict[str, Any]]:
-        return [p for p in self.paths.values() if p["user_id"] == user_id and (status is None or p.get("status") == status)]
-
-    def get_path_by_id(self, path_id: str, user_id: str) -> Optional[Dict[str, Any]]:
-        p = self.paths.get(path_id)
-        if p and p["user_id"] == user_id:
-            return p
-        return None
-
-
 class TestAdaptiveLearningEngine(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -114,7 +99,6 @@ class TestAdaptiveLearningEngine(unittest.TestCase):
     def setUp(self):
         self.interaction_repo = MockInteractionRepo()
         self.note_repo = MockNoteRepo()
-        self.learning_path_repo = MockLearningPathRepo()
         self.enrichment = FakeEnrichmentService()
         self.uc = GetPersonalizedRecommendationsUseCase(
             recommender=self.engine,
@@ -122,7 +106,6 @@ class TestAdaptiveLearningEngine(unittest.TestCase):
             book_data_port=None,
             enrichment_service=self.enrichment,
             note_repo=self.note_repo,
-            learning_path_repo=self.learning_path_repo,
         )
 
     def test_cold_start_fallback_and_diagnostics(self):
@@ -178,40 +161,6 @@ class TestAdaptiveLearningEngine(unittest.TestCase):
         isbns = [r["isbn13"] for r in recs]
         self.assertNotIn("9781000000001", isbns)
         self.assertNotIn("9781000000003", isbns)
-
-    def test_learning_path_candidate_exclusion(self):
-        """Phase 5: Books already present in target learning path are strictly excluded."""
-        user_id = "user-path-candidate"
-        path_id = "path-cs-1"
-        self.learning_path_repo.paths[path_id] = {
-            "id": path_id,
-            "user_id": user_id,
-            "title": "Machine Learning Mastery",
-            "category": "Computer Science",
-            "status": "active",
-            "books": [
-                {"book_id": "9781000000001", "order_index": 0},
-                {"book_id": "9781000000003", "order_index": 1},
-            ],
-        }
-
-        path_sugg_uc = GeneratePathSuggestionsUseCase(
-            personalized_recs_uc=self.uc,
-            path_repo=self.learning_path_repo,
-        )
-
-        suggs = path_sugg_uc.execute(user_id=user_id, path_id=path_id, limit=3)
-        sugg_isbns = [s["isbn13"] for s in suggs]
-
-        # Target path books 9781000000001 and 9781000000003 must be excluded
-        self.assertNotIn("9781000000001", sugg_isbns)
-        self.assertNotIn("9781000000003", sugg_isbns)
-        # Deep Learning Principles (9781000000002) should be suggested
-        self.assertIn("9781000000002", sugg_isbns)
-        for s in suggs:
-            if s["isbn13"] == "9781000000002":
-                self.assertEqual(s.get("explanation_type"), "learning_path_continuity")
-                self.assertIn("Machine Learning Mastery", s.get("recommendation_reason", ""))
 
     def test_ranking_determinism(self):
         """Phase 1: Equivalent input profiles produce 100% deterministic ranking."""
@@ -354,7 +303,7 @@ class TestAdaptiveLearningEngine(unittest.TestCase):
                 if exp_type in (
                     "liked_book", "favorite_book", "finished_book", "reading_journey",
                     "takeaway_affinity", "category_affinity", "author_affinity",
-                    "learning_path_continuity", "trending_catalog"
+                    "trending_catalog"
                 ):
                     valid_explanation_count += 1
 

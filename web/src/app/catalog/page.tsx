@@ -407,6 +407,8 @@ export default async function CatalogPage({
               </div>
             ) : (
               <CatalogBookList
+                // Remount when filters change so client-side list state never shows stale results.
+                key={buildCatalogUrl(filterState, { page })}
                 initialBooks={displayedBooks}
                 initialPage={page}
                 totalPages={totalPages}

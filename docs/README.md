@@ -1,6 +1,6 @@
 # Documentation Index
 
-- [Architecture](ARCHITECTURE.md) — backend, web, mobile and persistence boundaries.
+- [Architecture](ARCHITECTURE.md) — backend, web and persistence boundaries.
 - [Local development setup](setup.md) — prerequisites, environment setup, run commands and quality checks.
 - [Supabase and database setup](supabase_setup.md) — credentials, numbered migrations and database safety.
 - [Design system](DESIGN_SYSTEM.md) — UI tokens, themes and accessibility conventions.

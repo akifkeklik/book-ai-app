@@ -46,7 +46,6 @@ export async function getLearningOverviewAction(): Promise<{
 
 export async function getLearningQueueAction(params?: {
   concept?: string;
-  pathId?: string;
   limit?: number;
 }): Promise<{ success: boolean; queue?: ReviewItem[]; error?: string }> {
   try {
@@ -114,7 +113,6 @@ export async function createLearningItemAction(
 
     const item = await ApiService.createLearningItem(input);
     safeRevalidatePath('/learning');
-    safeRevalidatePath('/knowledge-graph');
     return { success: true, item };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to create review item';

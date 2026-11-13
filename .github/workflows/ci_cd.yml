@@ -168,36 +168,6 @@ jobs:
         run: |
           docker build --no-cache -t libris-web web/
 
-  #   Frontend CI (Flutter/Dart) 
-  frontend-ci:
-    name: Mobile App Analysis & Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up Flutter Environment
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.24.3'
-          cache: true
-
-      - name: Fetch Pub Dependencies
-        run: |
-          cd mobile/flutter_app
-          flutter pub get
-
-      - name: Structural Analysis
-        run: |
-          cd mobile/flutter_app
-          flutter analyze --no-fatal-infos
-
-      - name: Unit & Widget Tests
-        run: |
-          cd mobile/flutter_app
-          flutter test
-
-  # Backend Integration CI
   backend-integration-ci:
     name: Backend Integration Tests
     runs-on: ubuntu-latest

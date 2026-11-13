@@ -15,6 +15,13 @@ function createFilterUrl(
   return buildCatalogUrl({ ...rest, query: q }, overrides);
 }
 
+test('CatalogBookList remounts when filters change (no stale books after picking a category)', () => {
+  const page = readFileSync(join(__dirname, '..', 'app', 'catalog', 'page.tsx'), 'utf-8');
+  const usage = page.slice(page.indexOf('<CatalogBookList'), page.indexOf('/>', page.indexOf('<CatalogBookList')));
+  assert.match(usage, /key=\{buildCatalogUrl\(filterState/);
+  assert.notEqual(buildCatalogUrl({ category: 'Fantasy' }, {}), buildCatalogUrl({ category: 'Technology' }, {}));
+});
+
 test('Server CatalogPage never passes a function prop to the client CatalogBookList', () => {
   const page = readFileSync(join(__dirname, '..', 'app', 'catalog', 'page.tsx'), 'utf-8');
   const usage = page.slice(page.indexOf('<CatalogBookList'), page.indexOf('/>', page.indexOf('<CatalogBookList')));

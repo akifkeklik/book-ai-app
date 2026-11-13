@@ -1,16 +1,13 @@
 <#
 .SYNOPSIS
-    Libris -- Sprint 15: One-Command Full-Stack Development Launcher
+    Libris -- One-Command Development Launcher
 .DESCRIPTION
-    Launches the Flask backend, Next.js web application, and Flutter mobile-web
-    preview in managed background processes, verifies HTTP readiness on all three
-    endpoints, and opens Chrome with the web application and mobile viewport preview.
+    Launches the Flask backend and the Next.js web application in managed background
+    processes, verifies HTTP readiness on both, and opens the web application in Chrome.
 .PARAMETER BackendPort
     Local port for Flask API (default: 5000)
 .PARAMETER WebPort
     Local port for Next.js web application (default: 3000)
-.PARAMETER FlutterPort
-    Local port for Flutter web server (default: 5001)
 .PARAMETER TimeoutSeconds
     Readiness polling timeout in seconds (default: 60)
 .PARAMETER NoBrowser
@@ -21,12 +18,9 @@
 param(
     [int]$BackendPort = 5000,
     [int]$WebPort = 3000,
-    [int]$FlutterPort = 5001,
     [int]$TimeoutSeconds = 120,
     [switch]$NoBrowser,
     [switch]$Wait,
-    [switch]$Emulator,
-    [string]$DeviceId = "",
     [switch]$Help
 )
 
@@ -55,7 +49,7 @@ if (-not (Test-Path $LogDir)) {
 
 Write-Header "LIBRIS SPRINT 15 -- FULL-STACK DEVELOPMENT LAUNCHER"
 Write-Info "Repository Root: $RepoRoot"
-Write-Info "Target Ports: Backend=$BackendPort, Web=$WebPort, FlutterWeb=$FlutterPort"
+Write-Info "Target Ports: Backend=$BackendPort, Web=$WebPort"
 
 # -- Step 1: Pre-flight Runtime Checks -----------------------------------------
 Write-Header "STEP 1: PRE-FLIGHT RUNTIME AUDIT"
@@ -79,15 +73,6 @@ if (-not $nodeCmd -or -not $npmCmd) {
 $nodeVersion = (& node --version 2>&1).Trim()
 $npmVersion  = (& npm --version 2>&1).Trim()
 Write-Success "Node.js: $nodeVersion (npm: $npmVersion)"
-
-# Check Flutter
-$flutterCmd = Get-Command "flutter" -ErrorAction SilentlyContinue
-if (-not $flutterCmd) {
-    Write-Fail "Flutter SDK not found in PATH."
-    exit 1
-}
-$flutterVersionLine = ((& flutter --version 2>&1) | Select-Object -First 1).Trim()
-Write-Success "Flutter: $flutterVersionLine"
 
 # Detect Chrome Executable
 $ChromePath = $null
@@ -145,9 +130,8 @@ function Test-PortAvailable ($port, $serviceName) {
 
 $backendPortOk = Test-PortAvailable $BackendPort "Backend"
 $webPortOk     = Test-PortAvailable $WebPort "Web"
-$flutterPortOk = Test-PortAvailable $FlutterPort "Flutter"
 
-if (-not ($backendPortOk -and $webPortOk -and $flutterPortOk)) {
+if (-not ($backendPortOk -and $webPortOk)) {
     Write-Fail "Port conflict detected. Stopping launcher to prevent service corruption."
     exit 1
 }
@@ -169,12 +153,10 @@ Write-Header "STEP 4: STARTING SERVICES IN MANAGED BACKGROUND PROCESSES"
 
 $backendLog = Join-Path $LogDir "backend.log"
 $webLog     = Join-Path $LogDir "web.log"
-$flutterLog = Join-Path $LogDir "flutter.log"
 
 # Clear old logs
 "" | Set-Content $backendLog -Force
 "" | Set-Content $webLog -Force
-"" | Set-Content $flutterLog -Force
 
 # 4A. Start Backend
 Write-Info "Starting Flask Backend on 127.0.0.1:$BackendPort..."
@@ -189,12 +171,6 @@ $webCmd = "set BACKEND_URL=http://127.0.0.1:$BackendPort&& npm run dev -- -p $We
 $webProc = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $webCmd -WorkingDirectory $webDir -PassThru -NoNewWindow
 Write-Info "Web client launched with wrapper PID $($webProc.Id)."
 
-# 4C. Start Flutter Web
-Write-Info "Starting Flutter Web target on 127.0.0.1:$FlutterPort..."
-$flutterDir = Join-Path $RepoRoot "mobile\flutter_app"
-$flutterCmd = "flutter run -d web-server --web-port $FlutterPort --web-hostname 127.0.0.1 --dart-define=BACKEND_URL=http://127.0.0.1:$BackendPort --dart-define=SUPABASE_URL=https://vnedgshbefpctjyzpqlm.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZuZWRnc2hiZWZwY3RqeXpwcWxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MDU4MDksImV4cCI6MjA5MDI4MTgwOX0.dNbOM-n-HS4VQlI6Hkg6JE1XAhpgFBz5GoCo8o1MIYs > `"$flutterLog`" 2>&1"
-$flutterProc = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $flutterCmd -WorkingDirectory $flutterDir -PassThru -NoNewWindow
-Write-Info "Flutter web target launched with wrapper PID $($flutterProc.Id)."
 
 # Persist PID tracking metadata
 $pidRecord = @{
@@ -212,12 +188,6 @@ $pidRecord = @{
         port = $WebPort
         log = $webLog
         url = "http://127.0.0.1:$WebPort"
-    }
-    flutter = @{
-        pid = $flutterProc.Id
-        port = $FlutterPort
-        log = $flutterLog
-        url = "http://127.0.0.1:$FlutterPort"
     }
 }
 $pidRecord | ConvertTo-Json -Depth 4 | Set-Content $PidFile -Encoding UTF8
@@ -269,7 +239,6 @@ function Poll-Endpoint ($url, $timeoutSec, $proc, $logPath, $serviceName, [strin
 
 $backendReady = Poll-Endpoint "http://127.0.0.1:$BackendPort/api/health" $TimeoutSeconds $backendProc $backendLog "Backend" "book-ai-api"
 $webReady     = Poll-Endpoint "http://127.0.0.1:$WebPort" $TimeoutSeconds $webProc $webLog "Web"
-$flutterReady = Poll-Endpoint "http://127.0.0.1:$FlutterPort" $TimeoutSeconds $flutterProc $flutterLog "Flutter Web"
 
 # Inspect separate database readiness
 $dbStatus = "unavailable"
@@ -285,12 +254,11 @@ try {
     }
 }
 
-if (-not ($backendReady -and $webReady -and $flutterReady)) {
+if (-not ($backendReady -and $webReady)) {
     Write-Fail "One or more services failed readiness verification."
     Write-Info "Terminating launched development processes safely..."
     if ($backendProc -and -not $backendProc.HasExited) { Stop-Process -Id $backendProc.Id -Force -ErrorAction SilentlyContinue }
     if ($webProc -and -not $webProc.HasExited) { Stop-Process -Id $webProc.Id -Force -ErrorAction SilentlyContinue }
-    if ($flutterProc -and -not $flutterProc.HasExited) { Stop-Process -Id $flutterProc.Id -Force -ErrorAction SilentlyContinue }
     Remove-Item $PidFile -Force -ErrorAction SilentlyContinue
     exit 1
 }
@@ -298,24 +266,21 @@ if (-not ($backendReady -and $webReady -and $flutterReady)) {
 # -- Step 6: Three-Link Local Showroom ------------------------------------------
 Write-Host ""
 Write-Host "================================================================================" -ForegroundColor Cyan
-Write-Host "                   LIBRIS -- THREE-LINK LOCAL SHOWROOM                          " -ForegroundColor Cyan
+Write-Host "                   LIBRIS -- LOCAL DEVELOPMENT STACK                            " -ForegroundColor Cyan
 Write-Host "================================================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  1. Backend health:               http://127.0.0.1:$BackendPort/api/health" -ForegroundColor Green
 Write-Host "  2. Web application:              http://127.0.0.1:$WebPort" -ForegroundColor Green
-Write-Host "  3. Mobile application in Chrome: http://127.0.0.1:$FlutterPort" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Readiness and Dependency Details:" -ForegroundColor DarkCyan
 Write-Host "   * Backend Liveness:             HEALTHY (HTTP 200)"
 Write-Host "   * Backend Database Readiness:   $($dbStatus.ToUpper()) [HTTP $dbStatusCode at /api/health/ready]"
 Write-Host "   * Web Client Status:            READY (HTTP 200, Next.js Turbopack)"
-Write-Host "   * Flutter Web Target:           READY (HTTP 200, WebAssembly/CanvasKit)"
 Write-Host ""
 Write-Host "  Interactive Capabilities Available Now:" -ForegroundColor DarkCyan
-Write-Host "   - Browse 6,400+ titles in Public Catalog (Web and Flutter Mobile-Web)"
+Write-Host "   - Browse 6,400+ titles in Public Catalog "
 Write-Host "   - Category Timeline, Search and Filtering"
 Write-Host "   - AI Discovery Chat and Lexical/Semantic Book Exploration"
-Write-Host "   - Offline-first cache and state transitions"
 Write-Host ""
 Write-Host "  Prerequisites and Boundaries:" -ForegroundColor DarkCyan
 Write-Host '   - Unauthenticated browsing is fully open and functional without login.'
@@ -323,7 +288,7 @@ Write-Host '   - Personalized shelves (/favorites, library) require active authe
 Write-Host '   - Database readiness is independently audited via /api/health/ready.'
 Write-Host ""
 Write-Host "  Safe Termination:" -ForegroundColor Yellow
-Write-Host "   To stop all 3 services safely, run:" -ForegroundColor Yellow
+Write-Host "   To stop all services safely, run:" -ForegroundColor Yellow
 Write-Host '   .\scripts\stop_dev.ps1 (or .\stop_dev.ps1)' -ForegroundColor White
 Write-Host ""
 Write-Host "================================================================================" -ForegroundColor Cyan
@@ -338,17 +303,12 @@ if (-not $NoBrowser) {
             Start-Process -FilePath $ChromePath -ArgumentList "http://127.0.0.1:$WebPort"
             Start-Sleep -Milliseconds 500
 
-            # Open Flutter in dedicated Mobile-sized App Window (Pixel 7 / iPhone form factor: 412x915)
-            Write-Info "Opening Flutter Mobile preview in Chrome mobile window (412x915)..."
-            Start-Process -FilePath $ChromePath -ArgumentList "--app=http://127.0.0.1:$FlutterPort", "--window-size=412,915"
             Write-Success "Chrome windows opened successfully."
         } else {
             Write-Info "Opening Web application in default browser..."
             Start-Process "http://127.0.0.1:$WebPort"
-            Start-Process "http://127.0.0.1:$FlutterPort"
             Write-Success "Default browser tabs launched."
         }
-        Write-Info "Tip: In Chrome, press F12 then Ctrl+Shift+M to toggle Mobile Device Toolbar."
     } catch {
         Write-Warn "Could not launch Chrome automatically: $_"
     }

@@ -849,11 +849,6 @@ class BookRecommender:
             verb_tr = "çıkarımlar kaydettiğiniz"
             explanation_type = "takeaway_affinity"
             confidence = "high"
-        elif src_type == "learning_path":
-            rec_reason = "Suggested for your learning path"
-            verb_tr = "öğrenme yolunuzdaki"
-            explanation_type = "learning_path_continuity"
-            confidence = "high"
         else:
             # Evidence-based attribution: distinguish user profile from content-similarity
             has_profile = bool(preferred_genres or preferred_authors)

@@ -8,7 +8,6 @@ This guide follows the current repository layout and CI commands. Configure only
 |---|---|---|
 | Python | 3.12 | Flask API |
 | Node.js | 22 | Next.js web app |
-| Flutter | 3.24.3 in CI | Mobile app |
 | PostgreSQL | 16 for integration CI | Local database and migration testing |
 | Git | Current stable | Source control |
 | Docker Compose | Compose v2 | Optional full-stack environment |
@@ -86,22 +85,6 @@ npm run dev
 
 Default local URL: http://localhost:3000.
 
-## 4. Configure and run the mobile app
-
-~~~bash
-cd mobile/flutter_app
-flutter pub get
-flutter run
-~~~
-
-The app accepts runtime configuration through the --dart-define mechanism. Use the define names referenced by the mobile configuration code. For local networking:
-
-- Android emulator: use http://10.0.2.2:5000 to reach the host machine.
-- iOS simulator: http://localhost:5000 is commonly available.
-- Physical device: use the development machine's LAN IP and ensure both devices are on a reachable network.
-
-Do not treat values compiled into a mobile application as secret. Never embed a Supabase service-role key in a client application.
-
 ## 5. Optional Docker Compose environment
 
 The repository includes docker-compose.yaml for backend, web and a local PostgreSQL service. Compose reads a root .env file; set at least the required SECRET_KEY and the configuration needed by the services before starting:
@@ -132,15 +115,6 @@ npm ci
 npm run lint
 npm test
 npm run build
-~~~
-
-**Mobile**
-
-~~~bash
-cd mobile/flutter_app
-flutter pub get
-flutter analyze --no-fatal-infos
-flutter test
 ~~~
 
 For the CI-equivalent integration tests, use a disposable PostgreSQL 16 service and set LIBRIS_TEST_DATABASE_URL as shown in .github/workflows/ci_cd.yml. Never point these tests at production.
@@ -174,7 +148,6 @@ Do not run backend/ci_stubs.sql against a production database. Do not bulk-execu
 |---|---|
 | Backend import errors | Run python -m backend.app from the repository root rather than executing a package module from the wrong working directory. |
 | Web cannot reach backend | Confirm the backend is running and BACKEND_URL points to the correct host from the web server's network namespace. |
-| Android emulator cannot reach localhost | Use 10.0.2.2 for the host machine. |
 | Supabase requests fail | Verify project URL, public anon key, auth configuration, network access and deployed schema. |
 | AI features fail | Verify the selected provider and its server-side API key. |
 | Integration tests skip | Set LIBRIS_TEST_DATABASE_URL to an isolated PostgreSQL test service. |
