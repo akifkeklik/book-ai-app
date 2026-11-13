@@ -34,12 +34,7 @@ Also included: reading shelves and favorites, note export, and full localization
 
 ## Scope decisions
 
-Libris started with a Flutter mobile client alongside the web app, plus learning paths and a personal knowledge graph. In November 2026 these were removed:
-
-- **Mobile client.** Keeping two clients in sync meant every feature, translation, and bug fix had to be done twice, and the mobile app kept developing its own defects. Focusing on one well-tested web client (responsive on phones) gave a more reliable product.
-- **Learning paths and knowledge graph.** They were impressive to demo but did not serve the core loop above, and they added a lot of code to maintain.
-
-The database migrations for those features are kept in `backend/scripts/` because they are part of the applied schema history.
+Learning paths and a personal knowledge graph were removed in November 2026 to keep the product focused on the core loop above. Their database migrations stay in `backend/scripts/` as applied schema history.
 
 > **Project status:** Feature-complete as a portfolio project and no longer under active development. It runs locally with Docker Compose or the dev scripts; it is not deployed as a public service. CI status is shown by the badge above.
 
