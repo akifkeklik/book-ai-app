@@ -45,7 +45,7 @@ export default function LearningPage() {
             {t('learning_title')}
           </h1>
           <p className="text-sm text-[var(--text-secondary)]">
-            Please log in or sign up to access active recall practice, retention intelligence, and your personalized review queue.
+            {t('learning_login_required')}
           </p>
         </div>
         <div className="flex items-center justify-center gap-3">
@@ -71,7 +71,7 @@ export default function LearningPage() {
       <Suspense fallback={
         <div className="p-12 text-center flex flex-col items-center justify-center gap-3">
           <Loader2 className="w-6 h-6 animate-spin text-[var(--accent)]" />
-          <p className="text-sm text-[var(--text-secondary)]">Loading learning dashboard...</p>
+          <p className="text-sm text-[var(--text-secondary)]">{t('learning_loading')}</p>
         </div>
       }>
         <LearningDashboardWithParams />

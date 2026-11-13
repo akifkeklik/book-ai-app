@@ -7,6 +7,7 @@ import { BookCard } from '@/components/BookCard';
 import { fetchCatalogPageAction } from '@/app/actions/catalog';
 import { Loader2, ChevronDown, Check } from 'lucide-react';
 import { buildCatalogUrl, type CatalogFilterState, type CatalogUrlOverrides } from '@/lib/catalogUrl';
+import { usePreferences } from '@/components/PreferencesProvider';
 
 interface CatalogBookListProps {
   initialBooks: Book[];
@@ -23,6 +24,7 @@ export function CatalogBookList({
   totalBooks,
   filterParams,
 }: CatalogBookListProps) {
+  const { t } = usePreferences();
   const createFilterUrl = (overrides: CatalogUrlOverrides) => buildCatalogUrl(filterParams, overrides);
   const [books, setBooks] = useState<Book[]>(initialBooks);
   const [currentPage, setCurrentPage] = useState<number>(initialPage);
@@ -59,7 +61,7 @@ export function CatalogBookList({
           setError(res.error || 'Failed to load more books. Please try again.');
         }
       } catch {
-        setError('Network error loading more books. Please try again.');
+        setError(t('catalog_more_error'));
       }
     });
   };
@@ -116,7 +118,7 @@ export function CatalogBookList({
               className="btn btn-outline"
               style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
             >
-              Retry
+              {t('retry')}
             </button>
           </div>
         )}
@@ -144,7 +146,7 @@ export function CatalogBookList({
             {isPending ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                <span>Loading more books...</span>
+                <span>{t('catalog_loading_more')}</span>
               </>
             ) : (
               <>
@@ -174,7 +176,7 @@ export function CatalogBookList({
         {/* Direct page navigation for SSR, SEO, and accessible direct jumps */}
         {totalPages > 1 && (
           <nav
-            aria-label="Catalog pages"
+            aria-label={t('catalog_pages_label')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -194,7 +196,7 @@ export function CatalogBookList({
                 opacity: currentPage <= 1 ? 0.4 : 1,
               }}
             >
-              Previous
+              {t('previous')}
             </Link>
             <span>
               Page <strong style={{ color: 'var(--foreground)' }}>{currentPage}</strong> of {totalPages}
@@ -209,7 +211,7 @@ export function CatalogBookList({
                 opacity: currentPage >= totalPages ? 0.4 : 1,
               }}
             >
-              Next
+              {t('next')}
             </Link>
           </nav>
         )}

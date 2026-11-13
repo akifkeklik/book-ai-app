@@ -5,8 +5,10 @@ import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { sanitizeRedirect } from '../login/page';
+import { usePreferences } from '@/components/PreferencesProvider';
 
 function SignUpForm() {
+  const { t } = usePreferences();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +41,7 @@ function SignUpForm() {
       } else if (data.user) {
         // Supabase returns an empty identities array if email already exists with confirmation enabled
         if (data.user.identities && data.user.identities.length === 0) {
-          setError('An account with this email already exists. Please log in.');
+          setError(t('signup_exists'));
           return;
         }
         setConfirmationSent(true);
@@ -53,8 +55,8 @@ function SignUpForm() {
 
   return (
     <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem' }}>
-      <h1 style={{ fontSize: '2rem', textAlign: 'center', marginBottom: '0.5rem' }}>Join Libris</h1>
-      <p className="text-muted text-center" style={{ marginBottom: '2rem' }}>Create an account to start your journey.</p>
+      <h1 style={{ fontSize: '2rem', textAlign: 'center', marginBottom: '0.5rem' }}>{t('signup_title')}</h1>
+      <p className="text-muted text-center" style={{ marginBottom: '2rem' }}>{t('signup_subtitle')}</p>
       
       {error && (
         <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
@@ -65,7 +67,7 @@ function SignUpForm() {
       {confirmationSent ? (
         <div className="text-center" style={{ padding: '1rem 0' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✉️</div>
-          <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Check your email</h2>
+          <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{t('signup_check_email')}</h2>
           <p className="text-muted" style={{ marginBottom: '1.5rem', fontSize: '0.875rem' }}>
             We sent a confirmation link to <strong>{email}</strong>. Please verify your email before logging in.
           </p>
@@ -80,7 +82,7 @@ function SignUpForm() {
       ) : (
         <form onSubmit={handleSignUp}>
           <div className="input-group">
-            <label className="input-label" htmlFor="email">Email</label>
+            <label className="input-label" htmlFor="email">{t('email_label')}</label>
             <input 
               id="email"
               type="email" 
@@ -88,12 +90,12 @@ function SignUpForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input-field"
-              placeholder="your@email.com"
+              placeholder={t('email_placeholder')}
             />
           </div>
           
           <div className="input-group">
-            <label className="input-label" htmlFor="password">Password</label>
+            <label className="input-label" htmlFor="password">{t('password_label')}</label>
             <input 
               id="password"
               type="password" 
@@ -101,7 +103,7 @@ function SignUpForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="input-field"
-              placeholder="Min. 6 characters"
+              placeholder={t('password_min_hint')}
               minLength={6}
             />
           </div>
@@ -131,9 +133,10 @@ function SignUpForm() {
 }
 
 export default function SignUpPage() {
+  const { t } = usePreferences();
   return (
     <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '70vh' }}>
-      <Suspense fallback={<div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem', textAlign: 'center' }}>Loading...</div>}>
+      <Suspense fallback={<div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem', textAlign: 'center' }}>{t('loading')}</div>}>
         <SignUpForm />
       </Suspense>
     </div>

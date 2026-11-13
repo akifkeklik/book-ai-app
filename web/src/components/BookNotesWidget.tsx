@@ -71,7 +71,7 @@ export default function BookNotesWidget({
         })
         .catch(() => {
           if (!ignore) {
-            setError('Failed to load learning notes');
+            setError(t('notes_load_error'));
           }
         })
         .finally(() => {
@@ -86,7 +86,7 @@ export default function BookNotesWidget({
     return () => {
       ignore = true;
     };
-  }, [bookId, isUserAuthenticated]);
+  }, [bookId, isUserAuthenticated, t]);
 
   const handleCreate = async () => {
     if (!newContent.trim()) return;
@@ -125,7 +125,7 @@ export default function BookNotesWidget({
       setNotes((prev) => prev.filter((n) => n.id !== tempId));
       setNewContent(previousContent);
       setIsAdding(true);
-      setError('A network error occurred while saving your note');
+      setError(t('notes_save_error'));
     } finally {
       setSubmitting(false);
     }
@@ -171,7 +171,7 @@ export default function BookNotesWidget({
       }
     } catch {
       setNotes((prev) => prev.map((n) => (n.id === noteId ? prevNote : n)));
-      setError('A network error occurred while updating your note');
+      setError(t('notes_update_error'));
     } finally {
       setSubmitting(false);
     }
@@ -196,7 +196,7 @@ export default function BookNotesWidget({
       }
     } catch {
       setNotes((prev) => [prevNote, ...prev]);
-      setError('A network error occurred while deleting your note');
+      setError(t('notes_delete_error'));
     } finally {
       setDeletingId(null);
     }
@@ -346,7 +346,7 @@ export default function BookNotesWidget({
             type="button"
             onClick={() => setError(null)}
             style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
-            aria-label="Dismiss error"
+            aria-label={t('dismiss_error_label')}
           >
             <X size={16} />
           </button>
@@ -399,7 +399,7 @@ export default function BookNotesWidget({
           {/* Note Type Selector */}
           <div
             role="radiogroup"
-            aria-label="Note Type"
+            aria-label={t('note_type_label')}
             style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}
           >
             {(['personal_note', 'key_takeaway', 'question'] as NoteType[]).map((type) => {
@@ -541,7 +541,7 @@ export default function BookNotesWidget({
       {notes.length > 0 && (
         <div
           role="list"
-          aria-label="Notes list"
+          aria-label={t('notes_list_label')}
           style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}
         >
           {notes.map((note) => {

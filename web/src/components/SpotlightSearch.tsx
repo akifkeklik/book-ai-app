@@ -224,7 +224,7 @@ export function SpotlightSearch() {
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={t('search') || 'Search catalog'}
+        aria-label={t('search') || t('spot_search_label')}
         className="glass-panel spotlight-dialog"
         style={{
           width: '100%',
@@ -255,7 +255,7 @@ export function SpotlightSearch() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleInputKeyDown}
             placeholder={`${t('search')} titles, authors, genres, or ISBN...`}
-            aria-label="Search catalog"
+            aria-label={t('spot_search_label')}
             aria-autocomplete="list"
             aria-controls="spotlight-results-list"
             aria-activedescendant={results[selectedIndex] ? `spotlight-item-${results[selectedIndex].isbn13}` : undefined}
@@ -277,7 +277,7 @@ export function SpotlightSearch() {
                 setQuery('');
                 inputRef.current?.focus();
               }}
-              aria-label="Clear search"
+              aria-label={t('clear_search')}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -293,7 +293,7 @@ export function SpotlightSearch() {
           <button
             type="button"
             onClick={closeSpotlight}
-            aria-label="Close search"
+            aria-label={t('spot_close')}
             style={{
               background: 'rgba(255, 255, 255, 0.08)',
               border: '1px solid var(--card-border)',
@@ -313,7 +313,7 @@ export function SpotlightSearch() {
         <div
           id="spotlight-results-list"
           role="listbox"
-          aria-label="Search suggestions"
+          aria-label={t('spot_suggestions')}
           style={{
             maxHeight: '400px',
             overflowY: 'auto',
@@ -364,12 +364,12 @@ export function SpotlightSearch() {
               }}
             >
               <p style={{ fontWeight: 600, color: 'var(--foreground)', marginBottom: '0.5rem' }}>
-                Quick Search Tips:
+                {t('spot_tips')}
               </p>
               <ul style={{ paddingLeft: '1.25rem', margin: 0 }}>
-                <li>Type book title or author name (e.g. &ldquo;Orwell&rdquo; or &ldquo;1984&rdquo;)</li>
-                <li>Search specific ISBN numbers (e.g. &ldquo;9780451524935&rdquo;)</li>
-                <li>Use <kbd style={{ fontFamily: 'var(--font-mono)' }}>↓</kbd> / <kbd style={{ fontFamily: 'var(--font-mono)' }}>↑</kbd> to navigate and <kbd style={{ fontFamily: 'var(--font-mono)' }}>Enter</kbd> to view</li>
+                <li>{t('spot_tip_title')}</li>
+                <li>{t('spot_tip_isbn')}</li>
+                <li>{t('spot_tip_keys')}</li>
               </ul>
             </div>
           )}
@@ -525,7 +525,7 @@ export function SpotlightSearch() {
                 fontWeight: 600,
               }}
             >
-              See all results in catalog →
+              {t('spot_see_all')}
             </button>
           </div>
         )}

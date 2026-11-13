@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { usePreferences } from '@/components/PreferencesProvider';
 
 export default function BookDetailError({
   error,
@@ -11,6 +12,7 @@ export default function BookDetailError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = usePreferences();
   useEffect(() => {
     // Log sanitized error message in development/monitoring without exposing stack to user
     console.error('Book detail render error:', error?.message || 'Unknown error');
@@ -44,7 +46,7 @@ export default function BookDetailError({
         </div>
 
         <h2 style={{ fontSize: '1.75rem', marginBottom: '0.75rem' }}>
-          Unable to Load Book Details
+          {t('book_error_title')}
         </h2>
 
         <p className="text-muted" style={{ marginBottom: '2rem', lineHeight: '1.6' }}>

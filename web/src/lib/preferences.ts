@@ -14,7 +14,27 @@ export type ColorPalette =
 export type FontFamily = 'serif' | 'sans' | 'mono';
 export type FontScale = 0.9 | 1.0 | 1.15 | 1.3;
 export type LineSpacing = 'normal' | 'relaxed';
-export type Language = 'en' | 'tr' | 'de';
+export const LANGUAGES = ['en', 'tr', 'de', 'es', 'fr', 'it'] as const;
+export type Language = (typeof LANGUAGES)[number];
+
+/** Native language names, shown in the language picker. */
+export const LANGUAGE_NAMES: Record<Language, string> = {
+  en: 'English',
+  tr: 'Türkçe',
+  de: 'Deutsch',
+  es: 'Español',
+  fr: 'Français',
+  it: 'Italiano',
+};
+
+export function isLanguage(value: unknown): value is Language {
+  return typeof value === 'string' && (LANGUAGES as readonly string[]).includes(value);
+}
+
+/** Resolves an untrusted value (cookie, query, AI action) to a supported language. */
+export function resolveLanguage(value: unknown): Language {
+  return isLanguage(value) ? value : 'en';
+}
 export type Density = 'comfortable' | 'compact';
 
 export interface LibrisPreferences {
@@ -60,7 +80,6 @@ const VALID_PALETTES: ColorPalette[] = [
 const VALID_FONTS: FontFamily[] = ['serif', 'sans', 'mono'];
 const VALID_SCALES: FontScale[] = [0.9, 1.0, 1.15, 1.3];
 const VALID_SPACINGS: LineSpacing[] = ['normal', 'relaxed'];
-const VALID_LANGUAGES: Language[] = ['en', 'tr', 'de'];
 const VALID_DENSITIES: Density[] = ['comfortable', 'compact'];
 
 /**
@@ -102,7 +121,7 @@ export function parsePreferences(raw: unknown): LibrisPreferences {
     ? data.reducedMotion
     : DEFAULT_PREFERENCES.reducedMotion;
 
-  const language: Language = VALID_LANGUAGES.includes(data.language as Language)
+  const language: Language = isLanguage(data.language)
     ? (data.language as Language)
     : DEFAULT_PREFERENCES.language;
 

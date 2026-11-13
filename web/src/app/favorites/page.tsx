@@ -60,7 +60,7 @@ export default function FavoritesPage() {
         setError(res.error || 'Failed to load library items');
       }
     } catch {
-      setError('An unexpected network error occurred while loading your library.');
+      setError(t('library_load_error'));
     } finally {
       setLoading(false);
     }
@@ -84,7 +84,7 @@ export default function FavoritesPage() {
         })
         .catch(() => {
           if (!ignore) {
-            setError('An unexpected network error occurred while loading your library.');
+            setError(t('library_load_error'));
             setLoading(false);
           }
         });
@@ -93,7 +93,7 @@ export default function FavoritesPage() {
     return () => {
       ignore = true;
     };
-  }, [user, authLoading]);
+  }, [user, authLoading, t]);
 
   // Counts per status
   const counts = useMemo(() => {
@@ -153,7 +153,7 @@ export default function FavoritesPage() {
         }
       } catch {
         setItems(previousItems); // Rollback
-        setError('Network error while removing book.');
+        setError(t('library_remove_error'));
       } finally {
         setUpdatingId(null);
       }
@@ -178,7 +178,7 @@ export default function FavoritesPage() {
         }
       } catch {
         setItems(previousItems); // Rollback
-        setError('Network error while updating status.');
+        setError(t('library_status_error'));
       } finally {
         setUpdatingId(null);
       }
@@ -273,7 +273,7 @@ export default function FavoritesPage() {
             className="btn btn-outline"
             style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', borderColor: 'rgba(239, 68, 68, 0.4)' }}
           >
-            Retry
+            {t('retry')}
           </button>
         </div>
       )}
@@ -293,7 +293,7 @@ export default function FavoritesPage() {
         }}
       >
         {/* Collection Filter Tabs */}
-        <div className="library-tabs" role="tablist" aria-label="Library collections">
+        <div className="library-tabs" role="tablist" aria-label={t('library_collections')}>
           <button
             role="tab"
             aria-selected={activeTab === 'all'}
@@ -383,7 +383,7 @@ export default function FavoritesPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="input-field"
               style={{ width: '100%', paddingLeft: '2.4rem', height: '40px', fontSize: '0.875rem' }}
-              aria-label="Filter books by title or author"
+              aria-label={t('library_filter_label')}
             />
           </div>
 
@@ -394,7 +394,7 @@ export default function FavoritesPage() {
               onChange={(e) => setSortBy(e.target.value as SortOption)}
               className="input-field"
               style={{ height: '40px', fontSize: '0.875rem', paddingRight: '2rem', cursor: 'pointer' }}
-              aria-label="Sort library books"
+              aria-label={t('library_sort_label')}
             >
               <option value="recent">{t('sort_recent')}</option>
               <option value="title">{t('sort_title')}</option>
@@ -730,22 +730,22 @@ export default function FavoritesPage() {
                     <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 2 }}>
                       {item.status === 'favorite' && (
                         <span className="status-badge status-badge-favorite">
-                          <Heart size={12} fill="#f472b6" /> Favorite
+                          <Heart size={12} fill="#f472b6" /> {t('status_favorite')}
                         </span>
                       )}
                       {item.status === 'want_to_read' && (
                         <span className="status-badge status-badge-want-to-read">
-                          <Bookmark size={12} fill="currentColor" /> Want to Read
+                          <Bookmark size={12} fill="currentColor" /> {t('status_want_to_read')}
                         </span>
                       )}
                       {item.status === 'reading' && (
                         <span className="status-badge status-badge-reading">
-                          <BookOpen size={12} /> Reading
+                          <BookOpen size={12} /> {t('status_reading')}
                         </span>
                       )}
                       {item.status === 'finished' && (
                         <span className="status-badge status-badge-finished">
-                          <CheckCircle size={12} /> Finished
+                          <CheckCircle size={12} /> {t('status_finished')}
                         </span>
                       )}
                     </div>
@@ -795,10 +795,10 @@ export default function FavoritesPage() {
                     }}
                     aria-label={`Change collection status for ${book.title}`}
                   >
-                    <option value="favorite">Favorite</option>
-                    <option value="want_to_read">Want to Read</option>
-                    <option value="reading">Reading</option>
-                    <option value="finished">Finished</option>
+                    <option value="favorite">{t('status_favorite')}</option>
+                    <option value="want_to_read">{t('status_want_to_read')}</option>
+                    <option value="reading">{t('status_reading')}</option>
+                    <option value="finished">{t('status_finished')}</option>
                   </select>
 
                   <button
@@ -812,7 +812,7 @@ export default function FavoritesPage() {
                       color: 'var(--danger)',
                       borderColor: 'rgba(239, 68, 68, 0.25)',
                     }}
-                    title="Remove from Library"
+                    title={t('remove_from_library')}
                     aria-label={`Remove ${book.title} from library`}
                   >
                     <Trash2 size={15} />

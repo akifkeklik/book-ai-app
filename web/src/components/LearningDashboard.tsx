@@ -207,7 +207,7 @@ export function LearningDashboard({
           </div>
           <div className="saas-metric-footer">
             <span className="saas-pulse-dot amber" />
-            <span>Active recall ready</span>
+            <span>{t('ld_recall_ready')}</span>
           </div>
         </div>
 
@@ -224,7 +224,7 @@ export function LearningDashboard({
           </div>
           <div className="saas-metric-footer">
             <span className="saas-pulse-dot emerald" />
-            <span>Retained milestones</span>
+            <span>{t('ld_retained')}</span>
           </div>
         </div>
 
@@ -241,7 +241,7 @@ export function LearningDashboard({
           </div>
           <div className="saas-metric-footer">
             <span className="saas-pulse-dot blue" />
-            <span>Memory stability</span>
+            <span>{t('ld_memory_stability')}</span>
           </div>
         </div>
 
@@ -255,11 +255,11 @@ export function LearningDashboard({
           </div>
           <div className="saas-metric-value flex items-center gap-1.5">
             <span>{progress?.activeStreakDays ?? 0}</span>
-            <span className="text-xs font-normal text-[var(--text-muted)] font-sans">days</span>
+            <span className="text-xs font-normal text-[var(--text-muted)] font-sans">{t('unit_days')}</span>
           </div>
           <div className="saas-metric-footer">
             <span className="saas-pulse-dot amber" />
-            <span>Daily habit continuity</span>
+            <span>{t('ld_daily_habit')}</span>
           </div>
         </div>
       </div>
@@ -269,10 +269,10 @@ export function LearningDashboard({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
             <div style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
-              Learning Outcomes & Memory Retention Visualizer
+              {t('ld_chart_title')}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              Dynamic spaced-repetition memory trace and concept stabilization
+              {t('ld_chart_subtitle')}
             </div>
           </div>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', fontSize: '0.75rem' }}>
@@ -299,7 +299,7 @@ export function LearningDashboard({
             }}
           />
           <div
-            title="Proficient / In Review"
+            title={t('ld_proficient')}
             style={{
               width: `${Math.max(0, Math.min(30, 100 - (progress?.masteryScore || 15)))}%`,
               background: 'linear-gradient(90deg, #0284c7, var(--electric-blue))',
@@ -307,7 +307,7 @@ export function LearningDashboard({
             }}
           />
           <div
-            title="Practicing / Queue"
+            title={t('ld_practicing')}
             style={{
               flex: 1,
               background: 'linear-gradient(90deg, #d97706, #f59e0b)',
@@ -383,14 +383,14 @@ export function LearningDashboard({
       {/* Selected Concept Filter Chip */}
       {selectedConcept && (
         <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)] text-xs">
-          <span className="text-[var(--text-secondary)]">Filtered by concept:</span>
+          <span className="text-[var(--text-secondary)]">{t('ld_filtered_concept')}</span>
           <span className="font-bold text-[var(--accent)]">{selectedConcept}</span>
           <button
             type="button"
             onClick={() => setSelectedConcept(undefined)}
             className="ml-auto text-[var(--text-secondary)] hover:text-[var(--text)] font-semibold"
           >
-            Clear filter
+            {t('clear_filter')}
           </button>
         </div>
       )}
@@ -406,7 +406,7 @@ export function LearningDashboard({
             onClick={() => setSelectedPathId(undefined)}
             className="ml-auto text-[var(--text-secondary)] hover:text-[var(--text)] font-semibold"
           >
-            Clear filter
+            {t('clear_filter')}
           </button>
         </div>
       )}
@@ -415,7 +415,7 @@ export function LearningDashboard({
       {loading && (
         <div className="p-12 text-center flex flex-col items-center justify-center gap-3">
           <Loader2 className="w-6 h-6 animate-spin text-[var(--accent)]" />
-          <p className="text-sm text-[var(--text-secondary)]">Loading learning outcomes...</p>
+          <p className="text-sm text-[var(--text-secondary)]">{t('ld_loading')}</p>
         </div>
       )}
 

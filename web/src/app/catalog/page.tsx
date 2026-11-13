@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Search, SlidersHorizontal, X, ArrowUpDown, Star, BookOpen } from 'lucide-react';
 import { cookies } from 'next/headers';
 import { translate, type TranslationKey } from '@/lib/i18n';
-import type { Language } from '@/lib/preferences';
+import { type Language, resolveLanguage } from '@/lib/preferences';
 import { buildCatalogUrl, type CatalogFilterState, type CatalogUrlOverrides } from '@/lib/catalogUrl';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +18,7 @@ export default async function CatalogPage({
   const resolvedParams = await searchParams;
   const cookieStore = await cookies();
   const rawLang = cookieStore.get('libris_lang')?.value;
-  const lang: Language = (rawLang === 'tr' || rawLang === 'de' || rawLang === 'en') ? rawLang : 'en';
+  const lang: Language = resolveLanguage(rawLang);
   const t = (key: TranslationKey, args?: Record<string, string | number>) => translate(lang, key, args);
 
   const page = Math.max(1, Number(resolvedParams.page) || 1);
@@ -101,7 +101,7 @@ export default async function CatalogPage({
                 <Link
                   href={createFilterUrl({ q: null })}
                   style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }}
-                  aria-label="Clear search"
+                  aria-label={t('clear_search')}
                 >
                   <X size={16} />
                 </Link>
@@ -129,7 +129,7 @@ export default async function CatalogPage({
             {/* Sort Control */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <ArrowUpDown size={16} color="var(--muted)" />
-              <span style={{ fontSize: '0.875rem', color: 'var(--muted)' }}>Sort:</span>
+              <span style={{ fontSize: '0.875rem', color: 'var(--muted)' }}>{t('sort_label')}</span>
               <div style={{ display: 'flex', gap: '0.4rem' }}>
                 <Link
                   href={createFilterUrl({ sort: 'popularity', order: 'desc' })}
@@ -141,7 +141,7 @@ export default async function CatalogPage({
                     color: sort === 'popularity' ? '#fff' : 'var(--foreground)',
                   }}
                 >
-                  Popular
+                  {t('sort_popularity')}
                 </Link>
                 <Link
                   href={createFilterUrl({ sort: 'rating', order: 'desc' })}
@@ -153,7 +153,7 @@ export default async function CatalogPage({
                     color: sort === 'rating' ? '#fff' : 'var(--foreground)',
                   }}
                 >
-                  Top Rated
+                  {t('sort_rating')}
                 </Link>
                 <Link
                   href={createFilterUrl({ sort: 'title', order: 'asc' })}
@@ -165,7 +165,7 @@ export default async function CatalogPage({
                     color: sort === 'title' ? '#fff' : 'var(--foreground)',
                   }}
                 >
-                  Title A-Z
+                  {t('sort_title')}
                 </Link>
                 <Link
                   href={createFilterUrl({ sort: 'newest', order: 'desc' })}
@@ -177,7 +177,7 @@ export default async function CatalogPage({
                     color: sort === 'newest' ? '#fff' : 'var(--foreground)',
                   }}
                 >
-                  Newest
+                  {t('sort_newest')}
                 </Link>
               </div>
             </div>
@@ -185,7 +185,7 @@ export default async function CatalogPage({
             {/* Min Rating Filter */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Star size={16} color="#fbbf24" fill="#fbbf24" />
-              <span style={{ fontSize: '0.875rem', color: 'var(--muted)' }}>Min Rating:</span>
+              <span style={{ fontSize: '0.875rem', color: 'var(--muted)' }}>{t('min_rating_label')}</span>
               <div style={{ display: 'flex', gap: '0.4rem' }}>
                 <Link
                   href={createFilterUrl({ min_rating: null })}
@@ -246,7 +246,7 @@ export default async function CatalogPage({
         <div style={{ padding: '2rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', borderRadius: '12px', textAlign: 'center' }}>
           <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{error}</p>
           <Link href="/catalog" className="btn btn-primary" style={{ marginTop: '1rem' }}>
-            Reload Catalog
+            {t('reload_catalog')}
           </Link>
         </div>
       ) : (
@@ -256,7 +256,7 @@ export default async function CatalogPage({
             <div className="glass-panel" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--card-border)' }}>
                 <SlidersHorizontal size={18} color="var(--primary)" />
-                <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Categories</h3>
+                <h3 style={{ fontSize: '1.1rem', margin: 0 }}>{t('categories_filter')}</h3>
               </div>
               <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 <li>
@@ -273,7 +273,7 @@ export default async function CatalogPage({
                       fontWeight: !category ? 600 : 400,
                     }}
                   >
-                    <span>All Books</span>
+                    <span>{t('tab_all')}</span>
                     <span className="text-muted" style={{ fontSize: '0.8rem' }}>{totalBooks > 0 ? totalBooks : ''}</span>
                   </Link>
                 </li>
@@ -345,7 +345,7 @@ export default async function CatalogPage({
                         className="btn"
                         style={{ padding: '0.5rem 1rem', background: 'rgba(255, 255, 255, 0.06)' }}
                       >
-                        Clear All Filters
+                        {t('clear_filters')}
                       </Link>
                     </div>
                   </>
@@ -376,7 +376,7 @@ export default async function CatalogPage({
                       ))}
                     </div>
                     <Link href="/catalog" className="btn btn-primary">
-                      Clear Search Query
+                      {t('clear_search')}
                     </Link>
                   </>
                 ) : category ? (
@@ -385,22 +385,22 @@ export default async function CatalogPage({
                       No books found in {category}
                     </h3>
                     <p className="text-muted" style={{ maxWidth: '440px', margin: '0 auto 1.5rem', lineHeight: '1.6' }}>
-                      No titles are listed in this category matching your active filter criteria.
+                      {t('catalog_empty_category')}
                     </p>
                     <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                       <Link href="/catalog" className="btn btn-primary">
-                        Browse All Books
+                        {t('browse_all_books')}
                       </Link>
                     </div>
                   </>
                 ) : (
                   <>
-                    <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>No books match your criteria</h3>
+                    <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>{t('catalog_no_match')}</h3>
                     <p className="text-muted" style={{ maxWidth: '420px', margin: '0 auto 1.5rem', lineHeight: '1.6' }}>
-                      Try adjusting or clearing your filters to see more results:
+                      {t('catalog_adjust_filters')}
                     </p>
                     <Link href="/catalog" className="btn btn-primary">
-                      Reset All Filters
+                      {t('clear_filters')}
                     </Link>
                   </>
                 )}

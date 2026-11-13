@@ -299,7 +299,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
           <button
             onClick={() => loadGraph()}
             disabled={loading}
-            aria-label="Refresh graph"
+            aria-label={t('kg_refresh')}
             className="p-2 rounded-lg border border-border hover:bg-surface-raised text-muted-foreground hover:text-foreground transition"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -372,7 +372,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
       {/* ── Active Focus Pill (if focus node set) ── */}
       {focusId && (
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-xs text-primary w-fit">
-          <span className="font-semibold">Focused on:</span>
+          <span className="font-semibold">{t('kg_focused_on')}</span>
           <span className="font-mono">{focusId}</span>
           <button
             onClick={() => {
@@ -380,7 +380,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
               loadGraph(null);
             }}
             className="hover:text-primary/70 p-0.5 ml-1"
-            aria-label="Clear focus"
+            aria-label={t('kg_clear_focus')}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -442,7 +442,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Interactive Knowledge Nodes ({filteredNodes.length})
               </span>
-              <span className="text-xs text-muted-foreground">Click node to inspect evidence</span>
+              <span className="text-xs text-muted-foreground">{t('kg_click_hint')}</span>
             </div>
 
             {/* Nodes Cluster Grid */}
@@ -482,24 +482,21 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                  Book
+                  {t('kg_type_book')}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-                  Concept
+                  {t('kg_type_concept')}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  Note
+                  {t('kg_type_note')}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                  Learning Path
+                  {t('kg_type_path')}
                 </span>
               </div>
-              <span className="text-[11px] opacity-75">
-                Deterministic Rocchio & MMR attribution
-              </span>
             </div>
           </div>
 
@@ -530,7 +527,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
 
                   <button
                     onClick={() => setSelectedNode(null)}
-                    aria-label="Close inspector"
+                    aria-label={t('kg_close_inspector')}
                     className="p-1 rounded-lg text-muted-foreground hover:bg-surface transition"
                   >
                     <X className="w-4 h-4" />
@@ -543,7 +540,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
                     <>
                       {Boolean(selectedNode.data.authors) && (
                         <div>
-                          <span className="text-muted-foreground">Author: </span>
+                          <span className="text-muted-foreground">{t('kg_author_label')} </span>
                           <span className="font-semibold text-foreground">
                             {String(selectedNode.data.authors)}
                           </span>
@@ -551,7 +548,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
                       )}
                       {Boolean(selectedNode.data.categories) && (
                         <div>
-                          <span className="text-muted-foreground">Category: </span>
+                          <span className="text-muted-foreground">{t('kg_category_label')} </span>
                           <span className="font-semibold text-foreground">
                             {String(selectedNode.data.categories)}
                           </span>
@@ -571,7 +568,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
 
                   {selectedNode.type === 'concept' && (
                     <div>
-                      <span className="text-muted-foreground">Canonical Topic: </span>
+                      <span className="text-muted-foreground">{t('kg_topic_label')} </span>
                       <span className="font-semibold text-foreground">
                         {String(selectedNode.data.canonical_name || selectedNode.label)}
                       </span>
@@ -597,13 +594,13 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
                   {selectedNode.type === 'learning_path' && (
                     <div className="space-y-1">
                       <div>
-                        <span className="text-muted-foreground">Category: </span>
+                        <span className="text-muted-foreground">{t('kg_category_label')} </span>
                         <span className="font-semibold text-foreground">
                           {String(selectedNode.data.category || 'General')}
                         </span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Status: </span>
+                        <span className="text-muted-foreground">{t('kg_status_label')} </span>
                         <span className="font-semibold text-foreground capitalize">
                           {String(selectedNode.data.status || '')}
                         </span>
@@ -621,7 +618,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
                       className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
                     >
                       <Filter className="w-3 h-3" />
-                      Focus Subgraph (1-hop)
+                      {t('kg_focus_subgraph')}
                     </button>
                     <button
                       onClick={() => setIsConnectModalOpen(true)}
@@ -643,7 +640,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
 
                   {selectedNodeEdges.length === 0 ? (
                     <p className="text-xs text-muted-foreground italic py-2">
-                      No direct edges connected to this node in current view.
+                      {t('kg_no_edges')}
                     </p>
                   ) : (
                     <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
@@ -669,7 +666,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
                                 {edge.id && (
                                   <button
                                     onClick={() => handleDeleteConnection(edge.id)}
-                                    aria-label="Delete relationship"
+                                    aria-label={t('kg_delete_connection')}
                                     className="p-1 text-muted-foreground hover:text-destructive rounded transition"
                                   >
                                     <Trash2 className="w-3 h-3" />
@@ -689,7 +686,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
                                   onClick={() => setSelectedNode(otherNode)}
                                   className="text-primary hover:underline font-medium text-[11px]"
                                 >
-                                  Inspect
+                                  {t('kg_inspect')}
                                 </button>
                               )}
                             </div>
@@ -721,7 +718,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
                   {t('kg_node_details')}
                 </h3>
                 <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                  Select any node in the knowledge cluster to inspect its evidence-backed relationships.
+                  {t('kg_select_hint')}
                 </p>
               </div>
             )}
@@ -748,7 +745,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
             <form onSubmit={handleCreateConnection} className="space-y-4 text-xs">
               <div>
                 <label className="block font-medium text-muted-foreground mb-1">
-                  Source Entity (Selected)
+                  {t('kg_source_selected')}
                 </label>
                 <div className="p-2.5 rounded-lg bg-surface-raised border border-border font-semibold text-foreground">
                   {selectedNode.label} ({selectedNode.type})
@@ -757,7 +754,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
 
               <div>
                 <label className="block font-medium text-muted-foreground mb-1">
-                  Target Entity
+                  {t('kg_target')}
                 </label>
                 <select
                   value={targetNodeId}
@@ -765,7 +762,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
                   required
                   className="w-full p-2.5 rounded-lg bg-surface-raised border border-border text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
                 >
-                  <option value="">Select target node...</option>
+                  <option value="">{t('kg_select_target')}</option>
                   {graphData.nodes
                     .filter((n) => n.id !== selectedNode.id)
                     .map((n) => (
@@ -805,7 +802,7 @@ export function KnowledgeGraphView({ className = '', initialFocusId }: Knowledge
                   type="text"
                   value={connectionEvidence}
                   onChange={(e) => setConnectionEvidence(e.target.value)}
-                  placeholder="e.g. Chapter 4 insight, verified theme"
+                  placeholder={t('kg_evidence_hint')}
                   className="w-full p-2.5 rounded-lg bg-surface-raised border border-border text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
                 />
               </div>

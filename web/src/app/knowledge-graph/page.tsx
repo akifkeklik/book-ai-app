@@ -31,7 +31,7 @@ export default function KnowledgeGraphPage() {
             {t('kg_title')}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Please log in or sign up to view and interact with your personal knowledge map.
+            {t('kg_login_required')}
           </p>
         </div>
         <div className="flex items-center justify-center gap-3">

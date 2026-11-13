@@ -1,6 +1,10 @@
+import { cookies } from 'next/headers';
+import { translate } from '@/lib/i18n';
+import { resolveLanguage } from '@/lib/preferences';
 import { Skeleton, BookGridSkeleton } from '@/components/Skeleton';
 
-export default function CatalogLoading() {
+export default async function CatalogLoading() {
+  const lang = resolveLanguage((await cookies()).get('libris_lang')?.value);
   return (
     <div className="container animate-fade-in" style={{ paddingBottom: '4rem' }} aria-busy="true">
       {/* Header and Search Skeleton */}
@@ -35,7 +39,7 @@ export default function CatalogLoading() {
       </div>
 
       {/* Grid Skeleton */}
-      <BookGridSkeleton count={8} />
+      <BookGridSkeleton count={8} label={translate(lang, 'loading_books')} />
     </div>
   );
 }
