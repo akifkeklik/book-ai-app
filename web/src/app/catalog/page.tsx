@@ -6,6 +6,7 @@ import { Search, SlidersHorizontal, X, ArrowUpDown, Star, BookOpen } from 'lucid
 import { cookies } from 'next/headers';
 import { translate, type TranslationKey } from '@/lib/i18n';
 import type { Language } from '@/lib/preferences';
+import { buildCatalogUrl, type CatalogFilterState, type CatalogUrlOverrides } from '@/lib/catalogUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,30 +54,14 @@ export default async function CatalogPage({
 
   const hasActiveFilters = Boolean(q || category || (sort && sort !== 'popularity') || minRating);
 
-  const createFilterUrl = (overrides: Record<string, string | number | undefined | null>) => {
-    const params = new URLSearchParams();
-    if (category) params.set('category', category);
-    if (q) params.set('q', q);
-    if (sort && sort !== 'popularity') params.set('sort', sort);
-    if (order && order !== 'desc') params.set('order', order);
-    if (minRating) params.set('min_rating', String(minRating));
-
-    // Reset page to 1 when changing filters, unless explicitly passing page
-    if (!('page' in overrides)) {
-      params.delete('page');
-    }
-
-    for (const [key, value] of Object.entries(overrides)) {
-      if (value === undefined || value === null || value === '') {
-        params.delete(key);
-      } else {
-        params.set(key, String(value));
-      }
-    }
-
-    const queryStr = params.toString();
-    return queryStr ? `/catalog?${queryStr}` : '/catalog';
+  const filterState: CatalogFilterState = {
+    category: category || undefined,
+    query: q || undefined,
+    sort: sort || undefined,
+    order: order || undefined,
+    min_rating: minRating,
   };
+  const createFilterUrl = (overrides: CatalogUrlOverrides) => buildCatalogUrl(filterState, overrides);
 
   const totalPages = booksRes?.total_pages || 1;
   const totalBooks = booksRes?.total || 0;
@@ -426,14 +411,7 @@ export default async function CatalogPage({
                 initialPage={page}
                 totalPages={totalPages}
                 totalBooks={totalBooks}
-                filterParams={{
-                  category: category || undefined,
-                  query: q || undefined,
-                  sort: sort || undefined,
-                  order: order || undefined,
-                  min_rating: minRating,
-                }}
-                createFilterUrl={createFilterUrl}
+                filterParams={filterState}
               />
             )}
           </div>

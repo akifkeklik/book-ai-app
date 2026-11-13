@@ -2,40 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Book } from '../types';
 
-// Mirroring the state management and URL builder logic of CatalogBookList & CatalogPage
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { buildCatalogUrl } from '../lib/catalogUrl';
+
+// Tests exercise the real URL builder shared by CatalogPage and CatalogBookList.
 function createFilterUrl(
-  baseFilters: {
-    category?: string;
-    q?: string;
-    sort?: string;
-    order?: 'asc' | 'desc';
-    min_rating?: number;
-  },
+  baseFilters: { category?: string; q?: string; sort?: string; order?: 'asc' | 'desc'; min_rating?: number },
   overrides: Record<string, string | number | undefined | null>
 ): string {
-  const params = new URLSearchParams();
-  if (baseFilters.category) params.set('category', baseFilters.category);
-  if (baseFilters.q) params.set('q', baseFilters.q);
-  if (baseFilters.sort && baseFilters.sort !== 'popularity') params.set('sort', baseFilters.sort);
-  if (baseFilters.order && baseFilters.order !== 'desc') params.set('order', baseFilters.order);
-  if (baseFilters.min_rating) params.set('min_rating', String(baseFilters.min_rating));
-
-  // Reset page to 1 when changing filters, unless explicitly passing page
-  if (!('page' in overrides)) {
-    params.delete('page');
-  }
-
-  for (const [key, value] of Object.entries(overrides)) {
-    if (value === undefined || value === null || value === '') {
-      params.delete(key);
-    } else {
-      params.set(key, String(value));
-    }
-  }
-
-  const queryStr = params.toString();
-  return queryStr ? `/catalog?${queryStr}` : '/catalog';
+  const { q, ...rest } = baseFilters;
+  return buildCatalogUrl({ ...rest, query: q }, overrides);
 }
+
+test('Server CatalogPage never passes a function prop to the client CatalogBookList', () => {
+  const page = readFileSync(join(__dirname, '..', 'app', 'catalog', 'page.tsx'), 'utf-8');
+  const usage = page.slice(page.indexOf('<CatalogBookList'), page.indexOf('/>', page.indexOf('<CatalogBookList')));
+  assert.ok(usage.length > 0, 'CatalogBookList usage not found');
+  assert.doesNotMatch(usage, /createFilterUrl=/);
+});
 
 function appendBooks(currentBooks: Book[], incomingBooks: Book[]): Book[] {
   // Ensure stable append without duplicating by isbn13 if an overlap occurs

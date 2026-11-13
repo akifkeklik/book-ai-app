@@ -6,20 +6,14 @@ import type { Book } from '@/types';
 import { BookCard } from '@/components/BookCard';
 import { fetchCatalogPageAction } from '@/app/actions/catalog';
 import { Loader2, ChevronDown, Check } from 'lucide-react';
+import { buildCatalogUrl, type CatalogFilterState, type CatalogUrlOverrides } from '@/lib/catalogUrl';
 
 interface CatalogBookListProps {
   initialBooks: Book[];
   initialPage: number;
   totalPages: number;
   totalBooks: number;
-  filterParams: {
-    category?: string;
-    query?: string;
-    sort?: string;
-    order?: 'asc' | 'desc';
-    min_rating?: number;
-  };
-  createFilterUrl: (overrides: Record<string, string | number | undefined | null>) => string;
+  filterParams: CatalogFilterState;
 }
 
 export function CatalogBookList({
@@ -28,8 +22,8 @@ export function CatalogBookList({
   totalPages,
   totalBooks,
   filterParams,
-  createFilterUrl,
 }: CatalogBookListProps) {
+  const createFilterUrl = (overrides: CatalogUrlOverrides) => buildCatalogUrl(filterParams, overrides);
   const [books, setBooks] = useState<Book[]>(initialBooks);
   const [currentPage, setCurrentPage] = useState<number>(initialPage);
   const [isPending, startTransition] = useTransition();

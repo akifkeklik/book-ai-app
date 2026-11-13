@@ -51,12 +51,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           final favs = context.read<FavoritesProvider>();
           final userId = auth.currentUser?.id;
           if (userId != null) favs.loadFavorites(userId);
-
-          final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
-          final target = (redirect != null && redirect.isNotEmpty && redirect != '/login' && redirect != '/register')
-              ? redirect
-              : '/';
-          context.go(target);
+          // Navigation is owned by the router (AppRouter.redirect), see LoginScreen.
         }
       }
     } finally {
