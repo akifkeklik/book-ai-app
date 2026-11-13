@@ -364,44 +364,36 @@ class SettingsScreen extends StatelessWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Icon(Icons.language, color: colorScheme.primary),
-                          const SizedBox(width: 12),
-                          Flexible(
-                            child: Text(
-                              context.tr('language'),
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
                     Row(
                       children: [
-                        _LangButton(
-                          label: 'TR',
-                          isActive: lang.currentLanguageCode == 'tr',
-                          onTap: () => lang.setLanguage('tr'),
+                        Icon(Icons.language, color: colorScheme.primary),
+                        const SizedBox(width: 12),
+                        Flexible(
+                          child: Text(
+                            context.tr('language'),
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        const SizedBox(width: 6),
-                        _LangButton(
-                          label: 'EN',
-                          isActive: lang.currentLanguageCode == 'en',
-                          onTap: () => lang.setLanguage('en'),
-                        ),
-                        const SizedBox(width: 6),
-                        _LangButton(
-                          label: 'DE',
-                          isActive: lang.currentLanguageCode == 'de',
-                          onTap: () => lang.setLanguage('de'),
-                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final code in LanguageProvider.supportedLanguages)
+                          Semantics(
+                            label: context.tr('settings_language_$code'),
+                            child: _LangButton(
+                              label: code.toUpperCase(),
+                              isActive: lang.currentLanguageCode == code,
+                              onTap: () => lang.setLanguage(code),
+                            ),
+                          ),
                       ],
                     ),
                   ],
@@ -420,7 +412,7 @@ class SettingsScreen extends StatelessWidget {
               if (auth.isLoggedIn) ...[
                 ListTile(
                   leading: Icon(Icons.person_outline, color: colorScheme.primary),
-                  title: Text(auth.currentUser?.email ?? 'User'),
+                  title: Text(auth.currentUser?.email ?? context.tr('ui_user')),
                   subtitle: Text(context.tr('profile_auth_method')),
                 ),
                 Divider(height: 1, color: colorScheme.outline.withOpacity(0.08)),
@@ -464,7 +456,7 @@ class SettingsScreen extends StatelessWidget {
           // ── Version Footer ────────────────────────────────────────────────
           Center(
             child: Text(
-              'Libris v2.5.0 Editorial Experience',
+              context.tr('ui_app_version', args: {'version': '2.5.0'}),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
                     fontWeight: FontWeight.w600,

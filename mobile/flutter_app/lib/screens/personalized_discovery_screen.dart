@@ -104,6 +104,9 @@ class _PersonalizedDiscoveryScreenState
   Future<void> _loadJourneyItems(String userId) async {
     setState(() => _loadingJourney = true);
     try {
+      // Resolve localized fallbacks before the async gap.
+      final unknownAuthor = context.tr('ui_unknown_author', listen: false);
+      final bookFallback = context.tr('ui_book_fallback', listen: false);
       final rawItems = await ApiService.instance.getLibrary();
       final items = <ReadingJourneyItem>[];
 
@@ -121,8 +124,8 @@ class _PersonalizedDiscoveryScreenState
               ? BookDto.fromJson(rawBook)
               : Book(
                   isbn13: bid,
-                  title: 'Book $bid',
-                  authors: 'Unknown Author',
+                  title: bookFallback.replaceAll('{id}', bid),
+                  authors: unknownAuthor,
                   categories: '',
                   description: '',
                   thumbnail: '',
@@ -457,17 +460,17 @@ class _PersonalizedDiscoveryScreenState
                     ),
                     if (selectedType == ReadingGoalType.category) ...[
                       const SizedBox(height: 14),
-                      const Text(
-                        'Category / Genre',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      Text(
+                        context.tr('ui_category_genre'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                       const SizedBox(height: 8),
                       TextField(
                         controller: catController,
-                        decoration: const InputDecoration(
-                          hintText: 'e.g. Science Fiction, Philosophy',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: InputDecoration(
+                          hintText: context.tr('ui_category_hint'),
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                         onChanged: (val) => category = val,
                       ),
@@ -1071,7 +1074,7 @@ class _PersonalizedDiscoveryScreenState
                   ),
                 ),
                 Text(
-                  nextBook.authors.isEmpty ? 'Unknown' : nextBook.authors,
+                  nextBook.authors.isEmpty ? context.tr('ui_unknown') : nextBook.authors,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1216,10 +1219,10 @@ class _PersonalizedDiscoveryScreenState
               _journeyItems.isEmpty
                   ? context.tr('empty_journey_title')
                   : (_activeJourneyShelfTab == 'reading'
-                      ? 'No books currently being read'
+                      ? context.tr('ui_shelf_empty_reading')
                       : (_activeJourneyShelfTab == 'want_to_read'
-                          ? 'Your reading list is empty'
-                          : 'No books finished yet')),
+                          ? context.tr('ui_shelf_empty_want')
+                          : context.tr('ui_shelf_empty_finished'))),
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               textAlign: TextAlign.center,
             ),
@@ -1227,7 +1230,7 @@ class _PersonalizedDiscoveryScreenState
             Text(
               _journeyItems.isEmpty
                   ? context.tr('empty_journey_desc')
-                  : 'Add books from recommendations below to track your progress.',
+                  : context.tr('ui_shelf_empty_hint'),
               style: TextStyle(
                 fontSize: 11,
                 color: isDark ? Colors.white54 : Colors.black45,
@@ -1299,7 +1302,7 @@ class _PersonalizedDiscoveryScreenState
                   ),
                 ),
                 Text(
-                  book.authors.isEmpty ? 'Unknown' : book.authors,
+                  book.authors.isEmpty ? context.tr('ui_unknown') : book.authors,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1327,9 +1330,9 @@ class _PersonalizedDiscoveryScreenState
                     else if (_activeJourneyShelfTab == 'reading')
                       InkWell(
                         onTap: () => _updateReadingStatus(book, 'finished'),
-                        child: const Text(
-                          'Mark Finished',
-                          style: TextStyle(
+                        child: Text(
+                          context.tr('mark_as_finished_action'),
+                          style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: DesignSystem.statusFinished,
@@ -2039,7 +2042,7 @@ class _PersonalizedDiscoveryScreenState
                       const SizedBox(height: 2),
                       // Authors
                       Text(
-                        book.authors.isEmpty ? 'Unknown' : book.authors,
+                        book.authors.isEmpty ? context.tr('ui_unknown') : book.authors,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

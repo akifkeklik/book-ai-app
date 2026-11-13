@@ -805,7 +805,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             break;
         }
 
-        final formattedDate = DateFormat('MMM d, yyyy').format(note.createdAt);
+        final formattedDate = DateFormat.yMMMd(context.read<LanguageProvider>().currentLanguageCode).format(note.createdAt);
 
         return Container(
           key: Key('hub_note_card_${note.id}'),

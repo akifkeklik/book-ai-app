@@ -256,7 +256,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen> {
                                 provider.setFocus(currentNode.id);
                               },
                               icon: const Icon(Icons.filter_center_focus_rounded, size: 16),
-                              label: const Text('Focus (1-Hop)'),
+                              label: Text(context.tr('ui_kg_focus_one_hop')),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -287,7 +287,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen> {
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           child: Text(
-                            'No direct edges found in current graph view.',
+                            context.tr('ui_kg_no_edges'),
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   fontStyle: FontStyle.italic,
                                 ),
@@ -365,7 +365,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${isSource ? '→ Points to' : '← From'}: $otherLabel',
+                                    '${isSource ? context.tr('ui_kg_points_to') : context.tr('ui_kg_from')}: $otherLabel',
                                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -416,7 +416,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen> {
 
     if (availableTargets.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No other entities available to connect to.')),
+        SnackBar(content: Text(context.tr('ui_kg_no_entities'))),
       );
       return;
     }
@@ -439,7 +439,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Source: ${sourceNode.label} (${sourceNode.type})',
+                      '${context.tr('ui_kg_source')}: ${sourceNode.label} (${sourceNode.type})',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 12),
@@ -488,7 +488,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen> {
                       controller: evidenceController,
                       decoration: InputDecoration(
                         labelText: context.tr('kg_evidence'),
-                        hintText: 'e.g. Reader note or chapter reference',
+                        hintText: context.tr('ui_kg_evidence_hint'),
                       ),
                     ),
                   ],
@@ -502,6 +502,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen> {
                 ElevatedButton(
                   onPressed: () async {
                     final messenger = ScaffoldMessenger.of(context);
+                    final createdMessage = context.tr('ui_kg_connection_created', listen: false);
                     Navigator.pop(dCtx);
                     final ok = await provider.createRelationship(
                       sourceId: sourceNode.id,
@@ -515,7 +516,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen> {
                     );
                     if (ok && mounted) {
                       messenger.showSnackBar(
-                        const SnackBar(content: Text('Connection created successfully!')),
+                        SnackBar(content: Text(createdMessage)),
                       );
                     }
                   },
@@ -717,7 +718,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  'Focused: ${provider.focusId}',
+                                  '${context.tr('ui_kg_focused')}: ${provider.focusId}',
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: Theme.of(context).colorScheme.primary,
@@ -839,7 +840,7 @@ class _KnowledgeGraphScreenState extends State<KnowledgeGraphScreen> {
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(
-                                      '${node.degree} links',
+                                      context.tr('ui_kg_links', args: {'count': '${node.degree}'}),
                                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
                                     ),
                                   ),

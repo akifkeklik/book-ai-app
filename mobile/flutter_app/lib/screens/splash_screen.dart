@@ -117,7 +117,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Akıllı Kütüphane Rehberin',
+                    context.tr('ui_splash_tagline'),
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: colorScheme.onSurface.withOpacity(0.5),
                       letterSpacing: 2,

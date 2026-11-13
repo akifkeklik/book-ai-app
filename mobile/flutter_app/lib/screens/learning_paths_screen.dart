@@ -64,11 +64,11 @@ class _LearningPathsScreenState extends State<LearningPathsScreen> {
                     controller: titleController,
                     decoration: InputDecoration(
                       labelText: '${context.tr('path_title_label')} *',
-                      hintText: 'e.g. Stoicism & Ancient Philosophy',
+                      hintText: context.tr('ui_path_title_hint'),
                     ),
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) {
-                        return 'Title is required';
+                        return context.tr('ui_title_required');
                       }
                       return null;
                     },
@@ -79,7 +79,7 @@ class _LearningPathsScreenState extends State<LearningPathsScreen> {
                     controller: categoryController,
                     decoration: InputDecoration(
                       labelText: context.tr('path_category_label'),
-                      hintText: 'e.g. Philosophy, Science',
+                      hintText: context.tr('ui_path_category_hint'),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -87,7 +87,7 @@ class _LearningPathsScreenState extends State<LearningPathsScreen> {
                     controller: descController,
                     decoration: InputDecoration(
                       labelText: context.tr('path_desc_label'),
-                      hintText: 'Key learning goals...',
+                      hintText: context.tr('ui_path_goals_hint'),
                     ),
                     maxLines: 2,
                   ),
@@ -98,7 +98,7 @@ class _LearningPathsScreenState extends State<LearningPathsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
+              child: Text(context.tr('cancel')),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -312,7 +312,7 @@ class _LearningPathsScreenState extends State<LearningPathsScreen> {
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.of(ctx).pop(false),
-                          child: const Text('Cancel'),
+                          child: Text(context.tr('cancel')),
                         ),
                         TextButton(
                           onPressed: () => Navigator.of(ctx).pop(true),
@@ -389,9 +389,9 @@ class _LearningPathsScreenState extends State<LearningPathsScreen> {
       return Container(
         padding: const EdgeInsets.all(24),
         alignment: Alignment.center,
-        child: const Text(
-          'No books in this path yet. Add from suggestions below!',
-          style: TextStyle(color: Colors.grey),
+        child: Text(
+          context.tr('ui_path_no_books'),
+          style: const TextStyle(color: Colors.grey),
         ),
       );
     }
@@ -469,7 +469,7 @@ class _LearningPathsScreenState extends State<LearningPathsScreen> {
                       ],
                     ),
                     Text(
-                      book?.authors ?? 'Unknown',
+                      book?.authors ?? context.tr('ui_unknown'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
@@ -482,13 +482,13 @@ class _LearningPathsScreenState extends State<LearningPathsScreen> {
               if (!isReading && !isFinished)
                 IconButton(
                   icon: const Icon(Icons.play_arrow, size: 20, color: Colors.indigoAccent),
-                  tooltip: 'Start Reading',
+                  tooltip: context.tr('start_reading'),
                   onPressed: () => _updateBookStatus(item.bookId, 'reading'),
                 )
               else if (isReading)
                 IconButton(
                   icon: const Icon(Icons.check_circle_outline, size: 20, color: Colors.green),
-                  tooltip: 'Complete',
+                  tooltip: context.tr('ui_complete'),
                   onPressed: () => _updateBookStatus(item.bookId, 'finished'),
                 ),
 
