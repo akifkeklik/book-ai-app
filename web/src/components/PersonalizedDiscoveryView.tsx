@@ -280,10 +280,10 @@ export function PersonalizedDiscoveryView() {
         setNotice(t('reset_personalization_success'));
         await loadData();
       } else {
-        setError(res.error || 'Failed to reset personalization');
+        setError(res.error || t('pd_reset_error'));
       }
     } catch {
-      setError('Failed to reset personalization');
+      setError(t('pd_reset_error'));
     } finally {
       setLoading(false);
     }
@@ -377,7 +377,7 @@ export function PersonalizedDiscoveryView() {
         next.set(bookId, currentEntry);
         return next;
       });
-      setError('Network error while updating favorite');
+      setError(t('pd_favorite_error'));
     } finally {
       setPendingMutations((prev) => {
         const next = new Set(prev);
@@ -459,7 +459,7 @@ export function PersonalizedDiscoveryView() {
         return next;
       });
       setLibraryItems(previousItems);
-      setError('Network error while updating shelf');
+      setError(t('pd_shelf_error'));
     } finally {
       setPendingMutations((prev) => {
         const next = new Set(prev);
@@ -765,7 +765,7 @@ export function PersonalizedDiscoveryView() {
         }}
       >
         {/* Filter Tabs: all, favorites, reading, category */}
-        <div className="library-tabs" role="tablist" aria-label="Personalized discovery filters">
+        <div className="library-tabs" role="tablist" aria-label={t('pd_filters_label')}>
           <button
             role="tab"
             aria-selected={activeFilter === 'all'}
@@ -902,7 +902,7 @@ export function PersonalizedDiscoveryView() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="input-field"
             style={{ width: '100%', paddingLeft: '2.4rem', height: '38px', fontSize: '0.875rem' }}
-            aria-label="Filter recommendations by title or author"
+            aria-label={t('pd_search_label')}
           />
         </div>
       </div>

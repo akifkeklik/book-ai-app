@@ -377,7 +377,7 @@ class _AiDiscoveryScreenState extends State<AiDiscoveryScreen> {
               const SaasPulseDot(color: DesignSystem.electricBlue, size: 6.5),
               const SizedBox(width: 6),
               Text(
-                'AI Insight · Verified',
+                context.tr('ui_ai_insight_verified'),
                 style: theme.textTheme.titleSmall?.copyWith(
                   color: isDark ? DesignSystem.electricBlue : theme.colorScheme.primary,
                   fontWeight: FontWeight.bold,

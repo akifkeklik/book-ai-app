@@ -297,7 +297,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
-                '${_selectedCategories.length} selected',
+                context.tr('ui_selected_count', args: {'count': '${_selectedCategories.length}'}),
                 style: TextStyle(
                   color: theme.colorScheme.primary,
                   fontWeight: FontWeight.w700,

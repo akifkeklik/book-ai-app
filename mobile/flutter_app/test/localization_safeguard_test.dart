@@ -91,7 +91,8 @@ void main() {
       expect(LanguageProvider.isSupported('tr'), isTrue);
       expect(LanguageProvider.isSupported('en'), isTrue);
       expect(LanguageProvider.isSupported('de'), isTrue);
-      expect(LanguageProvider.isSupported('fr'), isFalse);
+      expect(LanguageProvider.isSupported('fr'), isTrue);
+      expect(LanguageProvider.isSupported('ja'), isFalse);
       expect(LanguageProvider.isSupported('TR'), isTrue);
     });
   });

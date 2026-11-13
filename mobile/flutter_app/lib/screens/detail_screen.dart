@@ -8,11 +8,11 @@ import '../domain/entities/book.dart';
 import '../providers/auth_provider.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/language_provider.dart';
+import '../utils/date_format.dart';
 import '../providers/recommendation_provider.dart';
 import '../application/use_cases/view_book_details_use_case.dart';
 import '../application/use_cases/manage_recommendations_use_case.dart';
 
-import 'package:intl/intl.dart';
 import '../domain/entities/learning_note.dart';
 import '../providers/notes_provider.dart';
 import '../widgets/book_card.dart';
@@ -1284,7 +1284,7 @@ Widget _buildLearningNotesSection(BuildContext context, Book book) {
         break;
     }
 
-    final formattedDate = DateFormat('MMM d, yyyy').format(note.createdAt);
+    final formattedDate = formatShortDate(note.createdAt, context.read<LanguageProvider>().currentLanguageCode);
 
     return Container(
       key: Key('note_card_${note.id}'),

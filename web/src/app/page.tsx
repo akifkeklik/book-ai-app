@@ -8,7 +8,7 @@ import { HomePersonalizationBanner } from '@/components/HomePersonalizationBanne
 import { ReadingJourneyDashboard } from '@/components/ReadingJourneyDashboard';
 import { getLibraryBooks } from '@/app/actions/library';
 import { translate, type TranslationKey } from '@/lib/i18n';
-import type { Language } from '@/lib/preferences';
+import { type Language, resolveLanguage } from '@/lib/preferences';
 import type { Book, LibraryItem } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +35,7 @@ export default async function Home({
 
   const cookieStore = await cookies();
   const rawLang = cookieStore.get('libris_lang')?.value;
-  const lang: Language = (rawLang === 'tr' || rawLang === 'de' || rawLang === 'en') ? rawLang : 'en';
+  const lang: Language = resolveLanguage(rawLang);
   const t = (key: TranslationKey, args?: Record<string, string | number>) => translate(lang, key, args);
 
   const supabase = await createClient();
@@ -378,9 +378,9 @@ export default async function Home({
       {/* 3-Pillar Feature Grid */}
       <section style={{ marginTop: '2rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>A Calm, Editorial Approach to Reading</h2>
+          <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{t('home_features_title')}</h2>
           <p className="text-muted" style={{ maxWidth: '580px', margin: '0 auto' }}>
-            Built around focus, taste refinement, and personal discovery rather than clickbait.
+            {t('home_features_subtitle')}
           </p>
         </div>
 
@@ -400,9 +400,9 @@ export default async function Home({
             >
               <BookOpen size={26} color="var(--primary)" />
             </div>
-            <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem' }}>Curated Catalog</h3>
+            <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem' }}>{t('home_feature_catalog')}</h3>
             <p className="text-muted" style={{ lineHeight: '1.6', fontSize: '0.95rem' }}>
-              Explore thoroughly indexed titles across genres with authentic ratings, synopsis, and metadata.
+              {t('home_feature_catalog_desc')}
             </p>
           </div>
           
@@ -421,9 +421,9 @@ export default async function Home({
             >
               <Sparkles size={26} color="var(--accent)" />
             </div>
-            <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem' }}>AI Semantic Discovery</h3>
+            <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem' }}>{t('home_feature_ai')}</h3>
             <p className="text-muted" style={{ lineHeight: '1.6', fontSize: '0.95rem' }}>
-              Describe a mood, plot twist, or atmosphere in natural language. Our vector-grounded pipeline finds exact catalog matches.
+              {t('home_feature_ai_desc')}
             </p>
           </div>
 
@@ -442,9 +442,9 @@ export default async function Home({
             >
               <Library size={26} color="var(--success)" />
             </div>
-            <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem' }}>Personal Library</h3>
+            <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem' }}>{t('home_feature_library')}</h3>
             <p className="text-muted" style={{ lineHeight: '1.6', fontSize: '0.95rem' }}>
-              Organize your journey into Want to Read, Reading, and Finished collections, with real-time cross-client synchronization.
+              {t('home_feature_library_desc')}
             </p>
           </div>
         </div>

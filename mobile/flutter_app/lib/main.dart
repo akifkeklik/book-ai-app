@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
@@ -48,6 +49,7 @@ class _DevHttpOverrides extends HttpOverrides {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting();
 
   // Android emulator debug: SSL sertifika doğrulamasını atla (only on native platforms)
   if (kDebugMode && !kIsWeb) {
@@ -247,7 +249,7 @@ class _GlobalErrorListenerState extends State<_GlobalErrorListener> {
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 4),
           action: SnackBarAction(
-            label: 'TAMAM',
+            label: context.tr('ok'),
             textColor: Colors.white,
             onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
           ),

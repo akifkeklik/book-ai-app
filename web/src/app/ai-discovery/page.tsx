@@ -6,7 +6,7 @@ import { streamAiChat } from '@/lib/ai_stream';
 import { BookCard } from '@/components/BookCard';
 import type { Book, AiAction } from '@/types';
 import { usePreferences } from '@/components/PreferencesProvider';
-import type { Language, ColorPalette, ThemeMode } from '@/lib/preferences';
+import { isLanguage, LANGUAGE_NAMES, type Language, type ColorPalette, type ThemeMode } from '@/lib/preferences';
 import { translate, type TranslationKey } from '@/lib/i18n';
 import { Sparkles, Send, BookOpen, RefreshCw, CheckCircle2, Square } from 'lucide-react';
 
@@ -23,7 +23,7 @@ interface ChatMessage {
 
 export default function AIDiscoveryPage() {
   const router = useRouter();
-  const { preferences, setThemeMode, setColorPalette, setLanguage } = usePreferences();
+  const { preferences, setThemeMode, setColorPalette, setLanguage, t } = usePreferences();
   const lang = preferences.language || 'en';
 
   const [query, setQuery] = useState('');
@@ -81,10 +81,9 @@ export default function AIDiscoveryPage() {
       }
       case 'SET_LANGUAGE': {
         const l = action.payload?.language as Language;
-        if (l === 'tr' || l === 'en' || l === 'de') {
+        if (isLanguage(l)) {
           setLanguage(l);
-          const langNames = { tr: 'Türkçe', en: 'English', de: 'Deutsch' };
-          return translate(lang, 'ai_action_language', { language: langNames[l] });
+          return translate(lang, 'ai_action_language', { language: LANGUAGE_NAMES[l] });
         }
         break;
       }
@@ -233,29 +232,41 @@ export default function AIDiscoveryPage() {
   };
 
   const PROMPT_SUGGESTIONS_BY_LANG: Record<Language, string[]> = {
-    tr: [
-      '1984 kitabı var mı?',
-      '1984 kitabı kaç puan almış?',
-      'Bugün günlerden ne, saat kaç?',
-      'Bana düşündürücü bilimkurgu romanları öner',
-      'Vurgu rengini orman yeşili yap',
-      'Koyu temaya geç',
-    ],
     en: [
       'Do you have the book 1984?',
-      'How is 1984 rated in the catalog?',
-      'What day and time is it?',
-      'Recommend fast-paced sci-fi with time travel',
-      'Switch accent palette to forest green',
-      'Set theme to dark mode',
+      'Books like Atomic Habits',
+      'A short philosophy book for beginners',
+      'Switch to dark mode',
+    ],
+    tr: [
+      '1984 kitabı var mı?',
+      'Atomik Alışkanlıklar gibi kitaplar',
+      'Yeni başlayanlar için kısa bir felsefe kitabı',
+      'Koyu temaya geç',
     ],
     de: [
       'Gibt es das Buch 1984?',
-      'Welche Bewertung hat 1984 im Katalog?',
-      'Welcher Tag und wie viel Uhr ist es?',
-      'Empfiehl mir fesselnde Science-Fiction',
-      'Akzentfarbe auf Waldgrün setzen',
+      'Bücher wie Die 1%-Methode',
+      'Ein kurzes Philosophiebuch für Einsteiger',
       'Dunklen Modus aktivieren',
+    ],
+    es: [
+      '¿Tenéis el libro 1984?',
+      'Libros como Hábitos atómicos',
+      'Un libro de filosofía breve para principiantes',
+      'Cambiar al modo oscuro',
+    ],
+    fr: [
+      'Avez-vous le livre 1984 ?',
+      'Des livres comme Atomic Habits',
+      'Un court livre de philosophie pour débuter',
+      'Passer en mode sombre',
+    ],
+    it: [
+      'Avete il libro 1984?',
+      'Libri come Atomic Habits',
+      'Un breve libro di filosofia per principianti',
+      'Passa alla modalità scura',
     ],
   };
 
@@ -278,14 +289,10 @@ export default function AIDiscoveryPage() {
           }}
         >
           <Sparkles className="text-gradient" size={32} />
-          <span>{lang === 'tr' ? 'Yapay Zeka ile Keşif' : lang === 'de' ? 'KI-Buchentdeckung' : 'AI Book Discovery'}</span>
+          <span>{t('ai_title')}</span>
         </h1>
         <p className="text-muted" style={{ fontSize: '1.1rem' }}>
-          {lang === 'tr'
-            ? 'Kitaplar hakkında doğal sorular sorun, kütüphanemizdeki gerçek katalog verilerine dayalı öneriler alın.'
-            : lang === 'de'
-            ? 'Stellen Sie natürliche Fragen zu Büchern und erhalten Sie fundierte Empfehlungen aus unserem Bibliothekskatalog.'
-            : 'Ask natural questions about books, get tailored suggestions grounded in our library catalog.'}
+          {t('ai_subtitle')}
         </p>
       </div>
 
@@ -305,37 +312,30 @@ export default function AIDiscoveryPage() {
               <>
                 <span className="saas-pulse-dot" style={{ backgroundColor: '#f59e0b' }} />
                 <span>
-                  {lang === 'tr' ? 'Akış Çözümleniyor...' : lang === 'de' ? 'Streamen...' : 'Streaming Tokens...'}
+                  {t('ai_streaming')}
                 </span>
               </>
             ) : isGrounded ? (
               <>
                 <span className="saas-pulse-dot cyan" />
                 <span>
-                  {lang === 'tr'
-                    ? `Katalog Doğrulamalı · ${referencedBooks.length} Kitap Alıntılandı`
-                    : lang === 'de'
-                    ? `Katalogverifiziert · ${referencedBooks.length} Bücher`
-                    : `Catalog Verified · ${referencedBooks.length} Books Grounded`}
+                  {t('ai_grounded', { count: referencedBooks.length })}
                 </span>
               </>
             ) : hasQueried ? (
               <>
                 <span className="saas-pulse-dot" style={{ backgroundColor: '#94a3b8' }} />
                 <span>
-                  {lang === 'tr' ? 'Genel Edebi Yanıt · Doğrudan Katalog Eşleşmesi Yok' : 'General Literary Response · No Direct Catalog Match'}
+                  {t('ai_general')}
                 </span>
               </>
             ) : (
               <>
                 <span className="saas-pulse-dot cyan" />
-                <span>Vector Semantic Engine · Ready</span>
+                <span>{t('ai_ready')}</span>
               </>
             )}
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            SSE Realtime Protocol
-          </span>
         </div>
 
         <div
@@ -355,11 +355,7 @@ export default function AIDiscoveryPage() {
             <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--muted)', padding: '2rem 1rem' }}>
               <Sparkles size={44} style={{ opacity: 0.3, margin: '0 auto 1rem', color: 'var(--accent)' }} />
               <p style={{ marginBottom: '1.25rem', fontSize: '1rem' }}>
-                {lang === 'tr'
-                  ? 'Ne soracağınızdan emin değil misiniz? Başlamak için bir öneriye tıklayın:'
-                  : lang === 'de'
-                  ? 'Nicht sicher, was Sie fragen sollen? Klicken Sie auf einen Vorschlag:'
-                  : 'Not sure what to ask? Click a suggestion below to start:'}
+                {t('ai_suggestion_prompt')}
               </p>
               <div
                 style={{
@@ -430,7 +426,7 @@ export default function AIDiscoveryPage() {
                 {msg.content}
                 {msg.streaming && !msg.content && (
                   <span className="animate-pulse" style={{ color: 'var(--text-muted)' }}>
-                    Thinking...
+                    {t('ai_thinking')}
                   </span>
                 )}
                 {msg.streaming && msg.content && (
@@ -513,8 +509,8 @@ export default function AIDiscoveryPage() {
               type="button"
               onClick={handleStopStream}
               className="btn btn-outline"
-              title="Stop streaming response"
-              aria-label="Stop response"
+              title={t('ai_stop_label')}
+              aria-label={t('ai_stop')}
               style={{ borderColor: 'rgba(239, 68, 68, 0.5)', color: '#ef4444' }}
             >
               <Square size={16} fill="currentColor" />
@@ -545,7 +541,7 @@ export default function AIDiscoveryPage() {
               }}
             >
               <Sparkles className="text-gradient" size={22} />
-              <span>{lang === 'tr' ? 'Önerilen Kitaplar' : lang === 'de' ? 'Referenzierte Bücher' : 'Referenced Books'}</span>
+              <span>{t('ai_referenced_books')}</span>
             </h3>
             <div className="grid-books">
               {referencedBooks.map((book) => (
@@ -568,14 +564,10 @@ export default function AIDiscoveryPage() {
           >
             <BookOpen size={36} style={{ opacity: 0.3, margin: '0 auto 0.75rem', color: 'var(--muted)' }} />
             <h4 style={{ fontSize: '1.1rem', marginBottom: '0.25rem', color: 'var(--foreground)' }}>
-              {lang === 'tr' ? 'Eşleşen Kitap Kaydı Yok' : lang === 'de' ? 'Keine Bücher referenziert' : 'No Books Referenced'}
+              {t('ai_no_referenced_books')}
             </h4>
             <p className="text-muted" style={{ fontSize: '0.9rem', maxWidth: '460px', margin: '0 auto' }}>
-              {lang === 'tr'
-                ? 'Bu sorgu için doğrudan bir katalog kitabı eklenmedi. Belirli bir tür, konu veya kitap adı belirterek arama yapabilirsiniz.'
-                : lang === 'de'
-                ? 'Für diese Abfrage wurden keine spezifischen Katalogbücher angegeben. Versuchen Sie es mit einem Genre oder Buchtitel.'
-                : 'The AI response did not cite any specific books from the catalog for this query. Try describing a genre, plot, or specific reading mood!'}
+              {t('ai_no_referenced_desc')}
             </p>
           </div>
         )

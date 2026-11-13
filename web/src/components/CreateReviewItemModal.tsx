@@ -37,7 +37,7 @@ export function CreateReviewItemModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !concept.trim() || !question.trim() || !answer.trim()) {
-      setError('Please fill in all required fields.');
+      setError(t('form_required_fields'));
       return;
     }
 
@@ -63,7 +63,7 @@ export function CreateReviewItemModal({
         setError(res.error || 'Failed to create question.');
       }
     } catch {
-      setError('An unexpected error occurred. Please try again.');
+      setError(t('unexpected_error'));
     } finally {
       setSubmitting(false);
     }
@@ -111,7 +111,7 @@ export function CreateReviewItemModal({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Distributed Consensus Concept"
+              placeholder={t('review_title_hint')}
               className="w-full text-sm p-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             />
           </div>
@@ -125,7 +125,7 @@ export function CreateReviewItemModal({
               required
               value={concept}
               onChange={(e) => setConcept(e.target.value)}
-              placeholder="e.g. Distributed Systems"
+              placeholder={t('review_concept_hint')}
               className="w-full text-sm p-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             />
           </div>
@@ -139,7 +139,7 @@ export function CreateReviewItemModal({
               rows={2}
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              placeholder="e.g. What is the difference between Raft and Paxos?"
+              placeholder={t('review_prompt_hint')}
               className="w-full text-sm p-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
             />
           </div>
@@ -153,7 +153,7 @@ export function CreateReviewItemModal({
               rows={3}
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
-              placeholder="e.g. Raft is designed to be more understandable than Paxos..."
+              placeholder={t('review_answer_hint')}
               className="w-full text-sm p-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
             />
           </div>
@@ -166,7 +166,7 @@ export function CreateReviewItemModal({
               rows={2}
               value={explanation}
               onChange={(e) => setExplanation(e.target.value)}
-              placeholder="Optional notes or context..."
+              placeholder={t('review_context_hint')}
               className="w-full text-sm p-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
             />
           </div>
@@ -177,7 +177,7 @@ export function CreateReviewItemModal({
               onClick={onClose}
               className="px-4 py-2 rounded-xl border border-[var(--border)] text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--surface-raised)]"
             >
-              Cancel
+              {t('cancel')}
             </button>
             <button
               type="submit"

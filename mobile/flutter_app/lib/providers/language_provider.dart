@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class LanguageProvider extends ChangeNotifier {
   static const String _languageKey = 'preferred_language';
-  static const List<String> supportedLanguages = ['en', 'tr', 'de'];
+  static const List<String> supportedLanguages = ['en', 'tr', 'de', 'es', 'fr', 'it'];
 
   static bool isSupported(String code) =>
       supportedLanguages.contains(code.toLowerCase());

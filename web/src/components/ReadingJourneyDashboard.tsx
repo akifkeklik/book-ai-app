@@ -106,7 +106,7 @@ export function ReadingJourneyDashboard({
 
   return (
     <section
-      aria-label="Personal reading journey dashboard"
+      aria-label={t('rj_label')}
       className="glass-panel reading-journey-dashboard animate-fade-in"
       style={{
         borderRadius: '20px',
@@ -160,14 +160,14 @@ export function ReadingJourneyDashboard({
                   alignItems: 'center',
                   gap: '4px',
                 }}
-                title="Your goal is stored safely on this device and not faked as cloud-synced."
+                title={t('rj_local_goal_title')}
               >
                 <Info size={11} />
-                <span>Local device goal</span>
+                <span>{t('rj_local_goal')}</span>
               </span>
             </div>
             <p className="text-muted" style={{ fontSize: '0.85rem', margin: '2px 0 0' }}>
-              Track completed milestones, active reads, and personal reading targets
+              {t('rj_subtitle')}
             </p>
           </div>
         </div>
@@ -212,9 +212,9 @@ export function ReadingJourneyDashboard({
                   fontSize: '0.8rem',
                 }}
               >
-                <option value="annual">Annual (Year)</option>
-                <option value="weekly">Weekly</option>
-                <option value="category">Topic / Category</option>
+                <option value="annual">{t('rj_goal_annual')}</option>
+                <option value="weekly">{t('rj_goal_weekly')}</option>
+                <option value="category">{t('rj_goal_topic')}</option>
               </select>
 
               <input
@@ -238,7 +238,7 @@ export function ReadingJourneyDashboard({
               {goalTypeInput === 'category' && (
                 <input
                   type="text"
-                  placeholder="e.g. Science Fiction"
+                  placeholder={t('rj_topic_hint')}
                   value={goalCategoryInput}
                   onChange={(e) => setGoalCategoryInput(e.target.value)}
                   style={{
@@ -258,7 +258,7 @@ export function ReadingJourneyDashboard({
                 className="btn btn-primary"
                 style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
               >
-                Save
+                {t('save')}
               </button>
               <button
                 type="button"
@@ -266,7 +266,7 @@ export function ReadingJourneyDashboard({
                 className="btn btn-outline"
                 style={{ padding: '0.35rem 0.6rem', fontSize: '0.8rem' }}
               >
-                Cancel
+                {t('cancel')}
               </button>
             </form>
           ) : (
@@ -280,7 +280,7 @@ export function ReadingJourneyDashboard({
               }}
               className="btn btn-outline"
               style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', gap: '0.45rem' }}
-              title="Change reading goal target and scope"
+              title={t('rj_change_goal_label')}
             >
               <Target size={14} color="var(--primary)" />
               <span>Goal: {goalLabel}</span>
@@ -294,7 +294,7 @@ export function ReadingJourneyDashboard({
         {/* Metric 1: Reading Goal Pace */}
         <div className="saas-metric-card">
           <div className="saas-metric-header">
-            <span className="saas-metric-label">Goal Pace</span>
+            <span className="saas-metric-label">{t('rj_goal_pace')}</span>
             <div className="saas-metric-icon">
               <Target size={16} />
             </div>
@@ -311,7 +311,7 @@ export function ReadingJourneyDashboard({
         {/* Metric 2: Currently Reading */}
         <div className="saas-metric-card">
           <div className="saas-metric-header">
-            <span className="saas-metric-label">Active on Shelf</span>
+            <span className="saas-metric-label">{t('rj_active')}</span>
             <div className="saas-metric-icon" style={{ background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.28)' }}>
               <BookOpen size={16} />
             </div>
@@ -330,7 +330,7 @@ export function ReadingJourneyDashboard({
         {/* Metric 3: Reading Queue */}
         <div className="saas-metric-card">
           <div className="saas-metric-header">
-            <span className="saas-metric-label">Want to Read</span>
+            <span className="saas-metric-label">{t('status_want_to_read')}</span>
             <div className="saas-metric-icon" style={{ background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.28)' }}>
               <Bookmark size={16} />
             </div>
@@ -340,14 +340,14 @@ export function ReadingJourneyDashboard({
           </div>
           <div className="saas-metric-footer">
             <span className="saas-pulse-dot blue" />
-            <span>Curated exploration list</span>
+            <span>{t('rj_want_desc')}</span>
           </div>
         </div>
 
         {/* Metric 4: Completed Milestones */}
         <div className="saas-metric-card">
           <div className="saas-metric-header">
-            <span className="saas-metric-label">Milestones Finished</span>
+            <span className="saas-metric-label">{t('rj_finished')}</span>
             <div className="saas-metric-icon" style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.28)' }}>
               <CheckCircle2 size={16} />
             </div>
@@ -469,13 +469,13 @@ export function ReadingJourneyDashboard({
         <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--card-border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
-              7-Day Reading & Learning Activity
+              {t('rj_activity_title')}
             </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--electric-blue)', fontWeight: 600 }}>
-              Consistent Habit Active
+              {t('rj_habit_active')}
             </span>
           </div>
-          <div className="saas-activity-chart" role="img" aria-label="7-Day Reading & Learning Activity Chart">
+          <div className="saas-activity-chart" role="img" aria-label={t('rj_activity_label')}>
             {[
               { day: 'Mon', height: '55%', active: false },
               { day: 'Tue', height: '80%', active: false },
@@ -568,7 +568,7 @@ export function ReadingJourneyDashboard({
               }}
             >
               <Sparkles size={11} />
-              <span>Recommended Next Read</span>
+              <span>{t('rj_next_read')}</span>
             </div>
 
             <Link
@@ -606,10 +606,10 @@ export function ReadingJourneyDashboard({
               disabled={isUpdating}
               className="btn btn-primary"
               style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', gap: '0.4rem' }}
-              title="Start reading this book now"
+              title={t('rj_start_label')}
             >
               <Play size={14} fill="currentColor" />
-              <span>Start Reading</span>
+              <span>{t('start_reading')}</span>
             </button>
 
             <button
@@ -618,10 +618,10 @@ export function ReadingJourneyDashboard({
               disabled={isUpdating}
               className="btn btn-outline"
               style={{ padding: '0.45rem 0.8rem', fontSize: '0.8rem', gap: '0.4rem' }}
-              title="Save to your Want to Read shelf"
+              title={t('rj_save_label')}
             >
               <Bookmark size={14} />
-              <span>Save for Later</span>
+              <span>{t('rj_save_later')}</span>
             </button>
           </div>
         </div>
@@ -753,17 +753,17 @@ export function ReadingJourneyDashboard({
                 )}
                 {activeShelfTab === 'want_to_read' && (
                   <>
-                    Your reading list is empty.
+                    {t('rj_want_empty')}
                     <span style={{ display: 'block', marginTop: '0.25rem' }}>
-                      Add books from personalized discovery to organize what to read next.
+                      {t('rj_want_empty_desc')}
                     </span>
                   </>
                 )}
                 {activeShelfTab === 'finished' && (
                   <>
-                    No finished books recorded yet.
+                    {t('rj_finished_empty')}
                     <span style={{ display: 'block', marginTop: '0.25rem' }}>
-                      When you finish reading a book, mark it as completed to track your journey.
+                      {t('rj_finished_empty_desc')}
                     </span>
                   </>
                 )}
@@ -896,7 +896,7 @@ export function ReadingJourneyDashboard({
                               style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem', gap: '0.25rem' }}
                             >
                               <Play size={11} fill="currentColor" />
-                              <span>Start Reading</span>
+                              <span>{t('start_reading')}</span>
                             </button>
                             <button
                               type="button"
@@ -906,7 +906,7 @@ export function ReadingJourneyDashboard({
                               style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem', gap: '0.25rem' }}
                             >
                               <CheckCircle2 size={11} />
-                              <span>Finished</span>
+                              <span>{t('status_finished')}</span>
                             </button>
                           </>
                         )}
@@ -921,7 +921,7 @@ export function ReadingJourneyDashboard({
                               style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem', gap: '0.25rem', color: '#10b981' }}
                             >
                               <CheckCircle2 size={11} />
-                              <span>Mark Finished</span>
+                              <span>{t('mark_as_finished')}</span>
                             </button>
                             <button
                               type="button"
@@ -931,7 +931,7 @@ export function ReadingJourneyDashboard({
                               style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem', gap: '0.25rem' }}
                             >
                               <Bookmark size={11} />
-                              <span>To List</span>
+                              <span>{t('rj_to_list')}</span>
                             </button>
                           </>
                         )}
@@ -945,7 +945,7 @@ export function ReadingJourneyDashboard({
                             style={{ padding: '0.25rem 0.6rem', fontSize: '0.72rem', gap: '0.25rem' }}
                           >
                             <RotateCcw size={11} />
-                            <span>Read Again</span>
+                            <span>{t('rj_read_again')}</span>
                           </button>
                         )}
 
@@ -960,7 +960,7 @@ export function ReadingJourneyDashboard({
                             marginLeft: 'auto',
                             color: 'var(--muted)',
                           }}
-                          title="Remove from shelf"
+                          title={t('rj_remove_label')}
                           aria-label={`Remove ${book.title} from shelf`}
                         >
                           <Trash2 size={12} />

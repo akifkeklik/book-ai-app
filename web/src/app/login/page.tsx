@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { usePreferences } from '@/components/PreferencesProvider';
 
 export function sanitizeRedirect(url: string | null): string {
   if (!url) return '/catalog';
@@ -24,6 +25,7 @@ export function sanitizeRedirect(url: string | null): string {
 }
 
 function LoginForm() {
+  const { t } = usePreferences();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -58,8 +60,8 @@ function LoginForm() {
 
   return (
     <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem' }}>
-      <h1 style={{ fontSize: '2rem', textAlign: 'center', marginBottom: '0.5rem' }}>Welcome Back</h1>
-      <p className="text-muted text-center" style={{ marginBottom: '2rem' }}>Log in to access your personalized recommendations and library.</p>
+      <h1 style={{ fontSize: '2rem', textAlign: 'center', marginBottom: '0.5rem' }}>{t('login_title')}</h1>
+      <p className="text-muted text-center" style={{ marginBottom: '2rem' }}>{t('login_subtitle')}</p>
       
       {error && (
         <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
@@ -69,7 +71,7 @@ function LoginForm() {
 
       <form onSubmit={handleLogin}>
         <div className="input-group">
-          <label className="input-label" htmlFor="email">Email</label>
+          <label className="input-label" htmlFor="email">{t('email_label')}</label>
           <input 
             id="email"
             type="email" 
@@ -77,12 +79,12 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="input-field"
-            placeholder="your@email.com"
+            placeholder={t('email_placeholder')}
           />
         </div>
         
         <div className="input-group">
-          <label className="input-label" htmlFor="password">Password</label>
+          <label className="input-label" htmlFor="password">{t('password_label')}</label>
           <input 
             id="password"
             type="password" 
@@ -110,7 +112,7 @@ function LoginForm() {
           href={searchParams.get('redirect') ? `/signup?redirect=${encodeURIComponent(searchParams.get('redirect')!)}` : '/signup'}
           style={{ color: 'var(--primary)', fontWeight: 500 }}
         >
-          Sign up
+          {t('nav_signup')}
         </Link>
       </p>
     </div>
@@ -118,9 +120,10 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  const { t } = usePreferences();
   return (
     <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '70vh' }}>
-      <Suspense fallback={<div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem', textAlign: 'center' }}>Loading...</div>}>
+      <Suspense fallback={<div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem', textAlign: 'center' }}>{t('loading')}</div>}>
         <LoginForm />
       </Suspense>
     </div>

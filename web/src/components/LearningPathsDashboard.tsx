@@ -75,7 +75,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
           }
         })
         .catch(() => {
-          if (!ignore) setError('Failed to load learning paths');
+          if (!ignore) setError(t('lp_load_error'));
         })
         .finally(() => {
           if (!ignore) setLoading(false);
@@ -89,7 +89,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
     return () => {
       ignore = true;
     };
-  }, [user, authLoading]);
+  }, [user, authLoading, t]);
 
   // Load active path details
   useEffect(() => {
@@ -128,7 +128,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
           }
         })
         .catch(() => {
-          if (!ignore) setError('Failed to load path detail');
+          if (!ignore) setError(t('lp_detail_error'));
         })
 
     } else {
@@ -139,7 +139,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
     return () => {
       ignore = true;
     };
-  }, [activePathId, user]);
+  }, [activePathId, user, t]);
 
   const handleCreatePath = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,7 +165,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
         setError(res.error || 'Failed to create path');
       }
     } catch {
-      setError('A network error occurred');
+      setError(t('network_error'));
     } finally {
       setSubmitting(false);
     }
@@ -189,7 +189,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
       }
     } catch {
       setPaths(previousPaths);
-      setError('A network error occurred');
+      setError(t('network_error'));
     }
   };
 
@@ -203,7 +203,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
         setPaths((prev) => prev.map((p) => (p.id === activePathId ? { ...p, totalBooks: (p.totalBooks || 0) + 1 } : p)));
       }
     } catch {
-      setError('Failed to add book to path');
+      setError(t('lp_add_error'));
     }
   };
 
@@ -216,7 +216,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
         setPaths((prev) => prev.map((p) => (p.id === activePathId ? { ...p, totalBooks: Math.max(0, (p.totalBooks || 1) - 1) } : p)));
       }
     } catch {
-      setError('Failed to remove book from path');
+      setError(t('lp_remove_error'));
     }
   };
 
@@ -238,7 +238,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
     try {
       await reorderLearningPathBooksAction(activePath.id, bookIds);
     } catch {
-      setError('Failed to reorder books');
+      setError(t('lp_reorder_error'));
     }
   };
 
@@ -253,7 +253,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
         }
       }
     } catch {
-      setError('Failed to update book reading status');
+      setError(t('lp_status_error'));
     }
   };
 
@@ -669,10 +669,10 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
                           onClick={() => handleUpdateBookReadingStatus(item.bookId, 'reading')}
                           className="btn btn-outline"
                           style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', gap: '0.3rem' }}
-                          title="Start reading"
+                          title={t('start_reading')}
                         >
                           <Play size={12} fill="currentColor" />
-                          <span>Start Reading</span>
+                          <span>{t('start_reading')}</span>
                         </button>
                       )}
 
@@ -682,10 +682,10 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
                           onClick={() => handleUpdateBookReadingStatus(item.bookId, 'finished')}
                           className="btn btn-primary"
                           style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', gap: '0.3rem' }}
-                          title="Mark finished"
+                          title={t('mark_as_finished')}
                         >
                           <CheckCircle2 size={12} />
-                          <span>Complete</span>
+                          <span>{t('complete')}</span>
                         </button>
                       )}
 
@@ -747,7 +747,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
               })
             ) : (
               <p className="text-muted" style={{ fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>
-                No books added to this path yet. Select from suggestions below or search the catalog.
+                {t('lp_no_books')}
               </p>
             )}
           </div>
@@ -821,7 +821,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
                         title={t('add_to_path')}
                       >
                         <Plus size={11} />
-                        <span>Add</span>
+                        <span>{t('add')}</span>
                       </button>
                     </div>
                   );
@@ -875,7 +875,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-                aria-label="Close"
+                aria-label={t('close')}
               >
                 <X size={18} />
               </button>
@@ -889,7 +889,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Stoicism & Practical Wisdom"
+                  placeholder={t('lp_title_hint')}
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   style={{
@@ -911,7 +911,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Philosophy, Science, Fiction"
+                  placeholder={t('lp_category_hint')}
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   style={{
@@ -932,7 +932,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Goals and focus areas for this learning path..."
+                  placeholder={t('lp_goals_hint')}
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
                   style={{
@@ -955,7 +955,7 @@ export function LearningPathsDashboard({ className = '' }: LearningPathsDashboar
                   className="btn btn-outline"
                   style={{ padding: '0.45rem 1rem', fontSize: '0.85rem' }}
                 >
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button
                   type="submit"

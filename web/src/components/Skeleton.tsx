@@ -1,4 +1,5 @@
 import React from 'react';
+import { translate } from '@/lib/i18n';
 
 interface SkeletonProps {
   width?: string | number;
@@ -40,9 +41,16 @@ export function BookCardSkeleton() {
   );
 }
 
-export function BookGridSkeleton({ count = 8 }: { count?: number }) {
+export function BookGridSkeleton({
+  count = 8,
+  label = translate('en', 'loading_books'),
+}: {
+  count?: number;
+  /** Localized accessible label; server loaders pass the user's language. */
+  label?: string;
+}) {
   return (
-    <div className="grid-books" aria-label="Loading books..." role="status">
+    <div className="grid-books" aria-label={label} role="status">
       {Array.from({ length: count }).map((_, i) => (
         <BookCardSkeleton key={i} />
       ))}
@@ -50,9 +58,9 @@ export function BookGridSkeleton({ count = 8 }: { count?: number }) {
   );
 }
 
-export function BookDetailSkeleton() {
+export function BookDetailSkeleton({ label = translate('en', 'loading_book_details') }: { label?: string } = {}) {
   return (
-    <div className="container animate-fade-in" style={{ paddingBottom: '5rem' }} aria-label="Loading book details..." role="status">
+    <div className="container animate-fade-in" style={{ paddingBottom: '5rem' }} aria-label={label} role="status">
       <div style={{ marginBottom: '2rem' }}>
         <Skeleton width="120px" height="36px" borderRadius="8px" />
       </div>

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { usePreferences } from './PreferencesProvider';
 import { BookOpen, LogOut, Compass, Sparkles, Bookmark, Settings, Globe, Search, Network, Brain } from 'lucide-react';
+import { LANGUAGES } from '@/lib/preferences';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -16,7 +17,7 @@ export function Navbar() {
     return pathname === route || pathname.startsWith(route + '/');
   };
 
-  const nextLanguage = preferences.language === 'en' ? 'tr' : preferences.language === 'tr' ? 'de' : 'en';
+  const nextLanguage = LANGUAGES[(LANGUAGES.indexOf(preferences.language) + 1) % LANGUAGES.length];
 
   const handleOpenSpotlight = () => {
     if (typeof window !== 'undefined') {
@@ -27,7 +28,7 @@ export function Navbar() {
   return (
     <nav className="navbar">
       <div className="container nav-container">
-        <Link href="/" className="brand" aria-label="Libris Home">
+        <Link href="/" className="brand" aria-label={t('nav_home_label')}>
           <BookOpen size={24} color="var(--primary)" />
           <span>Libris</span>
         </Link>
@@ -46,8 +47,8 @@ export function Navbar() {
               gap: '0.4rem',
               color: 'var(--text-muted)',
             }}
-            title="Search books (Ctrl+K / ⌘K)"
-            aria-label="Open spotlight search (Ctrl+K / ⌘K)"
+            title={t('nav_search_title')}
+            aria-label={t('nav_search_label')}
           >
             <Search size={14} color="var(--text-muted)" />
             <span className="nav-link-text">{t('search') || 'Search...'}</span>
@@ -132,8 +133,8 @@ export function Navbar() {
               borderRadius: '9999px',
               gap: '0.35rem',
             }}
-            title="Switch Language (EN / TR / DE)"
-            aria-label="Toggle language"
+            title={t('nav_language_title')}
+            aria-label={t('nav_language_title')}
           >
             <Globe size={14} color="var(--primary)" />
             <span style={{ fontWeight: 700, textTransform: 'uppercase' }}>{preferences.language}</span>

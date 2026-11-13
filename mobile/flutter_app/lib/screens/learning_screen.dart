@@ -126,7 +126,7 @@ class _LearningScreenState extends State<LearningScreen>
             onPressed: () => _showCreateQuestionDialog(context, provider),
           ),
           IconButton(
-            tooltip: 'Refresh',
+            tooltip: context.tr('ui_refresh'),
             icon: const Icon(Icons.refresh_rounded),
             onPressed: () => provider.loadAll(),
           ),
@@ -224,7 +224,7 @@ class _LearningScreenState extends State<LearningScreen>
           ),
           TextButton(
             onPressed: () => provider.filterByPath(null),
-            child: const Text('Clear Filter', style: TextStyle(fontSize: 12)),
+            child: Text(context.tr('ui_clear_filter'), style: const TextStyle(fontSize: 12)),
           ),
         ],
       ),
@@ -249,7 +249,7 @@ class _LearningScreenState extends State<LearningScreen>
           ),
           TextButton(
             onPressed: () => provider.filterByConcept(null),
-            child: const Text('Clear Filter', style: TextStyle(fontSize: 12)),
+            child: Text(context.tr('ui_clear_filter'), style: const TextStyle(fontSize: 12)),
           ),
         ],
       ),
@@ -827,7 +827,7 @@ class _LearningScreenState extends State<LearningScreen>
           : context.tr('outcome_struggled');
 
       setState(() {
-        _lastFeedback = '$outcomeLabel! Stage $stage · Next review in $days days.';
+        _lastFeedback = context.tr('ui_review_feedback', args: {'outcome': outcomeLabel, 'stage': '$stage', 'days': '$days'});
       });
       _resetCardState();
     }
@@ -902,7 +902,7 @@ class _LearningScreenState extends State<LearningScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${c.totalAttempts} attempts · ${c.retentionRate.toStringAsFixed(0)}% retention · ${c.dueItems} due',
+                        context.tr('ui_concept_stats', args: {'attempts': '${c.totalAttempts}', 'retention': c.retentionRate.toStringAsFixed(0), 'due': '${c.dueItems}'}),
                         style: TextStyle(
                           fontSize: 12,
                           color: isDark ? Colors.white60 : Colors.grey.shade600,
@@ -984,7 +984,7 @@ class _LearningScreenState extends State<LearningScreen>
               color: isSuccess ? const Color(0xFF16A34A) : Colors.deepOrange,
             ),
             title: Text(
-              a.itemTitle ?? a.concept ?? 'Review Attempt',
+              a.itemTitle ?? a.concept ?? context.tr('ui_review_attempt'),
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             ),
             subtitle: Text(
@@ -1039,7 +1039,7 @@ class _LearningScreenState extends State<LearningScreen>
                       labelText: dialogCtx.tr('question_concept_label'),
                     ),
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        (v == null || v.trim().isEmpty) ? context.tr('ui_required') : null,
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
@@ -1049,7 +1049,7 @@ class _LearningScreenState extends State<LearningScreen>
                       labelText: dialogCtx.tr('question_prompt_label'),
                     ),
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        (v == null || v.trim().isEmpty) ? context.tr('ui_required') : null,
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
@@ -1059,7 +1059,7 @@ class _LearningScreenState extends State<LearningScreen>
                       labelText: dialogCtx.tr('question_answer_label'),
                     ),
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        (v == null || v.trim().isEmpty) ? context.tr('ui_required') : null,
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
@@ -1076,7 +1076,7 @@ class _LearningScreenState extends State<LearningScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogCtx),
-              child: const Text('Cancel'),
+              child: Text(context.tr('cancel')),
             ),
             ElevatedButton(
               onPressed: () async {

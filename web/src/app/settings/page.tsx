@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePreferences } from '@/components/PreferencesProvider';
 import { useAuth } from '@/components/AuthProvider';
-import type { ThemeMode, ColorPalette, FontFamily, FontScale, LineSpacing, Language } from '@/lib/preferences';
+import { LANGUAGES, LANGUAGE_NAMES, type ThemeMode, type ColorPalette, type FontFamily, type FontScale, type LineSpacing, type Language } from '@/lib/preferences';
 import {
   Sun,
   Moon,
@@ -140,7 +140,7 @@ export default function SettingsPage() {
           }}
         >
           <Sliders size={15} />
-          <span>Libris Experience Engine</span>
+          <span>{t('nav_profile_settings')}</span>
         </div>
         <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>{t('settings_title')}</h1>
         <p className="text-muted" style={{ maxWidth: '600px', margin: '0 auto' }}>
@@ -203,7 +203,7 @@ export default function SettingsPage() {
                   <Star key={i} size={14} fill="var(--rating)" />
                 ))}
               </div>
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>4.9 · 1945 ratings</span>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t('settings_preview_rating')}</span>
             </div>
 
             <h3 style={{ fontSize: '1.4rem', marginBottom: '0.25rem', color: 'var(--text-primary)' }}>
@@ -236,7 +236,7 @@ export default function SettingsPage() {
             <span>{t('tab_appearance')}</span>
           </h2>
           <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '1.75rem' }}>
-            Customize your background mood, chromatic palette, and contrast.
+            {t('settings_appearance_desc')}
           </p>
 
           {/* Theme Mode Segmented Controls */}
@@ -413,7 +413,7 @@ export default function SettingsPage() {
             <span>{t('tab_readability')}</span>
           </h2>
           <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '1.75rem' }}>
-            Scale fonts, tune line leading, and switch font families for optimal comfort.
+            {t('settings_readability_desc')}
           </p>
 
           {/* Font Family */}
@@ -527,15 +527,11 @@ export default function SettingsPage() {
             <span>{t('tab_language')}</span>
           </h2>
           <p className="text-muted" style={{ fontSize: '0.9rem', marginBottom: '1.75rem' }}>
-            Switch interface language instantly across all pages and notifications.
+            {t('settings_language_desc')}
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem' }}>
-            {[
-              { id: 'en' as Language, label: 'English', native: 'English (US)' },
-              { id: 'tr' as Language, label: 'Türkçe', native: 'Türkçe (TR)' },
-              { id: 'de' as Language, label: 'Deutsch', native: 'Deutsch (DE)' },
-            ].map((lang) => {
+            {LANGUAGES.map((code) => ({ id: code as Language, label: LANGUAGE_NAMES[code], native: code.toUpperCase() })).map((lang) => {
               const isSelected = preferences.language === lang.id;
               return (
                 <button

@@ -9,10 +9,16 @@ import BookNotesWidget from '@/components/BookNotesWidget';
 import { getBookNotes } from '@/app/actions/notes';
 import type { LearningNote } from '@/types';
 import { getBookInteraction } from '@/app/actions/library';
+import { cookies } from 'next/headers';
+import { translate, type TranslationKey } from '@/lib/i18n';
+import { resolveLanguage } from '@/lib/preferences';
 
 export const dynamic = 'force-dynamic';
 
 export default async function BookPage({ params }: { params: Promise<{ isbn: string }> }) {
+  const cookieStore = await cookies();
+  const lang = resolveLanguage(cookieStore.get('libris_lang')?.value);
+  const t = (key: TranslationKey, args?: Record<string, string | number>) => translate(lang, key, args);
   const { isbn } = await params;
   
   let book: Book | null = null;
@@ -61,7 +67,7 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
             <AlertTriangle size={32} />
           </div>
           <h2 style={{ fontSize: '1.75rem', marginBottom: '0.75rem' }}>
-            Service Temporarily Unavailable
+            {t('book_service_unavailable')}
           </h2>
           <p className="text-muted" style={{ marginBottom: '2rem', lineHeight: '1.6' }}>
             {serviceError.message}
@@ -84,7 +90,7 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
                 background: 'rgba(255, 255, 255, 0.08)',
               }}
             >
-              <ArrowLeft size={16} /> Back to Catalog
+              <ArrowLeft size={16} /> {t('back_to_catalog')}
             </Link>
           </div>
         </div>
@@ -96,12 +102,12 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
   if (!book) {
     return (
       <div className="container" style={{ textAlign: 'center', padding: '6rem 2rem' }}>
-        <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>Book Not Found</h2>
+        <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>{t('book_not_found')}</h2>
         <p className="text-muted" style={{ marginBottom: '2rem' }}>
           We couldn&apos;t find any book with ISBN <code style={{ color: 'var(--primary)' }}>{isbn}</code>.
         </p>
         <Link href="/catalog" className="btn btn-primary">
-          Back to Catalog
+          {t('back_to_catalog')}
         </Link>
       </div>
     );
@@ -153,7 +159,7 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
     <div className="container animate-fade-in" style={{ paddingBottom: '5rem' }}>
       <div style={{ marginBottom: '2rem' }}>
         <Link href="/catalog" className="text-muted" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem' }}>
-          <ArrowLeft size={16} /> Back to Catalog
+          <ArrowLeft size={16} /> {t('back_to_catalog')}
         </Link>
       </div>
       
@@ -180,7 +186,7 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
                 By {book.authors}
               </Link>
             ) : (
-              <span style={{ fontSize: '1.25rem', color: 'var(--muted)' }}>Unknown Author</span>
+              <span style={{ fontSize: '1.25rem', color: 'var(--muted)' }}>{t('unknown_author')}</span>
             )}
           </div>
           
@@ -195,7 +201,7 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
             {book.pageCount > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '10px' }}>
                 <FileText size={16} color="var(--muted)" />
-                <span className="text-muted">Pages:</span>
+                <span className="text-muted">{t('book_pages_label')}</span>
                 <span style={{ fontWeight: 600 }}>{book.pageCount}</span>
               </div>
             )}
@@ -203,7 +209,7 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
             {book.publishedDate && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '10px' }}>
                 <Calendar size={16} color="var(--muted)" />
-                <span className="text-muted">Published:</span>
+                <span className="text-muted">{t('book_published_label')}</span>
                 <span style={{ fontWeight: 600 }}>{book.publishedDate}</span>
               </div>
             )}
@@ -219,7 +225,7 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
           {categoryList.length > 0 && (
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ fontSize: '0.95rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
-                Genres & Categories
+                {t('book_genres_label')}
               </h3>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {categoryList.map(cat => (
@@ -250,7 +256,7 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
           
           {/* Synopsis */}
           <div style={{ marginBottom: '2.5rem' }}>
-            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>Synopsis</h3>
+            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>{t('book_synopsis')}</h3>
             <p style={{ lineHeight: '1.8', color: 'rgba(255,255,255,0.85)', fontSize: '1rem', whiteSpace: 'pre-line' }}>
               {book.description || 'No description available for this book.'}
             </p>
@@ -278,8 +284,8 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
       {recommendations.length > 0 && (
         <div style={{ marginTop: '5rem' }}>
           <div style={{ marginBottom: '2rem' }}>
-            <h2 style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>Similar Books You Might Like</h2>
-            <p className="text-muted">Curated based on theme, genre, and reader similarity</p>
+            <h2 style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>{t('book_similar_title')}</h2>
+            <p className="text-muted">{t('book_similar_subtitle')}</p>
           </div>
           <div className="grid-books">
             {recommendations.map(rec => (

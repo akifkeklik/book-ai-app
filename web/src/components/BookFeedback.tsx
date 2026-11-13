@@ -9,6 +9,7 @@ import {
   removeFavoriteItem,
 } from '@/app/actions/library';
 import { ThumbsUp, ThumbsDown, Heart, Bookmark, Check, AlertCircle, Trash2, BookOpen, CheckCircle2, WifiOff } from 'lucide-react';
+import { usePreferences } from '@/components/PreferencesProvider';
 
 interface BookFeedbackProps {
   bookId: string;
@@ -25,6 +26,7 @@ export default function BookFeedback({
   interactionError = null,
   isAuthenticated = false,
 }: BookFeedbackProps) {
+  const { t } = usePreferences();
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'offline_pending'>(
     interactionError ? 'error' : 'idle'
   );
@@ -208,20 +210,20 @@ export default function BookFeedback({
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <h3 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 600 }}>Your Reading Activity & Feedback</h3>
+          <h3 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 600 }}>{t('feedback_title')}</h3>
           {activeFeedback === 'reading' && (
             <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: '9999px', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
-              Currently Reading
+              {t('feedback_currently_reading')}
             </span>
           )}
           {activeFeedback === 'finished' && (
             <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: '9999px', background: 'rgba(16, 185, 129, 0.2)', color: 'var(--success)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-              Finished Reading
+              {t('feedback_finished_reading')}
             </span>
           )}
         </div>
         <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-          Directly shapes your personalized recommendations
+          {t('feedback_shapes_recs')}
         </span>
       </div>
 
@@ -248,14 +250,14 @@ export default function BookFeedback({
           }}
         >
           <Heart size={16} fill={isFavorite ? '#f472b6' : 'none'} color={isFavorite ? '#f472b6' : 'currentColor'} />
-          <span>Favorite</span>
+          <span>{t('status_favorite')}</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleFeedback('want_to_read')}
           disabled={status === 'loading'}
-          aria-label="Want to read book"
+          aria-label={t('feedback_want_label')}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -272,14 +274,14 @@ export default function BookFeedback({
           }}
         >
           <Bookmark size={16} fill={activeFeedback === 'want_to_read' ? 'currentColor' : 'none'} color={activeFeedback === 'want_to_read' ? 'var(--primary)' : 'currentColor'} />
-          <span>Want to Read</span>
+          <span>{t('status_want_to_read')}</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleFeedback('reading')}
           disabled={status === 'loading'}
-          aria-label="Currently reading book"
+          aria-label={t('feedback_reading_label')}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -296,14 +298,14 @@ export default function BookFeedback({
           }}
         >
           <BookOpen size={16} color={activeFeedback === 'reading' ? '#fbbf24' : 'currentColor'} />
-          <span>Reading</span>
+          <span>{t('status_reading')}</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleFeedback('finished')}
           disabled={status === 'loading'}
-          aria-label="Finished reading book"
+          aria-label={t('feedback_finished_label')}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -320,14 +322,14 @@ export default function BookFeedback({
           }}
         >
           <CheckCircle2 size={16} color={activeFeedback === 'finished' ? 'var(--success)' : 'currentColor'} />
-          <span>Finished</span>
+          <span>{t('status_finished')}</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleFeedback('like')}
           disabled={status === 'loading'}
-          aria-label="Like book"
+          aria-label={t('feedback_like_label')}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -344,14 +346,14 @@ export default function BookFeedback({
           }}
         >
           <ThumbsUp size={16} fill={activeFeedback === 'like' ? 'currentColor' : 'none'} color={activeFeedback === 'like' ? 'var(--success)' : 'currentColor'} />
-          <span>Like</span>
+          <span>{t('status_like')}</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleFeedback('dislike')}
           disabled={status === 'loading'}
-          aria-label="Dislike book"
+          aria-label={t('feedback_dislike_label')}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -368,7 +370,7 @@ export default function BookFeedback({
           }}
         >
           <ThumbsDown size={16} fill={activeFeedback === 'dislike' ? 'currentColor' : 'none'} color={activeFeedback === 'dislike' ? 'var(--danger)' : 'currentColor'} />
-          <span>Dislike</span>
+          <span>{t('status_dislike')}</span>
         </button>
 
         {(isFavorite || activeFeedback) && (
@@ -376,8 +378,8 @@ export default function BookFeedback({
             type="button"
             onClick={handleRemoveFromLibrary}
             disabled={status === 'loading'}
-            aria-label="Remove completely from library"
-            title="Remove all saved status and interactions from library"
+            aria-label={t('feedback_remove_title')}
+            title={t('feedback_remove_label')}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -395,7 +397,7 @@ export default function BookFeedback({
             }}
           >
             <Trash2 size={14} />
-            <span>Remove from Library</span>
+            <span>{t('remove_from_library')}</span>
           </button>
         )}
       </div>
@@ -403,7 +405,7 @@ export default function BookFeedback({
       <div style={{ marginTop: '0.75rem', minHeight: '1.25rem' }}>
         {status === 'loading' && (
           <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }} className="animate-pulse">
-            Updating your preferences...
+            {t('feedback_updating')}
           </span>
         )}
         {status === 'success' && (

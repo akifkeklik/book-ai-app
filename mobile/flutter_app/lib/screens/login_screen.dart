@@ -65,12 +65,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final success = await auth.login(email: email, password: password);
 
-      if (!mounted) return;
-
       if (success) {
-        // Save credentials if remember me is checked
+        // Save credentials if remember me is checked. This does not use `context`,
+        // so it must also complete after the router has already left this page.
         final prefs = await SharedPreferences.getInstance();
-        if (!mounted) return;
         await prefs.setBool('remember_me', rememberMe);
         if (rememberMe) {
           await prefs.setString('saved_email', email);
@@ -78,15 +76,11 @@ class _LoginScreenState extends State<LoginScreen> {
           await prefs.remove('saved_email');
         }
 
-        if (!mounted) return;
         final userId = auth.currentUser?.id;
         if (userId != null) favs.loadFavorites(userId);
-
-        final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
-        final target = (redirect != null && redirect.isNotEmpty && redirect != '/login' && redirect != '/register')
-            ? redirect
-            : '/';
-        context.go(target);
+        // Navigation is owned by the router: AuthProvider notifies on login and
+        // AppRouter.redirect moves the user to the `redirect` target or '/'.
+        // Navigating here as well would touch this page while it is being removed.
       }
     } finally {
       if (mounted) {

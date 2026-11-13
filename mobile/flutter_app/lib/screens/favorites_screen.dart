@@ -6,10 +6,10 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../providers/favorites_provider.dart';
-import 'package:intl/intl.dart';
 import '../domain/entities/learning_note.dart';
 import '../providers/notes_provider.dart';
 import '../providers/language_provider.dart';
+import '../utils/date_format.dart';
 import '../theme/design_system.dart';
 
 
@@ -805,7 +805,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             break;
         }
 
-        final formattedDate = DateFormat('MMM d, yyyy').format(note.createdAt);
+        final formattedDate = formatShortDate(note.createdAt, context.read<LanguageProvider>().currentLanguageCode);
 
         return Container(
           key: Key('hub_note_card_${note.id}'),
