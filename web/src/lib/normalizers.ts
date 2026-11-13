@@ -4,6 +4,7 @@ import type {
   ReviewAttempt,
   LearningProgress,
 } from '@/types';
+import { cleanPublishedDate } from './format';
 
 export interface RawBookDto {
   isbn13?: string | number | null;
@@ -152,7 +153,7 @@ export function normalizeBook(raw: unknown): Book {
     ? r.publishedDate
     : r.published_date;
   const publishedDate = rawPubDate !== undefined && rawPubDate !== null
-    ? String(rawPubDate).trim()
+    ? cleanPublishedDate(String(rawPubDate))
     : '';
 
   // Page Count: pageCount vs page_count, preserving numeric 0

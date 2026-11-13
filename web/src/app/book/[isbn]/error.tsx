@@ -61,7 +61,7 @@ export default function BookDetailError({
             className="btn btn-primary"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
           >
-            <RefreshCw size={16} /> Try Again
+            <RefreshCw size={16} /> {t('retry')}
           </button>
           <Link
             href="/catalog"
@@ -73,7 +73,7 @@ export default function BookDetailError({
               background: 'rgba(255, 255, 255, 0.08)',
             }}
           >
-            <ArrowLeft size={16} /> Back to Catalog
+            <ArrowLeft size={16} /> {t('back_to_catalog')}
           </Link>
         </div>
       </div>

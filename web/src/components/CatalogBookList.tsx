@@ -56,7 +56,7 @@ export function CatalogBookList({
           const newBooks = res.data.books || [];
           setBooks((prev) => [...prev, ...newBooks]);
           setCurrentPage(nextPage);
-          setStatusMessage(`Loaded ${newBooks.length} more books. Now showing ${books.length + newBooks.length} of ${totalBooks} books.`);
+          setStatusMessage(t('catalog_loaded_more_sr', { added: newBooks.length, shown: books.length + newBooks.length, total: totalBooks }));
         } else {
           setError(res.error || 'Failed to load more books. Please try again.');
         }
@@ -141,7 +141,7 @@ export function CatalogBookList({
               cursor: isPending ? 'not-allowed' : 'pointer',
               opacity: isPending ? 0.75 : 1,
             }}
-            aria-label={`Load more books. Page ${currentPage + 1} of ${totalPages}`}
+            aria-label={t('catalog_load_more_label', { page: currentPage + 1, pages: totalPages })}
           >
             {isPending ? (
               <>
@@ -169,7 +169,7 @@ export function CatalogBookList({
             }}
           >
             <Check size={16} color="var(--primary)" />
-            <span>All {totalBooks} books displayed</span>
+            <span>{t('catalog_all_shown', { count: totalBooks })}</span>
           </div>
         ) : null}
 

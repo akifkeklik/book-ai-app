@@ -34,13 +34,19 @@ interface PreferencesContextValue {
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
 
-export function PreferencesProvider({ children }: { children: React.ReactNode }) {
-  // Lazy state initialization prevents setState in effect
+export function PreferencesProvider({
+  children,
+  initialLanguage,
+}: {
+  children: React.ReactNode;
+  /** Language the server rendered with (from the libris_lang cookie). */
+  initialLanguage?: Language;
+}) {
+  // Lazy state initialization prevents setState in effect. The language must match what the
+  // server rendered, otherwise every translated client component fails hydration.
   const [preferences, setPreferences] = useState<LibrisPreferences>(() => {
-    if (typeof window !== 'undefined') {
-      return loadPreferences();
-    }
-    return DEFAULT_PREFERENCES;
+    const base = typeof window !== 'undefined' ? loadPreferences() : DEFAULT_PREFERENCES;
+    return initialLanguage ? { ...base, language: initialLanguage } : base;
   });
 
   const [, startTransition] = useTransition();

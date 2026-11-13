@@ -43,7 +43,7 @@ export function ReadingJourneyDashboard({
   onUpdateStatus,
   isUpdating = false,
 }: ReadingJourneyDashboardProps) {
-  const { t } = usePreferences();
+  const { t, preferences } = usePreferences();
 
   // Goal persisted locally on device per specifications
   const [goal, setGoal] = useState<ReadingGoal>(() => loadSavedReadingGoal());
@@ -356,7 +356,7 @@ export function ReadingJourneyDashboard({
           </div>
           <div className="saas-metric-footer">
             <span className="saas-pulse-dot emerald" />
-            <span>{completedBooks.reduce((acc, b) => acc + (b.book?.pageCount || 0), 0).toLocaleString()} pages logged</span>
+            <span>{t('rj_pages_logged', { count: completedBooks.reduce((acc, b) => acc + (b.book?.pageCount || 0), 0).toLocaleString(preferences.language) })}</span>
           </div>
         </div>
       </div>
@@ -402,7 +402,7 @@ export function ReadingJourneyDashboard({
                   borderRadius: '9999px',
                 }}
               >
-                <CheckCircle2 size={12} /> Goal Achieved!
+                <CheckCircle2 size={12} /> {t('rj_goal_achieved')}
               </span>
             )}
           </div>
@@ -417,7 +417,7 @@ export function ReadingJourneyDashboard({
           aria-valuenow={progressPercent}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={`Reading progress: ${completedCount} of ${safeGoal} books (${progressPercent}%)`}
+          aria-label={t('rj_progress_label', { done: completedCount, goal: safeGoal, percent: progressPercent })}
           style={{
             height: '10px',
             borderRadius: '9999px',
@@ -456,11 +456,11 @@ export function ReadingJourneyDashboard({
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <span className="saas-pulse-dot amber" style={{ width: '8px', height: '8px' }} />
-            Currently Reading: <strong>{readingCount}</strong>
+            {t('rj_currently_reading_label')} <strong>{readingCount}</strong>
           </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <span className="saas-pulse-dot blue" style={{ width: '8px', height: '8px' }} />
-            Reading List: <strong>{wantToReadCount}</strong>
+            {t('rj_reading_list_label')} <strong>{wantToReadCount}</strong>
           </span>
         </div>
 
@@ -485,7 +485,7 @@ export function ReadingJourneyDashboard({
               { day: 'Sun', height: '75%', active: true },
             ].map((d) => (
               <div key={d.day} className="saas-chart-col">
-                <div className="saas-chart-bar-wrap" title={`${d.day}: ${d.height} activity pace`}>
+                <div className="saas-chart-bar-wrap" title={`${d.day}: ${d.height}`}>
                   <div
                     className="saas-chart-bar-fill"
                     style={{
@@ -734,10 +734,10 @@ export function ReadingJourneyDashboard({
               >
                 {activeShelfTab === 'reading' && (
                   <>
-                    No books currently marked as &ldquo;Reading&rdquo;.
+                    {t('rj_none_reading')}
                     {wantToReadBooks.length > 0 ? (
                       <span style={{ display: 'block', marginTop: '0.25rem' }}>
-                        You have {wantToReadBooks.length} title{wantToReadBooks.length > 1 ? 's' : ''} in your Want to Read shelf waiting to be started!
+                        {t('rj_want_waiting', { count: wantToReadBooks.length })}
                       </span>
                     ) : (
                       <span style={{ display: 'block', marginTop: '0.25rem' }}>
@@ -956,7 +956,7 @@ export function ReadingJourneyDashboard({
                             color: 'var(--muted)',
                           }}
                           title={t('rj_remove_label')}
-                          aria-label={`Remove ${book.title} from shelf`}
+                          aria-label={t('rj_remove_title_label', { title: book.title })}
                         >
                           <Trash2 size={12} />
                         </button>

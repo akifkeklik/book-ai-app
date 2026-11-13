@@ -7,6 +7,7 @@ import { Star, Sparkles, Heart, Bookmark, BookOpen, CheckCircle } from 'lucide-r
 import { BookCoverFallback } from './BookCoverFallback';
 import { usePreferences } from '@/components/PreferencesProvider';
 import { localizeRecommendationReason } from '@/lib/i18n';
+import { formatCount, formatRating } from '@/lib/format';
 
 interface BookCardProps {
   book: Book;
@@ -16,7 +17,7 @@ interface BookCardProps {
 
 export function BookCard({ book, userInteraction, isFavorite }: BookCardProps) {
   const [imageError, setImageError] = useState(false);
-  const { t } = usePreferences();
+  const { t, preferences } = usePreferences();
 
   const hasValidThumbnail = Boolean(
     book.thumbnail &&
@@ -148,8 +149,8 @@ export function BookCard({ book, userInteraction, isFavorite }: BookCardProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
           <Star size={14} color="var(--rating)" fill="var(--rating)" aria-hidden="true" />
           <span style={{ fontSize: '0.875rem', color: 'var(--muted)' }}>
-            {book.averageRating > 0 ? book.averageRating.toFixed(1) : t('no_rating')} 
-            {book.ratingsCount > 0 && ` (${book.ratingsCount})`}
+            {book.averageRating > 0 ? formatRating(book.averageRating, preferences.language) : t('no_rating')} 
+            {book.ratingsCount > 0 && ` (${formatCount(book.ratingsCount, preferences.language, true)})`}
           </span>
         </div>
 

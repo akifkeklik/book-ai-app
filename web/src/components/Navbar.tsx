@@ -66,53 +66,29 @@ export function Navbar() {
             </kbd>
           </button>
 
-          <Link
-            href="/catalog"
-            id="nav-catalog-link"
-            className={`nav-link ${isActive("/catalog") ? "active" : ""}`}
-          >
-            <Compass size={18} />
-            <span className="nav-link-text">{t('nav_discover')}</span>
-          </Link>
-
-          <Link
-            href="/ai-discovery"
-            id="nav-ai-discovery-link"
-            className={`nav-link ${isActive("/ai-discovery") ? "active" : ""}`}
-          >
-            <Sparkles size={18} color="var(--accent)" />
-            <span className="text-gradient nav-link-text">{t('nav_for_you')}</span>
-          </Link>
-
-          <Link
-            href="/favorites"
-            id="nav-library-link"
-            className={`nav-link ${isActive("/favorites") ? "active" : ""}`}
-          >
-            <Bookmark size={18} color="var(--primary)" />
-            <span className="nav-link-text">{t('nav_my_library')}</span>
-          </Link>
-
-          <Link
-            href="/learning"
-            id="nav-learning-link"
-            className={`nav-link ${isActive("/learning") ? "active" : ""}`}
-          >
-            <Brain size={18} color="var(--primary)" />
-            <span className="nav-link-text">{t('nav_review')}</span>
-          </Link>
-
-
-          <Link
-            href="/settings"
-            id="nav-settings-link"
-            className={`nav-link ${isActive("/settings") ? "active" : ""}`}
-            title={t('nav_profile_settings')}
-          >
-            <Settings size={18} />
-            <span className="nav-settings-label nav-link-text">{t('nav_profile_settings')}</span>
-          </Link>
-
+          {/* Primary destinations: inline on desktop, a bottom tab bar on phones */}
+          <div className="nav-primary" role="group" aria-label={t('nav_primary_label')}>
+            <Link href="/catalog" id="nav-catalog-link" className={`nav-link ${isActive("/catalog") ? "active" : ""}`}>
+              <Compass size={18} aria-hidden="true" />
+              <span className="nav-link-text">{t('nav_discover')}</span>
+            </Link>
+            <Link href="/ai-discovery" id="nav-ai-discovery-link" className={`nav-link ${isActive("/ai-discovery") ? "active" : ""}`}>
+              <Sparkles size={18} aria-hidden="true" />
+              <span className="nav-link-text">{t('nav_for_you')}</span>
+            </Link>
+            <Link href="/learning" id="nav-learning-link" className={`nav-link ${isActive("/learning") ? "active" : ""}`}>
+              <Brain size={18} aria-hidden="true" />
+              <span className="nav-link-text">{t('nav_review')}</span>
+            </Link>
+            <Link href="/favorites" id="nav-library-link" className={`nav-link ${isActive("/favorites") ? "active" : ""}`}>
+              <Bookmark size={18} aria-hidden="true" />
+              <span className="nav-link-text">{t('nav_my_library')}</span>
+            </Link>
+            <Link href="/settings" id="nav-settings-link" className={`nav-link ${isActive("/settings") ? "active" : ""}`}>
+              <Settings size={18} aria-hidden="true" />
+              <span className="nav-link-text">{t('nav_profile_settings')}</span>
+            </Link>
+          </div>
 
           {/* Quick Language Toggle */}
           <button

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Sparkles, Check, X, Compass, Loader2 } from 'lucide-react';
 import { usePreferences } from '@/components/PreferencesProvider';
 import { updateUserPreferencesAction } from '@/app/actions/user';
+import { translateGenre } from '@/lib/i18n';
 
 export const AVAILABLE_GENRES = [
   'Fiction',
@@ -34,7 +35,7 @@ export function TasteProfileModal({
   initialGenres = [],
   onSaved,
 }: TasteProfileModalProps) {
-  const { t } = usePreferences();
+  const { t, preferences } = usePreferences();
   const [selectedGenres, setSelectedGenres] = useState<string[]>(initialGenres);
   const [prevInitial, setPrevInitial] = useState(initialGenres);
   if (initialGenres !== prevInitial) {
@@ -221,7 +222,7 @@ export function TasteProfileModal({
                 }}
               >
                 {isSelected ? <Check size={14} /> : null}
-                <span>{genre}</span>
+                <span>{translateGenre(preferences.language, genre)}</span>
               </button>
             );
           })}

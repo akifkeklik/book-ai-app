@@ -69,7 +69,7 @@ function SignUpForm() {
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✉️</div>
           <h2 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{t('signup_check_email')}</h2>
           <p className="text-muted" style={{ marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-            We sent a confirmation link to <strong>{email}</strong>. Please verify your email before logging in.
+            {t('signup_confirm_sent', { email })}
           </p>
           <Link
             href={rawRedirect ? `/login?redirect=${encodeURIComponent(rawRedirect)}` : '/login'}
@@ -120,7 +120,7 @@ function SignUpForm() {
       )}
       
       <p className="text-center" style={{ marginTop: '2rem', fontSize: '0.875rem' }}>
-        Already have an account?{' '}
+        {t('signup_have_account')}{' '}
         <Link
           href={rawRedirect ? `/login?redirect=${encodeURIComponent(rawRedirect)}` : '/login'}
           style={{ color: 'var(--primary)', fontWeight: 500 }}

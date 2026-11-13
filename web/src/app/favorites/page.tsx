@@ -478,7 +478,7 @@ export default function FavoritesPage() {
                 >
                   <PenTool size={36} color="var(--muted)" style={{ margin: '0 auto 1rem' }} />
                   <h3 style={{ fontSize: '1.35rem', marginBottom: '0.5rem' }}>
-                    {searchQuery ? `No notes match "${searchQuery}"` : t('empty_notes_library')}
+                    {searchQuery ? t('library_no_notes_match', { query: searchQuery }) : t('empty_notes_library')}
                   </h3>
                   <p className="text-muted" style={{ maxWidth: '420px', margin: '0 auto', fontSize: '0.9rem' }}>
                     {searchQuery ? 'Try another keyword or change your filter.' : t('notes_subtitle')}
@@ -652,7 +652,7 @@ export default function FavoritesPage() {
           </div>
           <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>
             {searchQuery
-              ? `No books match "${searchQuery}"`
+              ? t('library_no_books_match', { query: searchQuery })
               : t('empty_library_title')}
           </h2>
           <p className="text-muted" style={{ maxWidth: '440px', margin: '0 auto 2rem', fontSize: '0.95rem' }}>
@@ -793,7 +793,7 @@ export default function FavoritesPage() {
                       flex: 1,
                       cursor: isProcessing ? 'not-allowed' : 'pointer',
                     }}
-                    aria-label={`Change collection status for ${book.title}`}
+                    aria-label={t('library_change_status_label', { title: book.title })}
                   >
                     <option value="favorite">{t('status_favorite')}</option>
                     <option value="want_to_read">{t('status_want_to_read')}</option>
@@ -813,7 +813,7 @@ export default function FavoritesPage() {
                       borderColor: 'rgba(239, 68, 68, 0.25)',
                     }}
                     title={t('remove_from_library')}
-                    aria-label={`Remove ${book.title} from library`}
+                    aria-label={t('library_remove_label', { title: book.title })}
                   >
                     <Trash2 size={15} />
                   </button>

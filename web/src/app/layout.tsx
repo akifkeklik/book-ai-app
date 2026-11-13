@@ -75,7 +75,7 @@ export default async function RootLayout({
       </head>
       <body>
         <a href="#main-content" className="skip-link">{translate(lang, "skip_content")}</a>
-        <PreferencesProvider>
+        <PreferencesProvider initialLanguage={lang}>
           <AuthProvider>
             <SpotlightSearch />
             <Navbar />
