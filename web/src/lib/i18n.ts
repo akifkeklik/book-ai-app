@@ -474,6 +474,10 @@ export const DICTIONARIES = {
     spot_tip_keys: "Use ↑ ↓ to move and Enter to open",
     ai_no_referenced_desc: "No catalog books were cited for this question. Try a genre, topic, or book title.",
     nav_review: "Review",
+    recall_card_title: "Libris will ask you",
+    recall_card_next: "First review {when}.",
+    recall_card_open: "Open Review",
+    recall_card_dismiss: "Dismiss",
   },
 
   tr: {
@@ -943,6 +947,10 @@ export const DICTIONARIES = {
     spot_tip_keys: "Gezinmek için ↑ ↓, açmak için Enter kullan",
     ai_no_referenced_desc: "Bu soru için katalogdan kitap gösterilmedi. Bir tür, konu veya kitap adı dene.",
     nav_review: "Tekrar",
+    recall_card_title: "Libris sana şunu soracak",
+    recall_card_next: "İlk tekrar {when}.",
+    recall_card_open: "Tekrara git",
+    recall_card_dismiss: "Kapat",
   },
 
   de: {
@@ -1413,6 +1421,10 @@ export const DICTIONARIES = {
     spot_tip_keys: "Mit ↑ ↓ navigieren und mit Enter öffnen",
     ai_no_referenced_desc: "Für diese Frage wurden keine Katalogbücher genannt. Versuche es mit einem Genre, Thema oder Buchtitel.",
     nav_review: "Wiederholen",
+    recall_card_title: "Libris wird dich fragen",
+    recall_card_next: "Erste Wiederholung {when}.",
+    recall_card_open: "Zur Wiederholung",
+    recall_card_dismiss: "Schließen",
   },
 } as const;
 

@@ -428,4 +428,8 @@ export const es: Record<TranslationKey, string> = {
   spot_tip_keys: 'Usa ↑ ↓ para moverte y Enter para abrir',
   ai_no_referenced_desc: 'No se citaron libros del catálogo para esta pregunta. Prueba con un género, un tema o un título.',
   nav_review: 'Repasar',
+  recall_card_title: 'Libris te preguntará',
+  recall_card_next: 'Primer repaso {when}.',
+  recall_card_open: 'Ir a Repasar',
+  recall_card_dismiss: 'Cerrar',
 };

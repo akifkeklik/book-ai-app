@@ -2,7 +2,7 @@
 
 import { ApiService } from '@/lib/api';
 import { createClient } from '@/lib/supabase/server';
-import type { LearningNote, NoteReview, NoteType } from '@/types';
+import type { LearningNote, RecallItemPreview, NoteReview, NoteType } from '@/types';
 import { revalidatePath } from 'next/cache';
 
 function safeRevalidatePath(path: string) {
@@ -64,6 +64,7 @@ export async function createNote(
 ): Promise<{
   success: boolean;
   note?: LearningNote;
+  recallItem?: RecallItemPreview | null;
   error?: string;
 }> {
   if (!bookId || typeof bookId !== 'string' || !bookId.trim()) {
@@ -94,13 +95,14 @@ export async function createNote(
       return { success: false, error: 'Unauthorized: Please sign in to create notes' };
     }
 
-    const note = await ApiService.createNote(bookId.trim(), noteType, content.trim());
+    const { note, recallItem } = await ApiService.createNoteWithRecall(bookId.trim(), noteType, content.trim());
     safeRevalidatePath(`/book/${encodeURIComponent(bookId.trim())}`);
     safeRevalidatePath('/favorites');
 
     return {
       success: true,
       note,
+      recallItem,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to create note';

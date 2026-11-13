@@ -334,3 +334,25 @@ def test_recommendation_integration_with_learning_notes(note_test_env):
     recs_after_dislike = uc.execute(user_id="user-aaa-111", limit=5)
     for r in recs_after_dislike:
         assert r.get("isbn13") != "9780451524935"
+
+
+
+def test_saving_a_takeaway_returns_its_recall_question(note_test_env):
+    client = note_test_env["client"]
+    headers = {"Authorization": "Bearer token_user_a"}
+    resp = client.post(
+        "/api/notes",
+        json={"book_id": "9780141439518", "note_type": "key_takeaway", "content": "Pride blinds judgement."},
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["recall_item"]["question"]
+    assert body["recall_item"]["next_review_at"]
+
+    personal = client.post(
+        "/api/notes",
+        json={"book_id": "9780141439518", "note_type": "personal_note", "content": "Nice prose."},
+        headers=headers,
+    )
+    assert "recall_item" not in personal.get_json()

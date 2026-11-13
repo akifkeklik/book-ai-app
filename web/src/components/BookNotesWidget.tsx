@@ -9,7 +9,8 @@ import {
   deleteNote,
   getBookNotes,
 } from '@/app/actions/notes';
-import type { LearningNote, NoteType } from '@/types';
+import type { LearningNote, NoteType, RecallItemPreview } from '@/types';
+import { RecallPreviewCard } from '@/components/RecallPreviewCard';
 import { NotesExportModal } from './NotesExportModal';
 import {
   PenTool,
@@ -42,6 +43,7 @@ export default function BookNotesWidget({
   const [notes, setNotes] = useState<LearningNote[]>(initialNotes);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recallPreview, setRecallPreview] = useState<RecallItemPreview | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [newType, setNewType] = useState<NoteType>('personal_note');
   const [newContent, setNewContent] = useState('');
@@ -114,6 +116,7 @@ export default function BookNotesWidget({
       const res = await createNote(bookId, newType, previousContent.trim());
       if (res.success && res.note) {
         setNotes((prev) => prev.map((n) => (n.id === tempId ? res.note! : n)));
+        setRecallPreview(res.recallItem ?? null);
       } else {
         // Rollback
         setNotes((prev) => prev.filter((n) => n.id !== tempId));
@@ -322,6 +325,8 @@ export default function BookNotesWidget({
           )}
         </div>
       </div>
+
+      {recallPreview && <RecallPreviewCard item={recallPreview} onDismiss={() => setRecallPreview(null)} />}
 
       {/* Error Alert */}
       {error && (
