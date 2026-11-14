@@ -339,6 +339,58 @@ class SupabaseBookDataPort:
             logger.error(f"Failed to get_books_by_isbns: {e}")
             return []
 
+    def add_book(self, book: Dict[str, Any], user_token: Optional[str] = None) -> bool:
+        """
+        Persists a contributed book through the add_catalog_book RPC (migration 15), called
+        with the reader's own JWT so the database records who added it. The books table
+        itself stays read-only for clients.
+        """
+        if not user_token:
+            return False
+        try:
+            from supabase import create_client
+
+            from ...config import Config
+
+            client = create_client(Config.SUPABASE_URL, Config.SUPABASE_ANON_KEY)
+            client.postgrest.auth(user_token)
+            client.rpc(
+                "add_catalog_book",
+                {
+                    "p_isbn13": book["isbn13"],
+                    "p_title": book["title"],
+                    "p_authors": book["authors"],
+                    "p_categories": book.get("categories") or "",
+                    "p_description": book.get("description") or "",
+                    "p_thumbnail": book.get("thumbnail") or "",
+                    "p_page_count": int(book.get("page_count") or 0),
+                    "p_published_date": book.get("published_date") or "",
+                },
+            ).execute()
+            return True
+        except Exception as e:
+            logger.warning(f"add_catalog_book RPC failed (is migration 15 applied?): {e}")
+            return False
+
+    def get_all_isbns(self) -> List[str]:
+        """All catalog ISBNs, paged (PostgREST returns at most 1000 rows per request)."""
+        if not self._supabase:
+            return []
+        isbns: List[str] = []
+        page = 1000
+        try:
+            start = 0
+            while True:
+                resp = self._supabase.table("books").select("isbn13").range(start, start + page - 1).execute()
+                rows = getattr(resp, "data", []) or []
+                isbns.extend(r["isbn13"] for r in rows if r.get("isbn13"))
+                if len(rows) < page:
+                    return isbns
+                start += page
+        except Exception as e:
+            logger.error(f"Failed to get_all_isbns: {e}")
+            return isbns
+
     def get_all_books_raw(self) -> List[Dict[str, Any]]:
         if not self._supabase:
             return []

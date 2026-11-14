@@ -332,7 +332,7 @@ class PostgresBookDataPort:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
-                    SELECT isbn13, title, authors, thumbnail, average_rating
+                    SELECT *
                     FROM public.books
                     WHERE isbn13 = ANY(%s);
                     """,
@@ -341,6 +341,37 @@ class PostgresBookDataPort:
                 return [dict(r) for r in cur.fetchall()]
         except Exception as e:
             logger.error(f"Failed to get_books_by_isbns in Postgres: {e}")
+            return []
+
+    BOOK_COLUMNS = (
+        "isbn13", "title", "authors", "categories", "description", "thumbnail",
+        "average_rating", "ratings_count", "published_date", "page_count",
+    )
+
+    def add_book(self, book: Dict[str, Any], user_token: Optional[str] = None) -> bool:
+        """Inserts a contributed book; never overwrites an existing catalog row."""
+        conn = self._get_connection()
+        cols = [c for c in self.BOOK_COLUMNS if c in book]
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"INSERT INTO public.books ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))}) "
+                    "ON CONFLICT (isbn13) DO NOTHING;",
+                    [book[c] for c in cols],
+                )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add_book in Postgres: {e}")
+            return False
+
+    def get_all_isbns(self) -> List[str]:
+        conn = self._get_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT isbn13 FROM public.books;")
+                return [r[0] for r in cur.fetchall()]
+        except Exception as e:
+            logger.error(f"Failed to get_all_isbns in Postgres: {e}")
             return []
 
     def get_all_books_raw(self) -> List[Dict[str, Any]]:

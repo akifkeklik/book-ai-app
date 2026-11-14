@@ -85,6 +85,11 @@ jobs:
             echo "Applying $sql..."
             psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f "$sql"
           done
+          echo "Re-applying 14 and 15 to prove they are idempotent..."
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f backend/scripts/14_drop_learning_paths_and_knowledge_graph.sql
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f backend/scripts/15_reader_catalog_contributions.sql
+          echo "Runtime checks for add_catalog_book..."
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d postgres -f backend/tests/sql/test_15_add_catalog_book.sql
 
       - name: Validate Hardening Scripts (Forward & Rollback)
         env:

@@ -10,7 +10,9 @@ from functools import wraps
 
 from flask import Blueprint, Response, g, jsonify, request
 
+from ..application.use_cases.catalog_contributions import CatalogContributionError
 from ..container import container
+from ..domain.models import Book
 from ..infrastructure.security.rate_limiter import get_rate_limiter
 
 logger = logging.getLogger(__name__)
@@ -56,6 +58,8 @@ _process_review_uc = getattr(container, "process_review_uc", None)
 _update_review_settings_uc = getattr(container, "update_review_settings_uc", None)
 _export_notes_uc = getattr(container, "export_notes_uc", None)
 _reset_preferences_uc = getattr(container, "reset_preferences_uc", None)
+_add_catalog_book_uc = getattr(container, "add_catalog_book_uc", None)
+_lookup_books_uc = getattr(container, "lookup_books_uc", None)
 _get_review_queue_uc = getattr(container, "get_review_queue_uc", None)
 _submit_review_attempt_uc = getattr(container, "submit_review_attempt_uc", None)
 _get_learning_overview_uc = getattr(container, "get_learning_overview_uc", None)
@@ -74,7 +78,7 @@ def rebind_container(new_container):
     global _update_preferences_uc, _submit_feedback_uc, _track_activity_uc, _process_rag_query_uc
     global _create_note_uc, _get_notes_uc, _get_note_by_id_uc, _update_note_uc, _delete_note_uc
     global _get_due_reviews_uc, _get_review_stats_uc, _process_review_uc, _update_review_settings_uc, _export_notes_uc
-    global _reset_preferences_uc
+    global _reset_preferences_uc, _add_catalog_book_uc, _lookup_books_uc
     global _get_review_queue_uc, _submit_review_attempt_uc, _get_learning_overview_uc
     global _get_review_history_uc, _create_review_item_uc, _update_review_item_uc
     global _delete_review_item_uc, _get_concept_outcomes_uc
@@ -105,6 +109,8 @@ def rebind_container(new_container):
     _update_review_settings_uc = getattr(new_container, "update_review_settings_uc", None)
     _export_notes_uc = getattr(new_container, "export_notes_uc", None)
     _reset_preferences_uc = getattr(new_container, "reset_preferences_uc", None)
+    _add_catalog_book_uc = getattr(new_container, "add_catalog_book_uc", None)
+    _lookup_books_uc = getattr(new_container, "lookup_books_uc", None)
     _get_review_queue_uc = getattr(new_container, "get_review_queue_uc", None)
     _submit_review_attempt_uc = getattr(new_container, "submit_review_attempt_uc", None)
     _get_learning_overview_uc = getattr(new_container, "get_learning_overview_uc", None)
@@ -125,6 +131,11 @@ def _parse_int_param(val, default: int, min_val: int = 1, max_val: int = None) -
     if max_val is not None:
         parsed = min(max_val, parsed)
     return parsed
+
+
+def _book_payload(book: dict) -> dict:
+    """Same public shape as the catalog endpoints (pydantic Book contract)."""
+    return Book(**book).model_dump()
 
 
 def require_auth(f):
@@ -875,6 +886,45 @@ def rate_limit_ai(f):
 
     return decorated
 
+
+
+@catalog_bp.route("/books/lookup", methods=["GET"])
+@require_auth
+@rate_limit_ai
+def lookup_books():
+    """Candidates from Google Books / Open Library to pre-fill the add-a-book form."""
+    if not _lookup_books_uc:
+        return jsonify({"error": "Book lookup is not available"}), 503
+    try:
+        results = _lookup_books_uc.execute(request.args.get("q", ""))
+        return jsonify({"status": "success", "results": results}), 200
+    except CatalogContributionError as err:
+        return jsonify({"error": str(err)}), 400
+    except Exception as exc:
+        logger.error(f"Book lookup failed: {exc}")
+        return jsonify({"error": "Book lookup failed"}), 500
+
+
+@catalog_bp.route("/books", methods=["POST"])
+@require_auth
+def add_catalog_book():
+    """A signed-in reader adds a book that is missing from the shared catalog."""
+    if not _add_catalog_book_uc:
+        return jsonify({"error": "Adding books is not available"}), 503
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON body required"}), 400
+    auth_header = request.headers.get("Authorization", "")
+    user_token = auth_header.split(" ", 1)[1].strip() if auth_header.startswith("Bearer ") else None
+    try:
+        book, created, persisted = _add_catalog_book_uc.execute(g.user_id, data, user_token=user_token)
+    except CatalogContributionError as err:
+        return jsonify({"error": str(err)}), 400
+    except Exception as exc:
+        logger.error(f"Adding catalog book failed: {exc}")
+        return jsonify({"error": "Failed to add the book"}), 500
+    payload = {"status": "success", "book": _book_payload(book), "created": created, "persisted": persisted}
+    return jsonify(payload), 201 if created else 200
 
 
 @discovery_bp.route("/ai/chat", methods=["POST"])

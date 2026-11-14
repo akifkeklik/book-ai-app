@@ -39,7 +39,7 @@ class BookService:
                     logger.info(
                         "Recommendation model loaded from pickle. Verifying data consistency..."
                     )
-                    # In a production env, we'd compare hashes here. For now, let's assume it's good if loaded.
+                    self._sync_contributed_books()
                     return
                 logger.info("Bootstrap: Loading data from Supabase for training...")
                 # We need to adapt the recommender to load from our new port.
@@ -63,6 +63,23 @@ class BookService:
         self.recommender.load_data(Config.DATA_PATH)
         self.recommender.fit(save_path=Config.MODEL_PATH)
         logger.info("Training complete. Model saved to %s", Config.MODEL_PATH)
+    def _sync_contributed_books(self) -> None:
+        """Adds books stored in the database but missing from the trained model (reader contributions)."""
+        if not self.book_data_port or not hasattr(self.book_data_port, "get_all_isbns"):
+            return
+        try:
+            known = set(self.recommender.df["isbn13"].astype(str)) if not self.recommender.df.empty else set()
+            missing = [i for i in self.book_data_port.get_all_isbns() if i and i not in known]
+            if not missing:
+                return
+            rows = self.book_data_port.get_books_by_isbns(missing[:500]) or []
+            for row in rows:
+                if row.get("title"):
+                    self.recommender.add_book(row)
+            logger.info("Added %d contributed books missing from the trained model.", len(rows))
+        except Exception as e:
+            logger.warning(f"Could not sync contributed books: {e}")
+
     @lru_cache(maxsize=1)
     def get_categories(self) -> List[Dict[str, Any]]:
         """Return all unique categories found in the dataset with counts."""

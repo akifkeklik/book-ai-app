@@ -7,6 +7,10 @@ from backend.application.use_cases.catalog import (
     GetPopularBooksUseCase,
     SearchBooksUseCase,
 )
+from backend.application.use_cases.catalog_contributions import (
+    AddCatalogBookUseCase,
+    LookupBooksUseCase,
+)
 from backend.application.use_cases.export_notes import ExportNotesUseCase
 from backend.application.use_cases.interactions import (
     GetUserPreferencesUseCase,
@@ -44,6 +48,7 @@ from backend.application.use_cases.spaced_repetition import (
     UpdateReviewSettingsUseCase,
 )
 from backend.config import Config
+from backend.infrastructure.adapters.book_lookup_adapter import BookLookupAdapter
 from backend.infrastructure.adapters.enrichment_adapter import GoogleBooksEnrichmentAdapter
 from backend.infrastructure.llm.adapters import GenericLlmAdapter
 from backend.infrastructure.ml.recommender import BookRecommender
@@ -179,6 +184,8 @@ class Container:
 
         # 3. Use Cases
         self.get_books_uc = GetBooksUseCase(self.recommender, self.enrichment_service)
+        self.add_catalog_book_uc = AddCatalogBookUseCase(self.recommender, self.book_data_port)
+        self.lookup_books_uc = LookupBooksUseCase(BookLookupAdapter(), self.recommender)
         self.search_books_uc = SearchBooksUseCase(self.recommender, self.enrichment_service)
         self.get_popular_books_uc = GetPopularBooksUseCase(
             self.recommender, self.enrichment_service
