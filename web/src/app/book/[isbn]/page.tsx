@@ -2,7 +2,7 @@ import { ApiService } from '@/lib/api';
 import { BookCard } from '@/components/BookCard';
 import { BookCoverImage } from '@/components/BookCoverImage';
 import type { Book } from '@/types';
-import { Star, ArrowLeft, Calendar, FileText, Bookmark, Hash, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Star, ArrowLeft, Calendar, FileText, Bookmark, Hash, AlertTriangle, RefreshCw, PenTool } from 'lucide-react';
 import Link from 'next/link';
 import BookFeedback from '@/components/BookFeedback';
 import BookNotesWidget from '@/components/BookNotesWidget';
@@ -222,6 +222,10 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
             </div>
           </div>
           
+          <a href="#learning-notes-heading" className="btn btn-primary" data-testid="book-takeaway-cta" style={{ gap: '0.5rem', marginBottom: '2rem' }}>
+            <PenTool size={16} aria-hidden="true" /> {t('book_add_takeaway_cta')}
+          </a>
+
           {/* Categories */}
           {categoryList.length > 0 && (
             <div style={{ marginBottom: '2rem' }}>
@@ -259,7 +263,7 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
           <div style={{ marginBottom: '2.5rem' }}>
             <h3 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>{t('book_synopsis')}</h3>
             <p style={{ lineHeight: '1.8', color: 'rgba(255,255,255,0.85)', fontSize: '1rem', whiteSpace: 'pre-line' }}>
-              {book.description || 'No description available for this book.'}
+              {book.description || t('book_no_description')}
             </p>
           </div>
           

@@ -49,7 +49,7 @@ def test_content_hash():
 
 
 
-@patch("backend.services.embedding_service.genai")
+@patch("backend.services.embedding_service.GeminiRestClient")
 @patch("os.getenv")
 def test_generate_embedding_success(mock_getenv, mock_genai):
     """Provider success: 3072-dim embedding returned and validated."""
@@ -64,7 +64,7 @@ def test_generate_embedding_success(mock_getenv, mock_genai):
 
     mock_getenv.side_effect = env_side_effect
 
-    mock_genai.embed_content.return_value = {"embedding": _FAKE_EMBEDDING}
+    mock_genai.return_value.embed.return_value = _FAKE_EMBEDDING
 
     service = EmbeddingService()
     assert service.is_configured() is True
@@ -72,14 +72,10 @@ def test_generate_embedding_success(mock_getenv, mock_genai):
     emb = service.generate_embedding("Test text")
     assert emb == _FAKE_EMBEDDING
     assert len(emb) == _DIM
-    mock_genai.embed_content.assert_called_once_with(
-        model="models/gemini-embedding-2",
-        content="Test text",
-        task_type="retrieval_document"
-    )
+    mock_genai.return_value.embed.assert_called_once_with("Test text", "models/gemini-embedding-2", task_type="RETRIEVAL_DOCUMENT")
 
 
-@patch("backend.services.embedding_service.genai")
+@patch("backend.services.embedding_service.GeminiRestClient")
 @patch("os.getenv")
 def test_generate_embedding_dimension_mismatch(mock_getenv, mock_genai):
     """Dimension mismatch: service returns None and does NOT persist."""
@@ -95,7 +91,7 @@ def test_generate_embedding_dimension_mismatch(mock_getenv, mock_genai):
     mock_getenv.side_effect = env_side_effect
 
     # Wrong dimension: 128 instead of 3072
-    mock_genai.embed_content.return_value = {"embedding": [0.1] * 128}
+    mock_genai.return_value.embed.return_value = [0.1] * 128
 
     service = EmbeddingService()
     emb = service.generate_embedding("Test text")
@@ -104,7 +100,7 @@ def test_generate_embedding_dimension_mismatch(mock_getenv, mock_genai):
 
 
 @patch("backend.services.embedding_service.time.sleep", return_value=None)
-@patch("backend.services.embedding_service.genai")
+@patch("backend.services.embedding_service.GeminiRestClient")
 @patch("os.getenv")
 def test_generate_embedding_transient_retry_then_success(mock_getenv, mock_genai, mock_sleep):
     """Transient errors are retried with exponential backoff, bounded at max_retries."""
@@ -120,21 +116,21 @@ def test_generate_embedding_transient_retry_then_success(mock_getenv, mock_genai
     mock_getenv.side_effect = env_side_effect
 
     # Fail once with Exception, then succeed
-    mock_genai.embed_content.side_effect = [
+    mock_genai.return_value.embed.side_effect = [
         Exception("rate limit"),
-        {"embedding": _FAKE_EMBEDDING},
+        _FAKE_EMBEDDING,
     ]
 
     service = EmbeddingService()
     emb = service.generate_embedding("Test text", max_retries=3)
 
     assert emb == _FAKE_EMBEDDING
-    assert mock_genai.embed_content.call_count == 2
+    assert mock_genai.return_value.embed.call_count == 2
     mock_sleep.assert_called_once_with(2)  # 2**1 = 2s after first failure
 
 
 @patch("backend.services.embedding_service.time.sleep", return_value=None)
-@patch("backend.services.embedding_service.genai")
+@patch("backend.services.embedding_service.GeminiRestClient")
 @patch("os.getenv")
 def test_generate_embedding_transient_exhausts_retries(mock_getenv, mock_genai, mock_sleep):
     """All retries exhausted on transient errors → returns None."""
@@ -149,17 +145,17 @@ def test_generate_embedding_transient_exhausts_retries(mock_getenv, mock_genai, 
 
     mock_getenv.side_effect = env_side_effect
 
-    mock_genai.embed_content.side_effect = Exception("API connection error")
+    mock_genai.return_value.embed.side_effect = Exception("API connection error")
 
     service = EmbeddingService()
     emb = service.generate_embedding("Test text", max_retries=3)
 
     assert emb is None
-    assert mock_genai.embed_content.call_count == 3
+    assert mock_genai.return_value.embed.call_count == 3
 
 
 @patch("backend.services.embedding_service.time.sleep", return_value=None)
-@patch("backend.services.embedding_service.genai")
+@patch("backend.services.embedding_service.GeminiRestClient")
 @patch("os.getenv")
 def test_generate_embedding_permanent_error_no_retry(mock_getenv, mock_genai, mock_sleep):
     """Permanent auth/config errors are currently retried due to catch-all Exception, so it acts like transient."""
@@ -174,14 +170,14 @@ def test_generate_embedding_permanent_error_no_retry(mock_getenv, mock_genai, mo
 
     mock_getenv.side_effect = env_side_effect
 
-    mock_genai.embed_content.side_effect = ValueError("invalid model")
+    mock_genai.return_value.embed.side_effect = ValueError("invalid model")
 
     service = EmbeddingService()
     emb = service.generate_embedding("Test text", max_retries=3)
 
     assert emb is None
     # Current implementation catches all exceptions and retries
-    assert mock_genai.embed_content.call_count == 3
+    assert mock_genai.return_value.embed.call_count == 3
 
 
 def test_get_existing_metadata():

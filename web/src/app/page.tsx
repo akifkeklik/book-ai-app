@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { BookOpen, Sparkles, Compass, Library, TrendingUp, ArrowRight, Bookmark } from 'lucide-react';
+import { BookOpen, Sparkles, Compass, TrendingUp, ArrowRight, Bookmark, PenTool, RotateCcw } from 'lucide-react';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { ApiService } from '@/lib/api';
@@ -384,7 +384,7 @@ export default async function Home({
       )}
 
       {/* 3-Pillar Feature Grid */}
-      <section style={{ marginTop: '2rem' }}>
+      <section id="how-it-works" style={{ marginTop: '2rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
           <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{t('home_features_title')}</h2>
           <p className="text-muted" style={{ maxWidth: '580px', margin: '0 auto' }}>
@@ -427,7 +427,7 @@ export default async function Home({
                 marginBottom: '1.25rem',
               }}
             >
-              <Sparkles size={26} color="var(--accent)" />
+              <PenTool size={26} color="var(--accent)" />
             </div>
             <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem' }}>{t('home_feature_ai')}</h3>
             <p className="text-muted" style={{ lineHeight: '1.6', fontSize: '0.95rem' }}>
@@ -448,7 +448,7 @@ export default async function Home({
                 marginBottom: '1.25rem',
               }}
             >
-              <Library size={26} color="var(--success)" />
+              <RotateCcw size={26} color="var(--success)" />
             </div>
             <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem' }}>{t('home_feature_library')}</h3>
             <p className="text-muted" style={{ lineHeight: '1.6', fontSize: '0.95rem' }}>

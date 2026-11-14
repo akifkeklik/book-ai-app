@@ -170,7 +170,7 @@ class Container:
         self.llm_port = GenericLlmAdapter(
             provider=Config.LLM_PROVIDER,
             api_key=Config.LLM_API_KEY,
-            model_name=getattr(Config, "GEMINI_MODEL", "models/gemini-2.5-flash"),
+            model_name=Config.GEMINI_MODEL if Config.LLM_PROVIDER == "gemini" else None,
         )
 
         # 2. Application Services
