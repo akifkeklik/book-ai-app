@@ -10,7 +10,7 @@ const OUT = path.join(__dirname, '..', '..', 'docs', 'screenshots');
 test.skip(!process.env.SCREENSHOTS, 'set SCREENSHOTS=1 to regenerate README screenshots');
 
 test('capture README screenshots', async ({ page, isMobile }, testInfo) => {
-  const suffix = isMobile ? 'phone' : 'desktop';
+  const suffix = isMobile ? 'web-phone' : 'desktop';
   const shots: Array<[string, string]> = isMobile
     ? [['home', '/'], ['review', '/learning'], ['catalog', '/catalog?category=Science']]
     : [['home', '/'], ['catalog', '/catalog?category=Science'], ['book', '/book/9780439554930']];
