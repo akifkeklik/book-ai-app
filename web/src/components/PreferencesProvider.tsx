@@ -16,6 +16,7 @@ import {
   applyPreferencesToDom,
 } from '@/lib/preferences';
 import { translate, type TranslationKey } from '@/lib/i18n';
+import { useRouter } from 'next/navigation';
 
 interface PreferencesContextValue {
   preferences: LibrisPreferences;
@@ -111,9 +112,16 @@ export function PreferencesProvider({
     updatePreferences((prev) => ({ ...prev, reducedMotion }));
   }, [updatePreferences]);
 
+  const router = useRouter();
   const setLanguage = useCallback((language: Language) => {
+    // Server components read the language from this cookie, so write it before asking
+    // the server to re-render; otherwise only the client parts of the page switch.
+    if (typeof document !== 'undefined') {
+      document.cookie = `libris_lang=${language}; path=/; max-age=31536000; SameSite=Lax;`;
+    }
     updatePreferences((prev) => ({ ...prev, language }));
-  }, [updatePreferences]);
+    router.refresh();
+  }, [updatePreferences, router]);
 
   const setDensity = useCallback((density: Density) => {
     updatePreferences((prev) => ({ ...prev, density }));

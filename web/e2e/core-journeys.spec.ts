@@ -65,6 +65,17 @@ for (const lang of ['tr', 'de', 'es', 'fr', 'it']) {
   });
 }
 
+test('switching language in the navbar translates server-rendered sections without a reload', async ({ page }) => {
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('heading', { name: 'How it works' })).toBeVisible();
+  await page.getByRole('button', { name: 'Change language' }).click();
+  await expect(page.getByRole('heading', { name: 'Nasıl çalışır' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'tr');
+
+  await page.goto('/catalog?category=Science', { waitUntil: 'networkidle' });
+  await expect(page.locator('.grid-books [lang]').first()).toHaveText('Bilim');
+});
+
 test('review page explains itself to signed-out visitors', async ({ page }) => {
   await page.goto('/learning');
   await expect(page.getByRole('heading', { name: 'Review what you read' })).toBeVisible();
