@@ -274,7 +274,7 @@ export default async function CatalogPage({
                     }}
                   >
                     <span>{t('tab_all')}</span>
-                    <span className="text-muted" style={{ fontSize: '0.8rem' }}>{totalBooks > 0 ? totalBooks : ''}</span>
+                    <span className="text-muted" style={{ fontSize: '0.8rem' }}>{!category && totalBooks > 0 ? totalBooks : ''}</span>
                   </Link>
                 </li>
                 {categories.map((c) => {
