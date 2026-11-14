@@ -2,17 +2,20 @@
 
 This document is the canonical, repository-specific deployment guide for launching the **Libris V1 Public Beta**. It establishes verified configuration settings, database migration procedures, environment variable requirements, and smoke tests across all tiers.
 
+
+> **Current deployment (November 2026):** the web app runs on **Vercel** (project root `web`, auto-deploys from `main`) instead of the Netlify setup described below; the API runs on Render's free tier as described. Environment variables are the same, with Vercel in place of Netlify.
+
 ---
 
 ## 1. Verified Repository & Architecture Baseline
 
 | Component | Target Platform / Tier | Source Code Directory | Key Framework / Runtime |
 | :--- | :--- | :--- | :--- |
-| **Backend API** | Render (Free Tier) | [`backend/`](file:///c:/Users/akifk/Desktop/book-ai-app/backend) | Python 3.12 / Flask / Gunicorn |
-| **Web Client** | Netlify (Free Tier) | [`web/`](file:///c:/Users/akifk/Desktop/book-ai-app/web) | Next.js 16 (Turbopack, Server Actions) |
-| **Database & Auth** | Supabase (PostgreSQL 15+) | [`backend/scripts/`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts) | PostgreSQL + `pgvector` (`>= 0.7.0`) |
+| **Backend API** | Render (Free Tier) | [`backend/`](../backend) | Python 3.12 / Flask / Gunicorn |
+| **Web Client** | Netlify (Free Tier) | [`web/`](../web) | Next.js 16 (Turbopack, Server Actions) |
+| **Database & Auth** | Supabase (PostgreSQL 15+) | [`backend/scripts/`](../backend/scripts) | PostgreSQL + `pgvector` (`>= 0.7.0`) |
 
-- **Baseline Commit:** [`6dbac4b638241c40469f6c74655a3dc2f9b1005c`](file:///c:/Users/akifk/Desktop/book-ai-app) (`main`).
+- **Baseline Commit:** [`6dbac4b638241c40469f6c74655a3dc2f9b1005c`](../) (`main`).
 - **CI Status:** 100% passing across all 6 validation pipelines (Docker build, backend tests, web build & lint, migration validation).
 
 ---
@@ -49,33 +52,33 @@ graph LR
 ## 3. Verified Provider Settings
 
 ### A. Netlify Web Deployment (Next.js 16)
-- **Repository Connection:** `akifkeklik/book-ai-app`
+- **Repository Connection:** `akifkeklik/libris`
 - **Base Directory:** `web`
 - **Package Directory:** `web` (automatically resolved)
 - **Build Command:** `npm run build`
 - **Publish Directory:** `.next`
 - **Framework Detection:** Netlify automatically detects Next.js and utilizes its official `@netlify/plugin-nextjs` runtime. No custom configuration file (`netlify.toml`) is required.
 - **Node.js Version:** Set environment variable `NODE_VERSION=22` in the Netlify site configuration to match the Node 22 runtime verified in CI.
-- **Server Execution Context:** All calls in [`web/src/lib/api.ts`](file:///c:/Users/akifk/Desktop/book-ai-app/web/src/lib/api.ts) originate from React Server Components or Server Actions (`'use server'`). The browser never sees `LIBRIS_API_KEY` or calls the backend directly; requests flow server-to-server over HTTPS.
+- **Server Execution Context:** All calls in [`web/src/lib/api.ts`](../web/src/lib/api.ts) originate from React Server Components or Server Actions (`'use server'`). The browser never sees `LIBRIS_API_KEY` or calls the backend directly; requests flow server-to-server over HTTPS.
 
 ### B. Render Backend Deployment (Flask / Gunicorn)
 - **Service Type:** Web Service (Free Tier)
-- **Repository Connection:** `akifkeklik/book-ai-app`
+- **Repository Connection:** `akifkeklik/libris`
 - **Root Directory:** `backend`
 - **Runtime Choice:**
-  - **Option 1 (Recommended & Verified - Container):** `Docker`. Render uses [`backend/Dockerfile`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/Dockerfile). Build context is `backend`. This matches the multi-stage Python 3.12 container verified in CI.
+  - **Option 1 (Recommended & Verified - Container):** `Docker`. Render uses [`backend/Dockerfile`](../backend/Dockerfile). Build context is `backend`. This matches the multi-stage Python 3.12 container verified in CI.
   - **Option 2 (Native Python):** `Python 3`. Build command: `pip install -r requirements.txt`.
     > [!WARNING]
     > In `backend/app.py`, package-relative imports (`from .config import ...`) are used. Invoking `gunicorn app:app` from within the `backend` directory fails with `ImportError: attempted relative import with no known parent package`. If using Root Directory `backend`, the start command must expose the parent package:
     ```bash
     PYTHONPATH=.. gunicorn backend.app:app --bind 0.0.0.0:$PORT --workers 1 --preload --timeout 120
     ```
-    Also note that [`backend/runtime.txt`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/runtime.txt) specifies `python-3.11.8` for Render native Python builds. Option 1 (Docker with Python 3.12) is strongly recommended for CI environment parity.
+    Also note that [`backend/runtime.txt`](../backend/runtime.txt) specifies `python-3.11.8` for Render native Python builds. Option 1 (Docker with Python 3.12) is strongly recommended for CI environment parity.
 - **Health Check Path:** `/api/health`
   > [!IMPORTANT]
   > Do **not** set Render's health check path to `/api/health/ready`. `/api/health` is a pure HTTP liveness probe that returns immediately without querying Supabase. Using `/api/health/ready` could cause false-positive deploy cancellations if Supabase has cold-start latency.
 - **Memory & Resource Budget:**
-  - *Measured Allocation:* Active app with loaded TF-IDF model ([`backend/saved_model/tfidf.pkl`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/saved_model/tfidf.pkl)) consumes ~106 MB allocated, ~180 MB RSS.
+  - *Measured Allocation:* Active app with loaded TF-IDF model ([`backend/saved_model/tfidf.pkl`](../backend/saved_model/tfidf.pkl)) consumes ~106 MB allocated, ~180 MB RSS.
   - *Free Tier Cap:* 512 MB RAM. Single worker with `--preload` fits comfortably with >50% headroom.
 - **Render Free Operational Constraints:**
   1. **Idle Sleep:** Spins down after **15 minutes of inactivity**.
@@ -104,7 +107,7 @@ Generate two distinct tokens:
 
 | Variable Name | Service Tier | Secret? | Destination Console | Example / Format | Behavior if Missing / Invalid |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `SECRET_KEY` | Backend | **Yes** | Render Environment | `64-char hex string` | **Fatal Boot Crash**: `ValueError` thrown in [`backend/app.py:L42`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/app.py#L42) when running in production mode. |
+| `SECRET_KEY` | Backend | **Yes** | Render Environment | `64-char hex string` | **Fatal Boot Crash**: `ValueError` thrown in [`backend/app.py:L42`](../backend/app.py#L42) when running in production mode. |
 | `LIBRIS_API_KEY` | Backend | **Yes** | Render Environment | `libris_sec_...` | **Degraded Service**: Protected `/api/*` endpoints return `503 Server misconfigured`. |
 | `NUM_PROXIES` | Backend | No | Render Environment | `1` | Defaults to `1` in production for Render reverse proxy trust. |
 | `LLM_PROVIDER` | Backend | No | Render Environment | `gemini` | Defaults to `gemini` (`openai` also supported). |
@@ -120,7 +123,7 @@ Generate two distinct tokens:
 | `LIBRIS_API_KEY` | Web | **Yes** | Netlify Environment | `libris_sec_...` (matches Backend) | Backend returns `401 Unauthorized` on server requests. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Web | No | Netlify Environment | `https://<ref>.supabase.co` | Browser client authentication fails. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Web | No (Public JWT) | Netlify Environment | `eyJhbGciOi...` | Browser client authentication fails. |
-| `SUPABASE_DB_URL` | Local Dev / Scripts | **Yes** | Local workstation only | `postgresql://postgres:<pw>@aws-0-<region>.pooler.supabase.com:6543/postgres` | Required only when running developer scripts ([`backend/scripts/backfill_embeddings.py`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/backfill_embeddings.py)). **Never** commit to Git or add to Render/Netlify console. |
+| `SUPABASE_DB_URL` | Local Dev / Scripts | **Yes** | Local workstation only | `postgresql://postgres:<pw>@aws-0-<region>.pooler.supabase.com:6543/postgres` | Required only when running developer scripts ([`backend/scripts/backfill_embeddings.py`](../backend/scripts/backfill_embeddings.py)). **Never** commit to Git or add to Render/Netlify console. |
 
 > [!CAUTION]
 > **Strict `service_role` Secret Isolation:**
@@ -159,7 +162,7 @@ Verify that the backup file is non-empty and readable.
 
 #### 2. Apply Migrations Sequentially
 Execute each file in the Supabase SQL Editor in exact order:
-1. [`00_init_books.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/00_init_books.sql): Creates base tables; renames `favorites.isbn13` to `book_id` if needed; ensures `book_author` and `book_image_url` exist.
+1. [`00_init_books.sql`](../backend/scripts/00_init_books.sql): Creates base tables; renames `favorites.isbn13` to `book_id` if needed; ensures `book_author` and `book_image_url` exist.
 2. **Execute Legacy Favorites Reconciliation & Thumbnail Backfill (Conditional):**
    If migrating an existing database where `favorites` was created under an earlier schema (which may lack `book_title` or stored thumbnails in `thumbnail`):
    ```sql
@@ -199,34 +202,34 @@ Execute each file in the Supabase SQL Editor in exact order:
        END IF;
    END $$;
    ```
-3. [`01_schema.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/01_schema.sql): Creates `user_interactions`. (If re-running on an existing table with policies, run first: `DROP POLICY IF EXISTS "Users can view their own interactions" ON public.user_interactions; DROP POLICY IF EXISTS "Users can insert their own interactions" ON public.user_interactions;`).
-4. [`02_phase3_migration.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/02_phase3_migration.sql): Deduplicates interactions, adds unique constraint, sync trigger `trg_sync_favorites`. Fully idempotent.
-5. [`03_phase3_embeddings.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/03_phase3_embeddings.sql): Creates `book_embeddings` with `halfvec(3072)` HNSW index. (If re-running on an existing table with policies, run first: `DROP POLICY IF EXISTS "Embeddings are readable by everyone" ON public.book_embeddings;`).
-6. [`04_phase3_hybrid.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/04_phase3_hybrid.sql): Creates base `match_book_embeddings` RPC. Fully idempotent.
-7. [`05_phase3_performance.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/05_phase3_performance.sql): Optimizes `match_book_embeddings` RPC for HNSW halfvec traversal. Fully idempotent.
-8. [`06_phase2_rag.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/06_phase2_rag.sql): Creates `match_query_embeddings` RPC. Fully idempotent.
-9. [`07_phase3_collections.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/07_phase3_collections.sql): Expands interaction type constraints. Fully idempotent.
-10. [`08_user_profiles_and_activities.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/08_user_profiles_and_activities.sql): Creates `user_profiles` and `user_activities` tables with RLS. Fully idempotent.
+3. [`01_schema.sql`](../backend/scripts/01_schema.sql): Creates `user_interactions`. (If re-running on an existing table with policies, run first: `DROP POLICY IF EXISTS "Users can view their own interactions" ON public.user_interactions; DROP POLICY IF EXISTS "Users can insert their own interactions" ON public.user_interactions;`).
+4. [`02_phase3_migration.sql`](../backend/scripts/02_phase3_migration.sql): Deduplicates interactions, adds unique constraint, sync trigger `trg_sync_favorites`. Fully idempotent.
+5. [`03_phase3_embeddings.sql`](../backend/scripts/03_phase3_embeddings.sql): Creates `book_embeddings` with `halfvec(3072)` HNSW index. (If re-running on an existing table with policies, run first: `DROP POLICY IF EXISTS "Embeddings are readable by everyone" ON public.book_embeddings;`).
+6. [`04_phase3_hybrid.sql`](../backend/scripts/04_phase3_hybrid.sql): Creates base `match_book_embeddings` RPC. Fully idempotent.
+7. [`05_phase3_performance.sql`](../backend/scripts/05_phase3_performance.sql): Optimizes `match_book_embeddings` RPC for HNSW halfvec traversal. Fully idempotent.
+8. [`06_phase2_rag.sql`](../backend/scripts/06_phase2_rag.sql): Creates `match_query_embeddings` RPC. Fully idempotent.
+9. [`07_phase3_collections.sql`](../backend/scripts/07_phase3_collections.sql): Expands interaction type constraints. Fully idempotent.
+10. [`08_user_profiles_and_activities.sql`](../backend/scripts/08_user_profiles_and_activities.sql): Creates `user_profiles` and `user_activities` tables with RLS. Fully idempotent.
 
 ---
 
 ### Procedure A.1: Production Database Hardening & Reconciliation (Live Deployment)
 
-For live production execution, the four audited hardening migrations in [`backend/scripts/hardening/`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening) supersede ad-hoc script execution:
-1. **Preflight Audit:** Execute [`backend/scripts/preflight_database_hardening.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/preflight_database_hardening.sql) (Section 12 single-shot summary query).
-2. **Grup 1 (Privilege Hardening):** [`01_DRAFT_revoke_dangerous_privileges.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/01_DRAFT_revoke_dangerous_privileges.sql).
-3. **Grup 2 (Profiles Staged Reconciliation):** [`02_DRAFT_reconcile_user_profiles.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/02_DRAFT_reconcile_user_profiles.sql).
-4. **Grup 3 (Model A Interactions & Lossless Deduplication):** [`03_DRAFT_reconcile_interactions_and_trigger.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/03_DRAFT_reconcile_interactions_and_trigger.sql).
-5. **Grup 4 (Vector RPC Hardening):** [`04_DRAFT_harden_vector_rpcs.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/hardening/04_DRAFT_harden_vector_rpcs.sql).
+For live production execution, the four audited hardening migrations in [`backend/scripts/hardening/`](../backend/scripts/hardening) supersede ad-hoc script execution:
+1. **Preflight Audit:** Execute [`backend/scripts/preflight_database_hardening.sql`](../backend/scripts/preflight_database_hardening.sql) (Section 12 single-shot summary query).
+2. **Grup 1 (Privilege Hardening):** [`01_DRAFT_revoke_dangerous_privileges.sql`](../backend/scripts/hardening/01_DRAFT_revoke_dangerous_privileges.sql).
+3. **Grup 2 (Profiles Staged Reconciliation):** [`02_DRAFT_reconcile_user_profiles.sql`](../backend/scripts/hardening/02_DRAFT_reconcile_user_profiles.sql).
+4. **Grup 3 (Model A Interactions & Lossless Deduplication):** [`03_DRAFT_reconcile_interactions_and_trigger.sql`](../backend/scripts/hardening/03_DRAFT_reconcile_interactions_and_trigger.sql).
+5. **Grup 4 (Vector RPC Hardening):** [`04_DRAFT_harden_vector_rpcs.sql`](../backend/scripts/hardening/04_DRAFT_harden_vector_rpcs.sql).
 
 ---
 
 ### Procedure B: Fresh Database Setup & Catalog Seeding
 
-1. Execute SQL scripts [`00_init_books.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/00_init_books.sql) through [`08_user_profiles_and_activities.sql`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/08_user_profiles_and_activities.sql) in numerical order.
+1. Execute SQL scripts [`00_init_books.sql`](../backend/scripts/00_init_books.sql) through [`08_user_profiles_and_activities.sql`](../backend/scripts/08_user_profiles_and_activities.sql) in numerical order.
 2. **Catalog Ingestion Analysis & Execution:**
-   - Script: [`backend/scripts/upload_books_to_supabase.py`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/upload_books_to_supabase.py)
-   - *Code Behavior:* Reads [`backend/data/books.csv`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/data/books.csv) (6,448 titles) and performs `supabase.table("books").upsert(batch)` keyed on primary key `isbn13`.
+   - Script: [`backend/scripts/upload_books_to_supabase.py`](../backend/scripts/upload_books_to_supabase.py)
+   - *Code Behavior:* Reads [`backend/data/books.csv`](../backend/data/books.csv) (6,448 titles) and performs `supabase.table("books").upsert(batch)` keyed on primary key `isbn13`.
    - *Rerun Safety:* **Safe on empty database.** On an existing database, it will NOT duplicate rows or delete records, but it **will overwrite any manually enriched book metadata** with raw CSV data.
    - *RLS Prerequisite:* `public.books` only permits `SELECT` for anonymous users. The ingestion script **must** be executed with `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS.
    - *Execution Hygiene:* Because `backend/config.py` loads `backend/.env` with `override=True`, never store `service_role` in `backend/.env`. Pass it as a one-time environment variable to the process:
@@ -241,7 +244,7 @@ For live production execution, the four audited hardening migrations in [`backen
    rm -f upload_log.txt
    ```
 3. **Optional Semantic Embedding Pre-computation:**
-   - Script: [`backend/scripts/backfill_embeddings.py`](file:///c:/Users/akifk/Desktop/book-ai-app/backend/scripts/backfill_embeddings.py)
+   - Script: [`backend/scripts/backfill_embeddings.py`](../backend/scripts/backfill_embeddings.py)
    - Connects via direct PostgreSQL connection string `SUPABASE_DB_URL` (use pooler port 6543 on IPv4 networks).
    - Idempotent: checks SHA-256 `content_hash` against existing rows and skips already computed embeddings.
    ```bash
