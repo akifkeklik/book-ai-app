@@ -87,6 +87,31 @@ export interface LibraryItem {
 
 export type NoteType = 'personal_note' | 'key_takeaway' | 'question';
 
+/** A candidate from Google Books / Open Library used to pre-fill the add-a-book form. */
+export interface BookLookupResult {
+  isbn13: string;
+  title: string;
+  authors: string;
+  categories: string;
+  description: string;
+  thumbnail: string;
+  pageCount: number;
+  publishedDate: string;
+  /** Catalog id when this book already exists in Libris. */
+  inCatalogIsbn: string | null;
+}
+
+export interface NewCatalogBook {
+  title: string;
+  authors: string;
+  categories?: string;
+  isbn13?: string;
+  pageCount?: number;
+  publishedDate?: string;
+  description?: string;
+  thumbnail?: string;
+}
+
 /** Recall question created from a saved takeaway (returned with the note). */
 export interface RecallItemPreview {
   id: string;

@@ -1146,6 +1146,39 @@ class BookRecommender:
             {"name": c, "count": counts[c]} for c in CANONICAL_CATEGORIES_ORDERED if c in counts
         ]
 
+    def find_book_by_title_author(self, title: str, authors: str) -> Optional[Dict[str, Any]]:
+        """Case-insensitive exact title match whose authors contain the given first author."""
+        if self.df.empty or not (title or "").strip():
+            return None
+        t = title.strip().lower()
+        first_author = (authors or "").split(",")[0].strip().lower()
+        same_title = self.df[self.df["title"].astype(str).str.strip().str.lower() == t]
+        if first_author:
+            same_title = same_title[
+                same_title["authors"].astype(str).str.lower().str.contains(first_author, regex=False, na=False)
+            ]
+        return same_title.iloc[0].to_dict() if not same_title.empty else None
+
+    def add_book(self, book: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Appends a contributed book to the in-memory catalog so it can be browsed and searched
+        right away, keeping the TF-IDF matrix aligned with the catalog rows.
+        """
+        row = preprocess_dataframe(pd.DataFrame([book]))
+        row["popularity_score"] = 0.0  # contributions never jump ahead of established books
+        base = self.engine.df if self.engine.df is not None else pd.DataFrame()
+        engine = self.engine
+        matrix = getattr(engine, "tfidf_matrix", None)
+        vectorizer = getattr(engine, "tfidf_vectorizer", None)
+        # Scoring assumes catalog rows and TF-IDF rows are aligned 1:1, so the new row gets
+        # its vector from the already-fitted vectorizer (no retraining needed).
+        if matrix is not None and vectorizer is not None and matrix.shape[0] == len(base):
+            from scipy.sparse import vstack
+
+            engine.tfidf_matrix = vstack([matrix, vectorizer.transform(row["combined_features"])]).tocsr()
+        engine.df = pd.concat([base, row], ignore_index=True)
+        return row.iloc[0].to_dict()
+
     def get_book_by_isbn(self, isbn: str) -> Optional[Dict[str, Any]]:
         """Retrieve a single book by its ISBN13."""
         if self.df.empty:

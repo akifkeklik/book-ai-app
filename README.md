@@ -33,7 +33,7 @@ Libris is also where I practised building a product end to end: a layered backen
 
 ## How it works
 
-1. **Find a book.** Search the catalog, ask the AI assistant, or use personalized recommendations.
+1. **Find a book.** Search the catalog, ask the AI assistant, or use personalized recommendations. Missing from the catalog? Add it in a few clicks: Libris fills in the details from Google Books or Open Library, and everyone can then find it. Your notes on it stay private.
 2. **Capture what matters.** Save notes, key takeaways, and questions on a book.
 3. **See your question immediately.** The moment you save a key takeaway, Libris shows the active-recall question an LLM wrote from it and when it will ask you. Your note is the answer. If no AI provider is configured, a plain fallback question is used.
 4. **Review at the right time.** A spaced-repetition schedule (1, 3, 7, ... days) brings cards back when they are due and moves them according to how well you recalled them.
@@ -43,7 +43,7 @@ Also included: reading shelves and favorites, note export, and full localization
 
 ## Scope decisions
 
-Learning paths and a personal knowledge graph were removed in November 2026 to keep the product focused on the core loop above. Their migrations (11, 12) stay in `backend/scripts/` as applied schema history; migration 14 retires their tables and must be applied deliberately, after a backup.
+Learning paths and a personal knowledge graph were removed in November 2026 to keep the product focused on the core loop above. Their migrations (11, 12) stay in `backend/scripts/` as applied schema history; migration 14 retires their tables and must be applied deliberately, after a backup. Migration 15 lets signed-in readers add books through a validated `add_catalog_book` function while the `books` table stays read-only for clients; apply it to persist contributed books.
 
 Who Libris is for, how success would be measured, and the business model are in the [product brief](docs/PRODUCT.md).
 

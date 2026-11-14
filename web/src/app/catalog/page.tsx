@@ -7,6 +7,7 @@ import { cookies } from 'next/headers';
 import { translate, translateGenre, type TranslationKey } from '@/lib/i18n';
 import { type Language, resolveLanguage } from '@/lib/preferences';
 import { buildCatalogUrl, type CatalogFilterState, type CatalogUrlOverrides } from '@/lib/catalogUrl';
+import { AddBookButton } from '@/components/AddBookButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,6 +112,7 @@ export default async function CatalogPage({
               {t('search')}
             </button>
           </form>
+          <AddBookButton />
         </div>
 
         {/* Filter Bar: Sort, Rating, Active Badges */}
@@ -322,6 +324,9 @@ export default async function CatalogPage({
                     <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>
                       {t('catalog_none_query_in_category', { query: q, category: translateGenre(lang, category) })}
                     </h3>
+                    <div style={{ display: 'flex', justifyContent: 'center', margin: '0.75rem 0 1rem' }}>
+                      <AddBookButton initialQuery={q} />
+                    </div>
                     <p className="text-muted" style={{ maxWidth: '520px', margin: '0 auto 1.5rem', lineHeight: '1.6' }}>
                       {t('catalog_none_query_in_category_desc', { category: translateGenre(lang, category) })}
                     </p>
@@ -355,8 +360,11 @@ export default async function CatalogPage({
                       {t('catalog_none_query', { query: q })}
                     </h3>
                     <p className="text-muted" style={{ maxWidth: '440px', margin: '0 auto 1.5rem', lineHeight: '1.6' }}>
-                      We couldn&apos;t find any books with that title, author, or ISBN. Try clearing your search query or explore one of these popular genres:
+                      {t('add_book_missing_hint')}
                     </p>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+                      <AddBookButton initialQuery={q} variant="primary" />
+                    </div>
                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap', maxWidth: '480px', margin: '0 auto 1.5rem' }}>
                       {['Fiction', 'Science', 'History', 'Philosophy', 'Mystery & Thriller', 'Fantasy'].map((suggestedGenre) => (
                         <Link
@@ -371,7 +379,7 @@ export default async function CatalogPage({
                             color: 'var(--foreground)',
                           }}
                         >
-                          {suggestedGenre}
+                          {translateGenre(lang, suggestedGenre)}
                         </Link>
                       ))}
                     </div>

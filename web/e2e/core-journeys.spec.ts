@@ -93,3 +93,12 @@ test('phones get a bottom tab bar with the review tab', async ({ page, isMobile 
   await bar.getByRole('link', { name: 'Review' }).click();
   await expect(page).toHaveURL(/\/learning/);
 });
+
+test('a missing book can be added: guests are sent to log in first', async ({ page }) => {
+  await page.goto('/catalog?q=zzqxbook-that-does-not-exist');
+  await expect(page.getByText("Can't find your book? Add it to Libris.")).toBeVisible();
+  const add = page.getByTestId('add-book-button').last();
+  await expect(add).toBeVisible();
+  await add.click();
+  await expect(page).toHaveURL(/\/login\?redirect=\/catalog/);
+});
