@@ -6,7 +6,7 @@ import type { Book } from '@/types';
 import { Star, Sparkles, Heart, Bookmark, BookOpen, CheckCircle } from 'lucide-react';
 import { BookCoverFallback } from './BookCoverFallback';
 import { usePreferences } from '@/components/PreferencesProvider';
-import { localizeRecommendationReason } from '@/lib/i18n';
+import { localizeRecommendationReason, translateGenre } from '@/lib/i18n';
 import { formatCount, formatRating } from '@/lib/format';
 
 interface BookCardProps {
@@ -32,7 +32,10 @@ export function BookCard({ book, userInteraction, isFavorite }: BookCardProps) {
     : null;
 
   const rawGenre = book.categories || '';
-  const primaryGenre = rawGenre.split(/[,|]/)[0]?.trim();
+  const rawPrimaryGenre = rawGenre.split(/[,|]/)[0]?.trim();
+  const primaryGenre = rawPrimaryGenre ? translateGenre(preferences.language, rawPrimaryGenre) : '';
+  // Untranslated catalog categories stay English; mark them so uppercase rules (e.g. Turkish i→İ) don't apply.
+  const genreLang = primaryGenre === rawPrimaryGenre ? 'en' : preferences.language;
   const authorDisplay = book.authors || t('unknown_author');
   const localizedReason = book.recommendationReason
     ? localizeRecommendationReason(book.recommendationReason, t)
@@ -137,6 +140,7 @@ export function BookCard({ book, userInteraction, isFavorite }: BookCardProps) {
               whiteSpace: 'nowrap',
               zIndex: 2,
             }}
+            lang={genreLang}
           >
             {primaryGenre}
           </div>
