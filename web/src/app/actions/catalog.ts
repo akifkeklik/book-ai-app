@@ -1,7 +1,8 @@
 'use server';
 
 import { ApiService } from '@/lib/api';
-import type { Book } from '@/types';
+import type { Book, BookLookupResult, NewCatalogBook } from '@/types';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * Server action to search catalog for Spotlight Search.
@@ -56,3 +57,47 @@ export async function fetchCatalogPageAction(params: {
   }
 }
 
+
+
+async function isSignedIn(): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    return !!user && !error;
+  } catch {
+    return false;
+  }
+}
+
+/** Candidates to pre-fill the add-a-book form. */
+export async function lookupBooksAction(query: string): Promise<{ success: boolean; results: BookLookupResult[]; error?: string }> {
+  const trimmed = (query || '').trim();
+  if (trimmed.length < 2) return { success: true, results: [] };
+  if (trimmed.length > 200) return { success: false, results: [], error: 'Query is too long' };
+  if (!(await isSignedIn())) return { success: false, results: [], error: 'Unauthorized' };
+  try {
+    return { success: true, results: await ApiService.lookupBooks(trimmed) };
+  } catch (err: unknown) {
+    return { success: false, results: [], error: err instanceof Error ? err.message : 'Lookup failed' };
+  }
+}
+
+/** Adds a book that is missing from the catalog and returns its catalog id. */
+export async function addCatalogBookAction(
+  input: NewCatalogBook
+): Promise<{ success: boolean; isbn13?: string; created?: boolean; persisted?: boolean; error?: string }> {
+  if (!input?.title?.trim() || !input?.authors?.trim()) {
+    return { success: false, error: 'Title and author are required' };
+  }
+  if (!(await isSignedIn())) return { success: false, error: 'Unauthorized' };
+  try {
+    const { book, created, persisted } = await ApiService.addCatalogBook({
+      ...input,
+      title: input.title.trim(),
+      authors: input.authors.trim(),
+    });
+    return { success: true, isbn13: book.isbn13, created, persisted };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to add book' };
+  }
+}

@@ -19,6 +19,8 @@ import type {
   DifficultConcept,
   CreateReviewItemInput,
   SubmitReviewAttemptInput,
+  BookLookupResult,
+  NewCatalogBook,
 } from '@/types';
 import { normalizeBook, normalizeBooks, normalizeReviewItem, normalizeReviewAttempt, normalizeLearningProgress } from './normalizers';
 
@@ -214,6 +216,58 @@ export class ApiService {
   }
 
   // Public catalog search and pagination: cached with tag 'catalog'
+  /** Book candidates for the add-a-book form (signed-in readers only). */
+  static async lookupBooks(query: string, options: { signal?: AbortSignal } = {}): Promise<BookLookupResult[]> {
+    const url = new URL(`${API_URL}/api/books/lookup`);
+    url.searchParams.set('q', query);
+    const res = await this.fetchWithTimeout(url.toString(), {
+      headers: await this.getHeaders(),
+      cache: 'no-store',
+      signal: options.signal,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error || `Book lookup failed (${res.status})`);
+    }
+    const data = await res.json();
+    const rows: Record<string, unknown>[] = Array.isArray(data?.results) ? data.results : [];
+    return rows.map((r) => ({
+      isbn13: String(r.isbn13 || ''),
+      title: String(r.title || ''),
+      authors: String(r.authors || ''),
+      categories: String(r.categories || ''),
+      description: String(r.description || ''),
+      thumbnail: String(r.thumbnail || ''),
+      pageCount: Number(r.page_count) || 0,
+      publishedDate: String(r.published_date || ''),
+      inCatalogIsbn: r.in_catalog_isbn ? String(r.in_catalog_isbn) : null,
+    }));
+  }
+
+  /** Adds a missing book to the shared catalog; returns the existing book if it is already there. */
+  static async addCatalogBook(input: NewCatalogBook): Promise<{ book: Book; created: boolean; persisted: boolean }> {
+    const res = await this.fetchWithTimeout(`${API_URL}/api/books`, {
+      method: 'POST',
+      headers: await this.getHeaders(),
+      cache: 'no-store',
+      body: JSON.stringify({
+        title: input.title,
+        authors: input.authors,
+        categories: input.categories || '',
+        isbn13: input.isbn13 || '',
+        page_count: input.pageCount || 0,
+        published_date: input.publishedDate || '',
+        description: input.description || '',
+        thumbnail: input.thumbnail || '',
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || `Failed to add book (${res.status})`);
+    }
+    return { book: normalizeBook(data.book), created: Boolean(data.created), persisted: Boolean(data.persisted) };
+  }
+
   static async getBooks(
     params: {
       page?: number;
