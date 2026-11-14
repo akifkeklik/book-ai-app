@@ -274,7 +274,7 @@ export default function BookNotesWidget({
           <div>
             <h2
               id="learning-notes-heading"
-              style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, lineHeight: 1.2 }}
+              style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, lineHeight: 1.2, scrollMarginTop: '6rem' }}
             >
               {t('notes_title')}
             </h2>

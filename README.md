@@ -7,232 +7,95 @@
 [![CI](https://github.com/akifkeklik/book-ai-app/actions/workflows/ci_cd.yml/badge.svg)](https://github.com/akifkeklik/book-ai-app/actions/workflows/ci_cd.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Flask](https://img.shields.io/badge/Flask-3.0-000000?logo=flask)](https://flask.palletsprojects.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-16.4-black?logo=next.js)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql)](https://www.postgresql.org/)
 
 </div>
 
-Most of what we read is gone within weeks. Libris is a reading companion built around one idea: a book is only worth the time if something stays with you. You save a takeaway while reading, Libris turns it into a recall question, and asks you again right before you would forget it.
+Most of what we read is gone within weeks. Libris is a reading companion built around one idea: you save a takeaway while reading, Libris turns it into a recall question, and asks you again right before you would forget it.
+
+## How to use it
+
+Open a book from **Discover** (or add it if it is missing) and press **Save a takeaway**. Write the one idea you want to keep, in your own words. Libris AI immediately turns it into a question and shows you when it will ask. When a card is due, open **Review**, answer from memory, then reveal your note and say how well you remembered. Stuck on what to read next? **Ask AI** suggests books from the catalog in plain conversation.
 
 ## Screenshots
 
-| Web — desktop browser | Web — phone browser |
+| Desktop browser | Phone browser |
 |---|---|
-| ![Home](docs/screenshots/home-desktop.png) | ![Home page of the web app in a phone browser](docs/screenshots/home-web-phone.png) |
-| ![Catalog filtered by category](docs/screenshots/catalog-desktop.png) | ![Review page of the web app in a phone browser](docs/screenshots/review-web-phone.png) |
+| ![Home](docs/screenshots/home-desktop.png) | ![Home page in a phone browser](docs/screenshots/home-web-phone.png) |
+| ![Book page with the Save a takeaway button](docs/screenshots/book-desktop.png) | ![Review page in a phone browser](docs/screenshots/review-web-phone.png) |
 
-All screenshots show the same responsive web app; there is no native mobile app. Regenerate with `SCREENSHOTS=1 npx playwright test screenshots` in `web/`.
+Both columns show the same responsive web app; there is no native mobile app.
 
 ## Why I built this
 
-I kept finishing good books and, a month later, being unable to explain what they said. Highlighting did not help, and generic flashcard apps meant writing every card by hand, so I never kept it up. I wanted the reviewing to be a by-product of reading, not a second job.
+I kept finishing good books and, a month later, being unable to explain what they said. Generic flashcard apps meant writing every card by hand, so I never kept it up. I wanted reviewing to be a by-product of reading, not a second job.
 
-Libris is also where I practised building a product end to end: a layered backend and a web client, real authentication and per-user data isolation, and AI features that degrade gracefully instead of breaking the app when a provider is down.
+It is also where I practised building a product end to end: a layered backend, a web client, real authentication with per-user data isolation, and AI features that degrade gracefully instead of breaking the app when a provider is down.
 
-## How it works
+## What is inside
 
-1. **Find a book.** Search the catalog, ask the AI assistant, or use personalized recommendations. Missing from the catalog? Add it in a few clicks: Libris fills in the details from Google Books or Open Library, and everyone can then find it. Your notes on it stay private.
-2. **Capture what matters.** Save notes, key takeaways, and questions on a book.
-3. **See your question immediately.** The moment you save a key takeaway, Libris shows the active-recall question an LLM wrote from it and when it will ask you. Your note is the answer. If no AI provider is configured, a plain fallback question is used.
-4. **Review at the right time.** A spaced-repetition schedule (1, 3, 7, ... days) brings cards back when they are due and moves them according to how well you recalled them.
-5. **See what you actually know.** A learning dashboard shows retention and difficult concepts.
+- **Recall questions:** an LLM (Google Gemini, `gemini-3.5-flash-lite` on the free tier) writes the question from your note; if the provider is unavailable a plain fallback question is used, so saving never fails.
+- **Spaced repetition:** cards come back after 1, 3, 7, ... days and move according to how well you recalled them; a dashboard shows retention.
+- **Recommendations:** a TF-IDF model trained on the ~6,400-book catalog powers "similar books"; the Ask AI assistant answers with retrieval over the same catalog.
+- **Catalog contributions:** missing books are looked up on Google Books or Open Library and added through a validated, rate-limited database function. Notes always stay private.
+- **Six languages:** English, Turkish, German, Spanish, French and Italian, enforced by tests so no screen ships untranslated.
 
-Also included: reading shelves and favorites, note export, and full localization in six languages (English, Turkish, German, Spanish, French, Italian), enforced by tests so no screen ships untranslated.
+Who it is for and how success would be measured are in the [product brief](docs/PRODUCT.md).
 
-## Scope decisions
-
-Learning paths and a personal knowledge graph were removed in November 2026 to keep the product focused on the core loop above. Their migrations (11, 12) stay in `backend/scripts/` as applied schema history; migration 14 retires their tables and must be applied deliberately, after a backup. Migration 15 lets signed-in readers add books through a validated `add_catalog_book` function while the `books` table stays read-only for clients; apply it to persist contributed books.
-
-Who Libris is for, how success would be measured, and the business model are in the [product brief](docs/PRODUCT.md).
-
-> **Project status:** Feature-complete as a portfolio project and no longer under active development. It runs locally with Docker Compose or the dev scripts; it is not deployed as a public service. CI status is shown by the badge above.
+> **Status:** feature-complete portfolio project, not deployed as a public service. It runs locally with Docker Compose or the dev scripts.
 
 ## Architecture
 
 ~~~mermaid
-flowchart TB
-    subgraph Clients["Client"]
-        WEB["Next.js 16 · React 19"]
-    end
-
-    subgraph Services["Application services"]
-        WEB_ACTIONS["Next.js Server Actions / Route Handlers"]
-        API["Flask REST API"]
-        USECASES["Application Use Cases"]
-        DOMAIN["Domain Models & Ports"]
-    end
-
-    subgraph Infrastructure["Infrastructure"]
-        ADAPTERS["Persistence & External-Service Adapters"]
-        AI["LLM / Embedding Providers"]
-        DB[("Supabase · PostgreSQL · pgvector")]
-    end
-
-    WEB --> WEB_ACTIONS
-    WEB_ACTIONS --> API
-    API --> USECASES
-    USECASES --> DOMAIN
-    ADAPTERS -. implements contracts .-> DOMAIN
-    ADAPTERS --> DB
-    ADAPTERS --> AI
+flowchart LR
+    WEB["Next.js 16 · React 19"] --> API["Flask REST API"]
+    API --> UC["Use cases"] --> DOMAIN["Domain models & ports"]
+    ADAPTERS["Adapters"] -. implement .-> DOMAIN
+    ADAPTERS --> DB[("Supabase · PostgreSQL · pgvector")]
+    ADAPTERS --> AI["Gemini REST API"]
 ~~~
-
-### Main technology choices
 
 | Area | Technologies |
 |---|---|
-| Web | Next.js 16.4, React 19, TypeScript |
-| Backend | Python 3.12, Flask 3 |
-| Data | PostgreSQL 16, Supabase, pgvector |
-| AI | Retrieval-augmented generation, embeddings, recommendation ranking |
-| Quality | Pytest, Ruff, TypeScript/ESLint, GitHub Actions |
-| Local orchestration | Docker Compose |
+| Web | Next.js 16, React 19, TypeScript |
+| Backend | Python 3.12, Flask 3, scikit-learn |
+| Data | PostgreSQL 16, Supabase (Auth, RLS, pgvector) |
+| Quality | Pytest, Ruff, ESLint, Playwright, GitHub Actions |
 
-The CI workflow currently pins Node.js 22. Use those versions when reproducing CI locally.
-
-## Repository layout
-
-~~~text
-.
-├── .github/workflows/       # CI/CD workflow
-├── backend/
-│   ├── application/         # Use cases
-│   ├── domain/              # Domain models and ports
-│   ├── infrastructure/      # Persistence, AI, security and integrations
-│   ├── routes/              # Flask HTTP endpoints
-│   ├── scripts/             # Ordered SQL migrations and maintenance tools
-│   └── tests/               # Backend tests
-├── docs/                    # Setup, architecture and project documentation
-├── scripts/                 # Local development and verification scripts
-├── web/                     # Next.js application
-├── docker-compose.yaml
-└── README.md
-~~~
+Gemini is called through its REST API rather than the `google-genai` SDK, because that SDK requires `websockets>=13`, which conflicts with the Supabase client. More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Run locally
 
-### Prerequisites
-
-- Python 3.12
-- Node.js 22 and npm
-- A configured Supabase project for authenticated/persistent features
-- Git
-
-### 1. Backend
-
-From the repository root:
+Requires Python 3.12, Node.js 22 and a Supabase project (see [docs/setup.md](docs/setup.md)).
 
 ~~~bash
-python -m venv .venv
-~~~
-
-Activate the environment:
-
-~~~powershell
-# Windows PowerShell
-.venv\Scripts\Activate.ps1
-~~~
-
-~~~bash
-# macOS / Linux
-source .venv/bin/activate
-~~~
-
-Install dependencies and configure the backend:
-
-~~~bash
+# Backend: copy backend/env.example to backend/.env and fill it in
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -r backend/requirements-test.txt
-# Copy backend/env.example to backend/.env and fill in the values.
-python -m backend.app
+python -m backend.app                               # http://localhost:5000
+
+# Web: copy web/.env.example to web/.env.local and fill it in
+cd web && npm ci && npm run dev                     # http://localhost:3000
 ~~~
 
-The API is expected at http://localhost:5000. The health endpoint is /api/health.
-
-### 2. Web
-
-In a second terminal:
-
-~~~bash
-cd web
-npm ci
-~~~
-
-Copy web/.env.example to web/.env.local and configure the Supabase and backend values. Then run:
-
-~~~bash
-npm run dev
-~~~
-
-The web app is expected at http://localhost:3000.
-
-For the full variable list and platform-specific details, see [docs/setup.md](docs/setup.md).
-
-## Database
-
-The numbered schema migrations are stored in backend/scripts/:
-
-- 00_init_books.sql through 13_learning_outcomes.sql are the ordered application migrations.
-- backend/ci_stubs.sql is a CI/test fixture, not a production migration.
-- backend/scripts/hardening/ contains separate hardening and rehearsal scripts. Files marked DRAFT are not automatic production instructions.
-
-Read [docs/supabase_setup.md](docs/supabase_setup.md) and the deployment checklist before changing a remote database. Back up the target environment and validate migrations in staging first. Do not apply the hardening scripts to production merely by running the whole directory.
+On Windows, `scripts/launch_dev.ps1` starts both.
 
 ## Quality checks
 
-Run checks from the repository root unless a command says otherwise.
-
-**Backend**
-
 ~~~bash
-ruff check backend/
-PYTHONPATH=. python -m pytest backend/tests/ -v --tb=short
+ruff check backend/ && PYTHONPATH=. python -m pytest backend/tests/
+cd web && npm run lint && npm test && npm run build && npm run test:e2e
 ~~~
 
-**Web**
+CI runs all of these, plus migration validation on a throwaway PostgreSQL and Docker builds.
 
-~~~bash
-cd web
-npm ci
-npm run lint
-npm test
-npm run build
-npx playwright install chromium   # once
-npm run test:e2e                   # desktop + phone journeys, hermetic stack
-~~~
+## Database and security
 
-GitHub Actions runs database migration validation, backend lint and tests, PostgreSQL integration tests, Docker builds, web lint/tests/build, Playwright end-to-end tests on desktop and phone, and a visual QA job. A historical report or README badge is not a substitute for checking the latest workflow run.
+Ordered migrations live in `backend/scripts/` (`00` to `15`). Migration 14 drops retired tables, so apply it deliberately after a backup. Read [docs/supabase_setup.md](docs/supabase_setup.md) before changing a remote database.
 
-## Configuration and security
-
-- Keep real credentials in local environment files or deployment secret stores; never commit them.
-- SUPABASE_SERVICE_ROLE_KEY is for tightly controlled administrative tasks only. Never expose it to the web client.
-- The web client should only receive public Supabase configuration. Server-to-server credentials belong in server environments.
-- Set explicit trusted ALLOWED_ORIGINS values in production; do not use a wildcard.
-- Use isolated disposable databases for integration tests. Do not point test commands at a production database.
-
-Environment templates:
-- Backend: [backend/env.example](backend/env.example)
-- Web: [web/.env.example](web/.env.example)
-- Root/Compose: [.env.example](.env.example)
-
-## Documentation
-
-- [Architecture](docs/ARCHITECTURE.md)
-- [Local development setup](docs/setup.md)
-- [Supabase and database setup](docs/supabase_setup.md)
-- [Google Books API setup](docs/google_api_setup.md)
-- [Design system](docs/DESIGN_SYSTEM.md)
-
-## Contributing
-
-1. Create a focused branch from the current main (for example, feat/short-description or fix/short-description).
-2. Keep each pull request limited to one logical change.
-3. Run the relevant quality checks before opening a pull request.
-4. Never commit credentials, local databases, generated build output, or personal machine artifacts.
-5. Use clear commit messages that describe the change.
+Keep credentials in local env files, never in git. The Supabase service-role key stays on the server, and `ALLOWED_ORIGINS` must list trusted origins explicitly in production.
 
 ## License
 
-Libris is distributed under the [MIT License](LICENSE).
+[MIT](LICENSE)

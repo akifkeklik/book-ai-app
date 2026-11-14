@@ -6,10 +6,11 @@ from typing import List, Optional
 
 try:
     from ..domain.ports import BookDataPort
+    from ..infrastructure.llm.gemini_rest import GeminiRestClient
 except ImportError:
     from domain.ports import BookDataPort
+    from infrastructure.llm.gemini_rest import GeminiRestClient
 
-import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +31,8 @@ class EmbeddingService:
                 "require Google Gemini. Set GEMINI_API_KEY to enable semantic embeddings."
             )
 
-        if self._api_key:
-            genai.configure(api_key=self._api_key)
-            self._is_configured = True
-        else:
-            self._is_configured = False
+        self._client = GeminiRestClient(self._api_key) if self._api_key else None
+        self._is_configured = self._client is not None
 
     def is_configured(self) -> bool:
         return self._is_configured
@@ -84,13 +82,7 @@ class EmbeddingService:
         attempt = 0
         while attempt < max_retries:
             try:
-                response = genai.embed_content(
-                    model=self._model,
-                    content=text,
-                    task_type="retrieval_document"
-                )
-
-                embedding = response['embedding']
+                embedding = self._client.embed(text, self._model, task_type="RETRIEVAL_DOCUMENT")
 
                 # Boyut (dimension) doğrulaması
                 if len(embedding) != self._dimension:

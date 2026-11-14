@@ -36,7 +36,8 @@ class Config:
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini").lower() # gemini or openai
     LLM_API_KEY: str = os.getenv("LLM_API_KEY") or os.getenv("GEMINI_API_KEY") or ""
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY") or os.getenv("LLM_API_KEY") or ""
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "models/gemini-2.5-flash")
+    # flash-lite: fast, cheap, and the highest free-tier quota (2.5-flash-lite is closed to new users).
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
     # ── Reverse Proxy ─────────────────────────────────────────────────────────
     # Count of trusted reverse proxy headers (e.g. 1 for Render / Railway / Nginx).

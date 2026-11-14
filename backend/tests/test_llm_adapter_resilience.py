@@ -30,47 +30,34 @@ def test_generic_llm_adapter_missing_api_key():
 @pytest.mark.unit
 def test_generic_llm_adapter_timeout_configuration():
     adapter = GenericLlmAdapter(provider="gemini", api_key="fake-key")
-    mock_model = MagicMock()
-    adapter._gemini_model = mock_model
-
-    mock_response = MagicMock()
-    mock_response.text = "Valid model generation"
-    mock_model.generate_content.return_value = mock_response
+    adapter._gemini = MagicMock()
+    adapter._gemini.generate_text.return_value = "Valid model generation"
 
     resp = adapter.generate_response("Sys", "User")
     assert resp == "Valid model generation"
 
-    # Verify request_options has timeout configured
-    mock_model.generate_content.assert_called_once()
-    _, kwargs = mock_model.generate_content.call_args
-    assert "request_options" in kwargs
-    assert kwargs["request_options"].get("timeout") == 15.0
+    adapter._gemini.generate_text.assert_called_once()
+    _, kwargs = adapter._gemini.generate_text.call_args
+    assert kwargs["timeout"] == 15.0
+    assert kwargs["system_instruction"] == "Sys"
 
 
 @pytest.mark.unit
 def test_generic_llm_adapter_safety_blocked_empty_response():
     adapter = GenericLlmAdapter(provider="gemini", api_key="fake-key")
-    mock_model = MagicMock()
-    adapter._gemini_model = mock_model
-
-    mock_response = MagicMock()
-    # When content is blocked, accessing response.text in google.generativeai raises ValueError
-    type(mock_response).text = property(lambda self: (_ for _ in ()).throw(ValueError("Candidate response has no text parts due to SAFETY")))
-    mock_model.generate_content.return_value = mock_response
-
-    # Must safely catch ValueError without crashing or leaking secrets
-    resp = adapter.generate_response("Sys", "User")
-    assert resp is None
+    adapter._gemini = MagicMock()
+    # A blocked response yields no text; a transport error must not crash or leak secrets.
+    adapter._gemini.generate_text.return_value = None
+    assert adapter.generate_response("Sys", "User") is None
+    adapter._gemini.generate_text.side_effect = RuntimeError("Gemini failed (403): key=AIzaSecret")
+    assert adapter.generate_response("Sys", "User") is None
 
 
 @pytest.mark.unit
 def test_generic_llm_adapter_concurrent_calls_thread_safe():
     adapter = GenericLlmAdapter(provider="gemini", api_key="fake-key")
-    mock_model = MagicMock()
-    mock_response = MagicMock()
-    mock_response.text = '{"answer": "Thread safe"}'
-    mock_model.generate_content.return_value = mock_response
-    adapter._gemini_model = mock_model
+    adapter._gemini = MagicMock()
+    adapter._gemini.generate_text.return_value = '{"answer": "Thread safe"}'
 
     latencies = []
     errors = []
