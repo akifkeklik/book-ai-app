@@ -15,8 +15,8 @@ This guide follows the current repository layout and CI commands. Configure only
 ## 1. Get the source
 
 ~~~bash
-git clone https://github.com/akifkeklik/book-ai-app.git
-cd book-ai-app
+git clone https://github.com/akifkeklik/libris.git
+cd libris
 ~~~
 
 ## 2. Configure the backend

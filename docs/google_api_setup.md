@@ -9,7 +9,7 @@ The app works without it (falls back to OpenLibrary covers) but a key gives bett
 
 1. Go to https://console.cloud.google.com
 2. Click the project selector (top bar) → **New Project**
-3. Name it `book-ai-app` → **Create**
+3. Name it `libris` → **Create**
 
 ---
 

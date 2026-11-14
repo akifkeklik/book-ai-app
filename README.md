@@ -4,7 +4,7 @@
 
 **Remember what you read.**
 
-[![CI](https://github.com/akifkeklik/book-ai-app/actions/workflows/ci_cd.yml/badge.svg)](https://github.com/akifkeklik/book-ai-app/actions/workflows/ci_cd.yml)
+[![CI](https://github.com/akifkeklik/libris/actions/workflows/ci_cd.yml/badge.svg)](https://github.com/akifkeklik/libris/actions/workflows/ci_cd.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-16.4-black?logo=next.js)](https://nextjs.org/)
