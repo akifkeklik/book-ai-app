@@ -18,12 +18,12 @@ Most of what we read is gone within weeks. Libris is a reading companion built a
 
 ## Screenshots
 
-| Desktop | Phone |
+| Web — desktop browser | Web — phone browser |
 |---|---|
-| ![Home](docs/screenshots/home-desktop.png) | ![Home on a phone](docs/screenshots/home-phone.png) |
-| ![Catalog filtered by category](docs/screenshots/catalog-desktop.png) | ![Review tab on a phone](docs/screenshots/review-phone.png) |
+| ![Home](docs/screenshots/home-desktop.png) | ![Home page of the web app in a phone browser](docs/screenshots/home-web-phone.png) |
+| ![Catalog filtered by category](docs/screenshots/catalog-desktop.png) | ![Review page of the web app in a phone browser](docs/screenshots/review-web-phone.png) |
 
-Regenerate with `SCREENSHOTS=1 npx playwright test screenshots` in `web/`.
+All screenshots show the same responsive web app; there is no native mobile app. Regenerate with `SCREENSHOTS=1 npx playwright test screenshots` in `web/`.
 
 ## Why I built this
 
