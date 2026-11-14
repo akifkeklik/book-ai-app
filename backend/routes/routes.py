@@ -1122,7 +1122,21 @@ def create_note():
             content=str(content),
             client_id=str(client_id) if client_id else None,
         )
-        return jsonify({"status": "success", "note": result}), 201
+        payload = {"status": "success", "note": result}
+        # Turn a takeaway into its AI recall question immediately so the user sees the value
+        # of saving it. Never fail the note save because of this optional step.
+        if _get_review_queue_uc and str(note_type) in ("key_takeaway", "question") and isinstance(result, dict):
+            try:
+                item = _get_review_queue_uc.create_item_for_note(user_id, result)
+                if item:
+                    payload["recall_item"] = {
+                        "id": item.get("id"),
+                        "question": item.get("question"),
+                        "next_review_at": item.get("next_review_at"),
+                    }
+            except Exception as rec_err:
+                logger.warning(f"Could not create recall item for note: {rec_err}")
+        return jsonify(payload), 201
     except ValueError as val_err:
         return jsonify({"error": str(val_err)}), 400
     except Exception as exc:

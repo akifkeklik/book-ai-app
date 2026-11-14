@@ -16,6 +16,7 @@ import {
 import { BookCoverFallback } from './BookCoverFallback';
 import { usePreferences } from '@/components/PreferencesProvider';
 import { localizeRecommendationReason, type TranslationKey } from '@/lib/i18n';
+import { formatCount, formatRating } from '@/lib/format';
 
 export interface PersonalizedDiscoveryCardProps {
   book: Book;
@@ -39,7 +40,7 @@ export function PersonalizedDiscoveryCard({
   onDismiss,
 }: PersonalizedDiscoveryCardProps) {
   const [imageError, setImageError] = useState(false);
-  const { t } = usePreferences();
+  const { t, preferences } = usePreferences();
 
   const hasValidThumbnail = Boolean(
     book.thumbnail &&
@@ -251,8 +252,8 @@ export function PersonalizedDiscoveryCard({
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <Star size={14} color="var(--rating)" fill="var(--rating)" aria-hidden="true" />
           <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
-            {book.averageRating > 0 ? book.averageRating.toFixed(1) : t('no_rating')}
-            {book.ratingsCount > 0 && ` (${book.ratingsCount})`}
+            {book.averageRating > 0 ? formatRating(book.averageRating, preferences.language) : t('no_rating')}
+            {book.ratingsCount > 0 && ` (${formatCount(book.ratingsCount, preferences.language, true)})`}
           </span>
         </div>
 
@@ -491,7 +492,7 @@ export function PersonalizedDiscoveryCard({
                 border: '1px solid var(--card-border)',
                 background: 'rgba(255, 255, 255, 0.05)',
               }}
-              aria-label={`Select reading shelf for ${book.title}`}
+              aria-label={t('library_change_status_label', { title: book.title })}
             >
               <option value="clear">{t('reset')}</option>
               <option value="want_to_read">{t('status_want_to_read')}</option>

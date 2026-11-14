@@ -7,10 +7,12 @@ import { searchCatalogAction } from '@/app/actions/catalog';
 import type { Book } from '@/types';
 import { usePreferences } from './PreferencesProvider';
 import { BookCoverFallback } from './BookCoverFallback';
+import { formatRating } from '@/lib/format';
+import { translateGenre } from '@/lib/i18n';
 
 export function SpotlightSearch() {
   const router = useRouter();
-  const { t } = usePreferences();
+  const { t, preferences } = usePreferences();
 
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -349,7 +351,7 @@ export function SpotlightSearch() {
                 {t('no_books_found') || 'No books found'}
               </p>
               <p style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>
-                No titles or authors match &ldquo;{query}&rdquo;
+                {t('spot_no_match', { query })}
               </p>
             </div>
           )}
@@ -456,7 +458,7 @@ export function SpotlightSearch() {
                     {book.categories && (
                       <>
                         <span>•</span>
-                        <span>{book.categories.split(/[,|]/)[0]?.trim()}</span>
+                        <span>{translateGenre(preferences.language, book.categories.split(/[,|]/)[0]?.trim() || '')}</span>
                       </>
                     )}
                   </div>
@@ -476,7 +478,7 @@ export function SpotlightSearch() {
                       }}
                     >
                       <Star size={12} fill="currentColor" />
-                      <span>{book.averageRating.toFixed(1)}</span>
+                      <span>{formatRating(book.averageRating, preferences.language)}</span>
                     </div>
                   )}
                   <ArrowRight

@@ -406,7 +406,7 @@ export default function AIDiscoveryPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                   <Sparkles size={13} color="var(--electric-blue)" />
                   <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--electric-blue)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Libris Intelligence {msg.streaming ? '· Streaming...' : ''}
+                    Libris AI {msg.streaming ? `· ${t('ai_streaming')}` : ''}
                   </span>
                   {msg.isGrounded && (
                     <span

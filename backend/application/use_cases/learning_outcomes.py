@@ -211,6 +211,55 @@ class GetReviewQueueUseCase:
             return fallback
         return question
 
+    def _book_title_for_note(self, note: Dict[str, Any]) -> str:
+        title = (note.get("book") or {}).get("title")
+        book_id = str(note.get("book_id") or "").strip()
+        if not title and book_id and self._book_data_port:
+            try:
+                books = self._book_data_port.get_books_by_isbns([book_id]) or []
+                if books:
+                    title = books[0].get("title")
+            except Exception as e:
+                logger.debug(f"Could not resolve book title for recall item: {e}")
+        return title or "Key Takeaway"
+
+    def _build_item_for_note(
+        self, user_id: str, note: Dict[str, Any], budget: List[int]
+    ) -> Optional[Dict[str, Any]]:
+        """Creates the recall item for a takeaway/question note (no existence check)."""
+        note_type = note.get("note_type", "personal_note")
+        if note_type not in {"key_takeaway", "question"}:
+            return None
+        concept_name = self._book_title_for_note(note)
+        content = note.get("content", "")
+        question = content if note_type == "question" else self._recall_question(content, concept_name, budget)
+        return self._learning_repo.create_review_item(
+            user_id=user_id,
+            title="Takeaway Review" if note_type == "key_takeaway" else "Reading Question",
+            concept=concept_name[:80],
+            question=question,
+            answer=content,
+            explanation=f"Derived from your reading note on {concept_name}.",
+            source_type=note_type,
+            source_id=str(note.get("id", "")),
+            book_id=note.get("book_id"),
+        )
+
+    def create_item_for_note(self, user_id: str, note: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Turns a freshly saved takeaway/question into its recall item right away, so the user
+        sees the generated question immediately. Idempotent: returns the existing item if the
+        note was already converted.
+        """
+        clean_user_id = (user_id or "").strip()
+        note_id = str(note.get("id", "")).strip()
+        if not clean_user_id or not note_id:
+            return None
+        for item in self._learning_repo.list_review_items(clean_user_id, status="active", limit=500) or []:
+            if str(item.get("source_id") or "") == note_id:
+                return item
+        return self._build_item_for_note(clean_user_id, note, [1])
+
     def execute(
         self,
         user_id: str,
@@ -250,27 +299,8 @@ class GetReviewQueueUseCase:
                     note_id = str(note.get("id", ""))
                     if not note_id or note_id in existing_source_ids:
                         continue
-                    note_type = note.get("note_type", "personal_note")
-                    if note_type in {"key_takeaway", "question"}:
-                        concept_name = note.get("book", {}).get("title") or "Key Takeaway"
-                        title = "Takeaway Review" if note_type == "key_takeaway" else "Reading Question"
-                        question = (
-                            note.get("content", "")
-                            if note_type == "question"
-                            else self._recall_question(note.get("content", ""), concept_name, llm_budget)
-                        )
-                        answer = note.get("content", "")
-                        created_item = self._learning_repo.create_review_item(
-                            user_id=clean_user_id,
-                            title=title,
-                            concept=concept_name[:80],
-                            question=question,
-                            answer=answer,
-                            explanation=f"Derived from your reading note on {concept_name}.",
-                            source_type=note_type,
-                            source_id=note_id,
-                            book_id=note.get("book_id"),
-                        )
+                    created_item = self._build_item_for_note(clean_user_id, note, llm_budget)
+                    if created_item:
                         items.append(created_item)
                         existing_source_ids.add(note_id)
             except Exception as e:

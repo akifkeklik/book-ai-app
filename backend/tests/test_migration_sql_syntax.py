@@ -1212,3 +1212,19 @@ def test_migration_13_learning_outcomes_schema_and_rls():
     assert "CREATE POLICY \"Users can view their own review attempts\"" in sql
     assert "auth.uid() = user_id" in sql
 
+
+
+def test_migration_14_retires_removed_feature_tables_safely():
+    """14 drops only the tables of the removed features, idempotently, in one transaction."""
+    sql = (SCRIPTS_DIR / "14_drop_learning_paths_and_knowledge_graph.sql").read_text(encoding="utf-8")
+    statements = [s.strip() for s in sql.split(";") if s.strip() and not s.strip().startswith("--")]
+    body = "\n".join(line for line in sql.splitlines() if not line.strip().startswith("--"))
+    assert "BEGIN" in body and "COMMIT" in body
+    drops = [line.strip() for line in body.splitlines() if line.strip().upper().startswith("DROP")]
+    assert drops == [
+        "DROP TABLE IF EXISTS public.learning_path_items;",
+        "DROP TABLE IF EXISTS public.learning_paths;",
+        "DROP TABLE IF EXISTS public.knowledge_relationships;",
+    ]
+    assert "CASCADE" not in body.upper(), "no CASCADE: nothing else may depend on these tables"
+    assert statements

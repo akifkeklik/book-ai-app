@@ -7,7 +7,7 @@ import { BookCard } from '@/components/BookCard';
 import { HomePersonalizationBanner } from '@/components/HomePersonalizationBanner';
 import { ReadingJourneyDashboard } from '@/components/ReadingJourneyDashboard';
 import { getLibraryBooks } from '@/app/actions/library';
-import { translate, type TranslationKey } from '@/lib/i18n';
+import { translate, translateGenre, type TranslationKey } from '@/lib/i18n';
 import { type Language, resolveLanguage } from '@/lib/preferences';
 import type { Book, LibraryItem } from '@/types';
 import { SmartReviewWidget } from '@/components/SmartReviewWidget';
@@ -211,7 +211,7 @@ export default async function Home({
                 transition: 'all 0.2s ease',
               }}
             >
-              {genre}
+              {translateGenre(lang, genre)}
             </Link>
           ))}
         </div>

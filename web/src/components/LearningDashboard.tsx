@@ -460,7 +460,7 @@ export function LearningDashboard({
                     </span>
                   </div>
                   <p className="text-xs text-[var(--text-secondary)]">
-                    {c.totalItems} items • {Math.round(c.retentionRate * 100)}% retention • Avg stage {c.averageStage}
+                    {t('ld_concept_summary', { items: c.totalItems, retention: Math.round(c.retentionRate * 100), stage: c.averageStage })}
                   </p>
                 </div>
                 <button

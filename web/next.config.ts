@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The dev-only route indicator overlaps the phone tab bar.
+  devIndicators: false,
+  // E2E runs build into its own directory so it never collides with a running dev server.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   images: {
     remotePatterns: [
       {

@@ -10,8 +10,9 @@ import { getBookNotes } from '@/app/actions/notes';
 import type { LearningNote } from '@/types';
 import { getBookInteraction } from '@/app/actions/library';
 import { cookies } from 'next/headers';
-import { translate, type TranslationKey } from '@/lib/i18n';
+import { translate, translateGenre, type TranslationKey } from '@/lib/i18n';
 import { resolveLanguage } from '@/lib/preferences';
+import { formatCount, formatRating } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -194,8 +195,8 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '10px' }}>
               <Star size={18} color="#fbbf24" fill="#fbbf24" />
-              <span style={{ fontWeight: 600 }}>{book.averageRating > 0 ? book.averageRating.toFixed(1) : 'No rating'}</span>
-              {book.ratingsCount > 0 && <span className="text-muted" style={{ fontSize: '0.85rem' }}>({book.ratingsCount})</span>}
+              <span style={{ fontWeight: 600 }}>{book.averageRating > 0 ? formatRating(book.averageRating, lang) : t('no_rating')}</span>
+              {book.ratingsCount > 0 && <span className="text-muted" style={{ fontSize: '0.85rem' }}>({formatCount(book.ratingsCount, lang)})</span>}
             </div>
             
             {book.pageCount > 0 && (
@@ -247,7 +248,7 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
                     }}
                   >
                     <Bookmark size={12} />
-                    <span>{cat}</span>
+                    <span>{translateGenre(lang, cat)}</span>
                   </Link>
                 ))}
               </div>

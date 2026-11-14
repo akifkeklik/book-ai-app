@@ -7,6 +7,7 @@ import type {
   LibraryCollectionStatus,
   LibraryItem,
   LearningNote,
+  RecallItemPreview,
   NoteType,
   NoteReview,
   NoteReviewStats,
@@ -632,6 +633,17 @@ export class ApiService {
     clientId?: string,
     options: { signal?: AbortSignal } = {}
   ): Promise<LearningNote> {
+    return (await this.createNoteWithRecall(bookId, noteType, content, clientId, options)).note;
+  }
+
+  /** Creates a note and returns the AI recall question the backend generated for it, if any. */
+  static async createNoteWithRecall(
+    bookId: string,
+    noteType: NoteType,
+    content: string,
+    clientId?: string,
+    options: { signal?: AbortSignal } = {}
+  ): Promise<{ note: LearningNote; recallItem: RecallItemPreview | null }> {
     const headers = await this.getHeaders();
     const res = await this.fetchWithTimeout(`${API_URL}/api/notes`, {
       method: 'POST',
@@ -652,7 +664,16 @@ export class ApiService {
     }
 
     const data = await res.json();
-    return normalizeLearningNote(data?.note || {});
+    const rawRecall = data?.recall_item;
+    const recallItem: RecallItemPreview | null =
+      rawRecall && typeof rawRecall.question === 'string' && rawRecall.question.trim()
+        ? {
+            id: String(rawRecall.id || ''),
+            question: rawRecall.question.trim(),
+            nextReviewAt: rawRecall.next_review_at ? String(rawRecall.next_review_at) : null,
+          }
+        : null;
+    return { note: normalizeLearningNote(data?.note || {}), recallItem };
   }
 
   static async updateNote(

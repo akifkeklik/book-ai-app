@@ -1,5 +1,6 @@
 # Documentation Index
 
+- [Product brief](PRODUCT.md) — target user, core loop, success metrics and business model.
 - [Architecture](ARCHITECTURE.md) — backend, web and persistence boundaries.
 - [Local development setup](setup.md) — prerequisites, environment setup, run commands and quality checks.
 - [Supabase and database setup](supabase_setup.md) — credentials, numbered migrations and database safety.

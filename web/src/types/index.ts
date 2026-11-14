@@ -87,6 +87,13 @@ export interface LibraryItem {
 
 export type NoteType = 'personal_note' | 'key_takeaway' | 'question';
 
+/** Recall question created from a saved takeaway (returned with the note). */
+export interface RecallItemPreview {
+  id: string;
+  question: string;
+  nextReviewAt: string | null;
+}
+
 export interface LearningNote {
   id: string;
   userId: string;

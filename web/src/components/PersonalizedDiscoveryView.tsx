@@ -44,6 +44,7 @@ import { TasteProfileModal } from './TasteProfileModal';
 import { ReadingJourneyDashboard } from './ReadingJourneyDashboard';
 import { determineNextBook } from '@/lib/reading_journey';
 import type { LibraryItem } from '@/types';
+import { translateGenre } from '@/lib/i18n';
 
 const DEFAULT_CATEGORIES = [
   'Fiction',
@@ -59,7 +60,7 @@ const DEFAULT_CATEGORIES = [
 
 export function PersonalizedDiscoveryView() {
   const { user, loading: authLoading } = useAuth();
-  const { t } = usePreferences();
+  const { t, preferences } = usePreferences();
 
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -877,7 +878,7 @@ export function PersonalizedDiscoveryView() {
                   transition: 'all 0.2s',
                 }}
               >
-                {cat}
+                {translateGenre(preferences.language, cat)}
               </button>
             ))}
           </div>
@@ -949,7 +950,7 @@ export function PersonalizedDiscoveryView() {
 
           <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>
             {searchQuery
-              ? `No books match "${searchQuery}"`
+              ? t('library_no_books_match', { query: searchQuery })
               : t('empty_discovery_title')}
           </h2>
 

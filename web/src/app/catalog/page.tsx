@@ -4,7 +4,7 @@ import type { Book, Category, PaginatedResponse } from '@/types';
 import Link from 'next/link';
 import { Search, SlidersHorizontal, X, ArrowUpDown, Star, BookOpen } from 'lucide-react';
 import { cookies } from 'next/headers';
-import { translate, type TranslationKey } from '@/lib/i18n';
+import { translate, translateGenre, type TranslationKey } from '@/lib/i18n';
 import { type Language, resolveLanguage } from '@/lib/preferences';
 import { buildCatalogUrl, type CatalogFilterState, type CatalogUrlOverrides } from '@/lib/catalogUrl';
 
@@ -74,10 +74,10 @@ export default async function CatalogPage({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem', marginBottom: '1.5rem' }}>
           <div>
             <h1 style={{ fontSize: '2.5rem', marginBottom: '0.25rem' }}>
-              {q ? `Search: "${q}"` : category ? `${category}` : t('catalog_title')}
+              {q ? t('catalog_search_title', { query: q }) : category ? translateGenre(lang, category) : t('catalog_title')}
             </h1>
             <p className="text-muted">
-              {q ? `Matching books for your query` : category ? `Discover books in ${category}` : t('catalog_subtitle')}
+              {q ? t('catalog_search_subtitle') : category ? t('catalog_category_subtitle', { category: translateGenre(lang, category) }) : t('catalog_subtitle')}
             </p>
           </div>
 
@@ -127,13 +127,13 @@ export default async function CatalogPage({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             {/* Sort Control */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               <ArrowUpDown size={16} color="var(--muted)" />
               <span style={{ fontSize: '0.875rem', color: 'var(--muted)' }}>{t('sort_label')}</span>
-              <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                 <Link
                   href={createFilterUrl({ sort: 'popularity', order: 'desc' })}
-                  className="btn"
+                  className="btn filter-chip"
                   style={{
                     padding: '0.35rem 0.75rem',
                     fontSize: '0.8rem',
@@ -145,7 +145,7 @@ export default async function CatalogPage({
                 </Link>
                 <Link
                   href={createFilterUrl({ sort: 'rating', order: 'desc' })}
-                  className="btn"
+                  className="btn filter-chip"
                   style={{
                     padding: '0.35rem 0.75rem',
                     fontSize: '0.8rem',
@@ -157,7 +157,7 @@ export default async function CatalogPage({
                 </Link>
                 <Link
                   href={createFilterUrl({ sort: 'title', order: 'asc' })}
-                  className="btn"
+                  className="btn filter-chip"
                   style={{
                     padding: '0.35rem 0.75rem',
                     fontSize: '0.8rem',
@@ -169,7 +169,7 @@ export default async function CatalogPage({
                 </Link>
                 <Link
                   href={createFilterUrl({ sort: 'newest', order: 'desc' })}
-                  className="btn"
+                  className="btn filter-chip"
                   style={{
                     padding: '0.35rem 0.75rem',
                     fontSize: '0.8rem',
@@ -183,13 +183,13 @@ export default async function CatalogPage({
             </div>
 
             {/* Min Rating Filter */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               <Star size={16} color="#fbbf24" fill="#fbbf24" />
               <span style={{ fontSize: '0.875rem', color: 'var(--muted)' }}>{t('min_rating_label')}</span>
-              <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                 <Link
                   href={createFilterUrl({ min_rating: null })}
-                  className="btn"
+                  className="btn filter-chip"
                   style={{
                     padding: '0.35rem 0.65rem',
                     fontSize: '0.8rem',
@@ -197,11 +197,11 @@ export default async function CatalogPage({
                     color: 'var(--foreground)',
                   }}
                 >
-                  All
+                  {t('all')}
                 </Link>
                 <Link
                   href={createFilterUrl({ min_rating: 4 })}
-                  className="btn"
+                  className="btn filter-chip"
                   style={{
                     padding: '0.35rem 0.65rem',
                     fontSize: '0.8rem',
@@ -214,7 +214,7 @@ export default async function CatalogPage({
                 </Link>
                 <Link
                   href={createFilterUrl({ min_rating: 3 })}
-                  className="btn"
+                  className="btn filter-chip"
                   style={{
                     padding: '0.35rem 0.65rem',
                     fontSize: '0.8rem',
@@ -236,7 +236,7 @@ export default async function CatalogPage({
               className="btn btn-outline"
               style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.4)' }}
             >
-              <X size={14} /> Clear all filters
+              <X size={14} /> {t('clear_filters')}
             </Link>
           )}
         </div>
@@ -258,7 +258,7 @@ export default async function CatalogPage({
                 <SlidersHorizontal size={18} color="var(--primary)" />
                 <h3 style={{ fontSize: '1.1rem', margin: 0 }}>{t('categories_filter')}</h3>
               </div>
-              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <ul className="catalog-category-list" style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 <li>
                   <Link 
                     href={createFilterUrl({ category: null })} 
@@ -274,7 +274,7 @@ export default async function CatalogPage({
                     }}
                   >
                     <span>{t('tab_all')}</span>
-                    <span className="text-muted" style={{ fontSize: '0.8rem' }}>{totalBooks > 0 ? totalBooks : ''}</span>
+                    <span className="text-muted" style={{ fontSize: '0.8rem' }}>{!category && totalBooks > 0 ? totalBooks : ''}</span>
                   </Link>
                 </li>
                 {categories.map((c) => {
@@ -295,7 +295,7 @@ export default async function CatalogPage({
                         }}
                       >
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '0.5rem' }}>
-                          {c.name}
+                          {translateGenre(lang, c.name)}
                         </span>
                         <span className="text-muted" style={{ fontSize: '0.8rem', flexShrink: 0 }}>{c.count}</span>
                       </Link>
@@ -320,10 +320,10 @@ export default async function CatalogPage({
                 {q && category ? (
                   <>
                     <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>
-                      No books found for &ldquo;{q}&rdquo; in {category}
+                      {t('catalog_none_query_in_category', { query: q, category: translateGenre(lang, category) })}
                     </h3>
                     <p className="text-muted" style={{ maxWidth: '520px', margin: '0 auto 1.5rem', lineHeight: '1.6' }}>
-                      The active category filter excludes matching catalog entries. You can expand your search across all categories or browse all titles in {category}.
+                      {t('catalog_none_query_in_category_desc', { category: translateGenre(lang, category) })}
                     </p>
                     <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
                       <Link
@@ -331,18 +331,18 @@ export default async function CatalogPage({
                         className="btn btn-primary"
                         style={{ padding: '0.5rem 1.25rem' }}
                       >
-                        Search &ldquo;{q}&rdquo; in All Categories
+                        {t('catalog_search_all_categories', { query: q })}
                       </Link>
                       <Link
                         href={createFilterUrl({ q: null })}
                         className="btn btn-outline"
                         style={{ padding: '0.5rem 1.25rem' }}
                       >
-                        Browse All in {category}
+                        {t('catalog_browse_category', { category: translateGenre(lang, category) })}
                       </Link>
                       <Link
                         href="/catalog"
-                        className="btn"
+                        className="btn filter-chip"
                         style={{ padding: '0.5rem 1rem', background: 'rgba(255, 255, 255, 0.06)' }}
                       >
                         {t('clear_filters')}
@@ -352,7 +352,7 @@ export default async function CatalogPage({
                 ) : q ? (
                   <>
                     <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>
-                      No books match &ldquo;{q}&rdquo;
+                      {t('catalog_none_query', { query: q })}
                     </h3>
                     <p className="text-muted" style={{ maxWidth: '440px', margin: '0 auto 1.5rem', lineHeight: '1.6' }}>
                       We couldn&apos;t find any books with that title, author, or ISBN. Try clearing your search query or explore one of these popular genres:
@@ -362,7 +362,7 @@ export default async function CatalogPage({
                         <Link
                           key={suggestedGenre}
                           href={`/catalog?category=${encodeURIComponent(suggestedGenre)}`}
-                          className="btn"
+                          className="btn filter-chip"
                           style={{
                             padding: '0.4rem 0.85rem',
                             fontSize: '0.8rem',
@@ -382,7 +382,7 @@ export default async function CatalogPage({
                 ) : category ? (
                   <>
                     <h3 style={{ fontSize: '1.4rem', marginBottom: '0.5rem' }}>
-                      No books found in {category}
+                      {t('catalog_none_in_category', { category: translateGenre(lang, category) })}
                     </h3>
                     <p className="text-muted" style={{ maxWidth: '440px', margin: '0 auto 1.5rem', lineHeight: '1.6' }}>
                       {t('catalog_empty_category')}

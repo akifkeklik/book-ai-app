@@ -28,6 +28,7 @@ import {
 import Link from 'next/link';
 import { AVAILABLE_GENRES } from '@/components/TasteProfileModal';
 import { getUserPreferencesAction, updateUserPreferencesAction } from '@/app/actions/user';
+import { translateGenre } from '@/lib/i18n';
 
 interface PaletteOption {
   id: ColorPalette;
@@ -709,7 +710,7 @@ export default function SettingsPage() {
                       }}
                     >
                       {isSelected ? <Check size={13} /> : null}
-                      <span>{genre}</span>
+                      <span>{translateGenre(preferences.language, genre)}</span>
                     </button>
                   );
                 })}
