@@ -253,3 +253,15 @@ def test_api_adds_book_once_and_it_shows_up_in_the_catalog(api):
 def test_api_rejects_invalid_books(api):
     resp = api.post("/api/books", json={"title": "", "authors": "A"}, headers={"Authorization": "Bearer token_a"})
     assert resp.status_code == 400 and "title" in resp.get_json()["error"]
+
+
+def test_added_books_keep_recommendations_working_and_are_recommendable():
+    """Regression: catalog rows and TF-IDF rows must stay aligned after contributions."""
+    rec = _catalog()
+    uc = AddCatalogBookUseCase(rec, None)
+    book, _, _ = uc.execute(USER, {"title": "Tiny Habits", "authors": "BJ Fogg", "categories": "Self-Help",
+                                   "description": "Habits behaviour change small steps."})
+    assert rec.engine.tfidf_matrix.shape[0] == len(rec.df)
+    recs = rec.recommend(seed_titles=["9780000000101"], top_n=5)
+    assert "Tiny Habits" in [r["title"] for r in recs]
+    assert rec.recommend(seed_titles=[book["isbn13"]], top_n=5)

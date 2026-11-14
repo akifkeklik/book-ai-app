@@ -1162,13 +1162,21 @@ class BookRecommender:
     def add_book(self, book: Dict[str, Any]) -> Dict[str, Any]:
         """
         Appends a contributed book to the in-memory catalog so it can be browsed and searched
-        right away. It is not part of the TF-IDF matrix until the next training run, so it is
-        never returned as a similarity recommendation before then.
+        right away, keeping the TF-IDF matrix aligned with the catalog rows.
         """
         row = preprocess_dataframe(pd.DataFrame([book]))
         row["popularity_score"] = 0.0  # contributions never jump ahead of established books
         base = self.engine.df if self.engine.df is not None else pd.DataFrame()
-        self.engine.df = pd.concat([base, row], ignore_index=True)
+        engine = self.engine
+        matrix = getattr(engine, "tfidf_matrix", None)
+        vectorizer = getattr(engine, "tfidf_vectorizer", None)
+        # Scoring assumes catalog rows and TF-IDF rows are aligned 1:1, so the new row gets
+        # its vector from the already-fitted vectorizer (no retraining needed).
+        if matrix is not None and vectorizer is not None and matrix.shape[0] == len(base):
+            from scipy.sparse import vstack
+
+            engine.tfidf_matrix = vstack([matrix, vectorizer.transform(row["combined_features"])]).tocsr()
+        engine.df = pd.concat([base, row], ignore_index=True)
         return row.iloc[0].to_dict()
 
     def get_book_by_isbn(self, isbn: str) -> Optional[Dict[str, Any]]:
