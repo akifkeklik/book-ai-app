@@ -10,6 +10,8 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16.4-black?logo=next.js)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql)](https://www.postgresql.org/)
 
+**[Live demo → libris-pink.vercel.app](https://libris-pink.vercel.app)**
+
 </div>
 
 Most of what we read is gone within weeks. Libris is a reading companion built around one idea: you save a takeaway while reading, Libris turns it into a recall question, and asks you again right before you would forget it.
@@ -43,7 +45,7 @@ It is also where I practised building a product end to end: a layered backend, a
 
 Who it is for and how success would be measured are in the [product brief](docs/PRODUCT.md).
 
-> **Status:** feature-complete portfolio project, not deployed as a public service. It runs locally with Docker Compose or the dev scripts.
+> **Status:** feature-complete portfolio project. The web app runs on Vercel and the API on Render's free tier, which sleeps when idle, so the first visit after a quiet spell can take up to a minute to load the catalog.
 
 ## Architecture
 
