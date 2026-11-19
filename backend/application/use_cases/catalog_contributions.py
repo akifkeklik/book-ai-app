@@ -7,6 +7,7 @@ private to each reader, like for every other book.
 
 import logging
 import re
+import threading
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -56,9 +57,42 @@ def _cover(value: Any) -> str:
 
 
 class AddCatalogBookUseCase:
-    def __init__(self, recommender, book_data_port=None):
+    def __init__(self, recommender, book_data_port=None, embedding_service=None, run_background=None):
         self._recommender = recommender
         self._book_data_port = book_data_port
+        self._embedding_service = embedding_service
+        # Embedding calls can wait on Gemini quota, so they never run on the request thread.
+        self._run_background = run_background or self._start_thread
+
+    @staticmethod
+    def _start_thread(fn) -> None:
+        threading.Thread(target=fn, name="embed-contributed-book", daemon=True).start()
+
+    def _embed_persisted_book(self, book: Dict[str, Any]) -> None:
+        """
+        Best-effort: embed a book that was just persisted. Never raises. A failure only logs;
+        scripts/backfill_embeddings.py finds books without a vector and fills them in later.
+        Writes go through the server's own BookDataPort (never the reader's JWT), so
+        book_embeddings stays read-only for clients.
+        """
+        isbn = book.get("isbn13")
+        try:
+            svc = self._embedding_service
+            if not svc.is_configured():
+                logger.warning(f"Embedding skipped for {isbn}: embedding service not configured; backfill will recover it")
+                return
+            text = svc.generate_canonical_text(book)
+            if not text:
+                logger.warning(f"Embedding skipped for {isbn}: empty canonical text")
+                return
+            vector = svc.generate_embedding(text)
+            if not vector:
+                logger.error(f"Embedding generation failed for {isbn}; backfill will recover it")
+                return
+            if not svc.upsert_embedding(isbn, vector, svc.generate_content_hash(text)):
+                logger.error(f"Embedding upsert failed for {isbn}; backfill will recover it")
+        except Exception as e:
+            logger.error(f"Embedding failed for {isbn}: {e}; backfill will recover it")
 
     def _find_existing(self, isbn13: str, title: str, authors: str) -> Optional[Dict[str, Any]]:
         if isbn13:
@@ -106,6 +140,11 @@ class AddCatalogBookUseCase:
                 logger.warning(f"Could not persist contributed book {book['isbn13']}: {e}")
 
         added = self._recommender.add_book(book)
+        if persisted and self._embedding_service is not None:
+            try:
+                self._run_background(lambda b=dict(book): self._embed_persisted_book(b))
+            except Exception as e:
+                logger.error(f"Could not schedule embedding for {book['isbn13']}: {e}; backfill will recover it")
         logger.info(f"Catalog contribution by {user_id}: {book['isbn13']} persisted={persisted}")
         return added, True, persisted
 

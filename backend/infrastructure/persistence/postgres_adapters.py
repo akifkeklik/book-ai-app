@@ -6,12 +6,72 @@ enforcing Model A canonical contracts, constraints, and RLS contexts.
 
 import datetime
 import logging
+import os
+from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
 import psycopg2
+import psycopg2.errors
 from psycopg2.extras import RealDictCursor
 
+from ...domain.ports import SemanticSearchUnavailable
+from .vector_rows import parse_similarity_rows
+
 logger = logging.getLogger(__name__)
+
+# Upper bound for one vector RPC. An exact scan over ~6.5k 3072-d rows takes well under a second;
+# anything slower is a stuck or overloaded database, and the request should fall back instead.
+VECTOR_QUERY_TIMEOUT_MS = int(os.getenv("VECTOR_QUERY_TIMEOUT_MS", "5000"))
+
+# An HNSW scan returns at most hnsw.ef_search rows (pgvector default 40), whatever LIMIT asks for.
+# Measured on the live index (6,446 real vectors, reports/pgvector_live_benchmark.json): a request
+# for 100 rows returned exactly 40 at the default; ef_search=200 returned 100 with recall@100 0.994.
+# Set per transaction (SET LOCAL) so no server setting changes. ef_search = max(floor, 2 * limit).
+VECTOR_EF_SEARCH_MIN = int(os.getenv("VECTOR_EF_SEARCH_MIN", "40"))
+VECTOR_EF_SEARCH_MAX = 1000  # pgvector's upper bound for hnsw.ef_search
+
+
+def hnsw_ef_search_for(limit: int) -> int:
+    """hnsw.ef_search that lets an HNSW scan return `limit` rows with high recall."""
+    return max(VECTOR_EF_SEARCH_MIN, min(VECTOR_EF_SEARCH_MAX, 2 * max(1, int(limit))))
+
+
+@contextmanager
+def _transaction(conn, explicit: bool = False):
+    """
+    One unit of work on `conn`, correct for both connection kinds the adapters accept:
+
+    - URI-created connections are autocommit, so each statement already commits on its own.
+      With explicit=True a real transaction is opened (BEGIN ... COMMIT/ROLLBACK) so that
+      SET LOCAL settings such as statement_timeout apply and are discarded afterwards.
+    - Injected connections may be in psycopg2's default transactional mode. Then the work is
+      committed on success and rolled back on any error, so a failed statement cannot leave the
+      connection "in failed transaction" (every later query would error) and successful writes
+      are not silently lost when the caller never commits.
+    """
+    began = False
+    if explicit and conn.autocommit:
+        with conn.cursor() as cur:
+            cur.execute("BEGIN")
+        began = True
+    try:
+        yield conn
+    except BaseException:
+        try:
+            if began:
+                with conn.cursor() as cur:
+                    cur.execute("ROLLBACK")
+            elif not conn.autocommit:
+                conn.rollback()
+        except Exception as rollback_error:  # the original error matters more
+            logger.warning(f"Rollback failed: {rollback_error}")
+        raise
+    else:
+        if began:
+            with conn.cursor() as cur:
+                cur.execute("COMMIT")
+        elif not conn.autocommit:
+            conn.commit()
 
 
 class PostgresInteractionRepository:
@@ -40,7 +100,7 @@ class PostgresInteractionRepository:
     def get_user_interactions(self, user_id: str) -> List[Dict[str, Any]]:
         conn = self._get_connection()
         try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with _transaction(conn), conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
                     SELECT book_id, interaction_type
@@ -58,7 +118,7 @@ class PostgresInteractionRepository:
     def get_user_favorites(self, user_id: str) -> List[Dict[str, Any]]:
         conn = self._get_connection()
         try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with _transaction(conn), conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
                     SELECT book_id, book_title, book_author, book_image_url, added_at
@@ -83,7 +143,7 @@ class PostgresInteractionRepository:
     def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
         conn = self._get_connection()
         try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with _transaction(conn), conn.cursor(cursor_factory=RealDictCursor) as cur:
                 row = None
                 try:
                     cur.execute(
@@ -131,7 +191,7 @@ class PostgresInteractionRepository:
             return
         conn = self._get_connection()
         try:
-            with conn.cursor() as cur:
+            with _transaction(conn), conn.cursor() as cur:
                 fav_entries = [e for e in entries if e.get("interaction_type") == "favorite"]
                 other_entries = [e for e in entries if e.get("interaction_type") != "favorite"]
 
@@ -197,7 +257,7 @@ class PostgresInteractionRepository:
     ) -> None:
         conn = self._get_connection()
         try:
-            with conn.cursor() as cur:
+            with _transaction(conn), conn.cursor() as cur:
                 authors_list = authors if authors is not None else []
                 try:
                     cur.execute(
@@ -232,7 +292,7 @@ class PostgresInteractionRepository:
     def track_activity(self, payload: Dict[str, Any]) -> None:
         conn = self._get_connection()
         try:
-            with conn.cursor() as cur:
+            with _transaction(conn), conn.cursor() as cur:
                 uid = payload.get("user_id")
                 action = payload.get("action") or payload.get("activity_type") or "view"
                 book_id = payload.get("book_id")
@@ -257,7 +317,7 @@ class PostgresInteractionRepository:
     ) -> None:
         conn = self._get_connection()
         try:
-            with conn.cursor() as cur:
+            with _transaction(conn), conn.cursor() as cur:
                 if interaction_type:
                     cur.execute(
                         """
@@ -329,7 +389,7 @@ class PostgresBookDataPort:
             return []
         conn = self._get_connection()
         try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with _transaction(conn), conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
                     SELECT *
@@ -353,7 +413,7 @@ class PostgresBookDataPort:
         conn = self._get_connection()
         cols = [c for c in self.BOOK_COLUMNS if c in book]
         try:
-            with conn.cursor() as cur:
+            with _transaction(conn), conn.cursor() as cur:
                 cur.execute(
                     f"INSERT INTO public.books ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))}) "
                     "ON CONFLICT (isbn13) DO NOTHING;",
@@ -367,7 +427,7 @@ class PostgresBookDataPort:
     def get_all_isbns(self) -> List[str]:
         conn = self._get_connection()
         try:
-            with conn.cursor() as cur:
+            with _transaction(conn), conn.cursor() as cur:
                 cur.execute("SELECT isbn13 FROM public.books;")
                 return [r[0] for r in cur.fetchall()]
         except Exception as e:
@@ -377,7 +437,7 @@ class PostgresBookDataPort:
     def get_all_books_raw(self) -> List[Dict[str, Any]]:
         conn = self._get_connection()
         try:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with _transaction(conn), conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("SELECT * FROM public.books;")
                 return [dict(r) for r in cur.fetchall()]
         except Exception as e:
@@ -387,7 +447,7 @@ class PostgresBookDataPort:
     def check_health(self) -> bool:
         try:
             conn = self._get_connection()
-            with conn.cursor() as cur:
+            with _transaction(conn), conn.cursor() as cur:
                 cur.execute("SELECT 1 FROM public.books LIMIT 1;")
                 cur.fetchone()
                 return True
@@ -395,9 +455,99 @@ class PostgresBookDataPort:
             logger.error(f"Database health check failed: {e}")
             return False
 
+    # ── Vector retrieval ─────────────────────────────────────────────────────
+    # Calls the same SQL functions Supabase exposes as RPCs (migrations 03/05/06), so both
+    # adapters rank with one implementation. A missing pgvector table or function raises
+    # SemanticSearchUnavailable instead of returning {} (which would read as "no matches").
+
+    def _vector_query(self, sql: str, params: tuple, limit: int = 100) -> Dict[str, float]:
+        """Runs one vector RPC under a statement timeout and a matching hnsw.ef_search, in its own
+        transaction (SET LOCAL: both settings end with it)."""
+        try:
+            conn = self._get_connection()
+            with _transaction(conn, explicit=True), conn.cursor() as cur:
+                cur.execute("SET LOCAL statement_timeout = %s", (f"{int(VECTOR_QUERY_TIMEOUT_MS)}ms",))
+                cur.execute("SELECT set_config('hnsw.ef_search', %s, true)", (str(hnsw_ef_search_for(limit)),))
+                cur.execute(sql, params)
+                rows = cur.fetchall()
+        except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedFunction,
+                psycopg2.errors.UndefinedObject) as e:
+            raise SemanticSearchUnavailable(
+                f"pgvector schema missing (apply migrations 03, 05, 06): {str(e).splitlines()[0]}"
+            ) from e
+        except psycopg2.errors.QueryCanceled as e:
+            raise SemanticSearchUnavailable(
+                f"vector query exceeded {VECTOR_QUERY_TIMEOUT_MS} ms: {str(e).splitlines()[0]}"
+            ) from e
+        except psycopg2.Error as e:
+            raise SemanticSearchUnavailable(f"vector query failed: {str(e).splitlines()[0]}") from e
+        return parse_similarity_rows(rows, "vector query")
+
     def get_semantic_candidates(self, likes: List[str], limit: int = 100) -> Dict[str, float]:
-        # Semantic RPC is Supabase pgvector specific. In local Postgres fallback gracefully.
-        return {}
+        if not likes:
+            return {}
+        return self._vector_query(
+            "SELECT book_id, similarity FROM public.match_book_embeddings(%s::text[], 0.0, %s);",
+            (list(likes), int(limit)),
+            limit=int(limit),
+        )
+
+    def match_query_embeddings(self, embedding: List[float], limit: int = 100) -> Dict[str, float]:
+        if not embedding:
+            return {}
+        return self._vector_query(
+            "SELECT book_id, similarity FROM public.match_query_embeddings(%s::vector, 0.0, %s);",
+            (_vector_literal(embedding), int(limit)),
+            limit=int(limit),
+        )
+
+    def get_embedding_metadata(self, book_id: str) -> Optional[Dict[str, Any]]:
+        conn = self._get_connection()
+        try:
+            with _transaction(conn), conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT content_hash, model_version FROM public.book_embeddings WHERE book_id = %s;",
+                    (book_id,),
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+        except psycopg2.Error as e:
+            logger.error(f"Error fetching embedding metadata in Postgres: {e}")
+            return None
+
+    def find_other_embedding_profiles(self, accepted: List[str], limit: int = 5) -> List[str]:
+        """Stored model_version values outside `accepted`."""
+        conn = self._get_connection()
+        with _transaction(conn), conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT model_version FROM public.book_embeddings "
+                "WHERE NOT (model_version = ANY(%s)) LIMIT %s;",
+                (list(accepted), max(1, int(limit))),
+            )
+            return sorted(str(r[0]) for r in cur.fetchall() if r[0])
+
+    def upsert_embedding(
+        self, book_id: str, embedding: List[float], content_hash: str, model_version: str
+    ) -> None:
+        conn = self._get_connection()
+        with _transaction(conn), conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO public.book_embeddings (book_id, embedding, content_hash, model_version)
+                VALUES (%s, %s::vector, %s, %s)
+                ON CONFLICT (book_id) DO UPDATE SET
+                    embedding = EXCLUDED.embedding,
+                    content_hash = EXCLUDED.content_hash,
+                    model_version = EXCLUDED.model_version,
+                    updated_at = now();
+                """,
+                (book_id, _vector_literal(embedding), content_hash, model_version),
+            )
+
+
+def _vector_literal(embedding: List[float]) -> str:
+    """pgvector text input format: '[0.1,0.2,...]'."""
+    return "[" + ",".join(repr(float(x)) for x in embedding) + "]"
 
 
 
@@ -428,7 +578,7 @@ class PostgresNoteRepository:
         self, user_id: str, book_id: str, note_type: str, content: str
     ) -> Dict[str, Any]:
         conn = self._get_connection()
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with _transaction(conn), conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
                 INSERT INTO public.user_notes (user_id, book_id, note_type, content)
@@ -473,7 +623,7 @@ class PostgresNoteRepository:
         sql += " ORDER BY created_at DESC LIMIT %s OFFSET %s;"
         params.extend([limit, offset])
 
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with _transaction(conn), conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(sql, tuple(params))
             rows = cur.fetchall()
             result = []
@@ -505,14 +655,14 @@ class PostgresNoteRepository:
         if query:
             sql += " AND content ILIKE %s"
             params.append(f"%{query}%")
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with _transaction(conn), conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(sql, tuple(params))
             row = cur.fetchone()
             return int(row["total"]) if row else 0
 
     def get_note_by_id(self, note_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         conn = self._get_connection()
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with _transaction(conn), conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
                 """
                 SELECT id, user_id, book_id, note_type, content, created_at, updated_at
@@ -537,7 +687,7 @@ class PostgresNoteRepository:
     ) -> Optional[Dict[str, Any]]:
         conn = self._get_connection()
         now = datetime.datetime.now(datetime.timezone.utc)
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with _transaction(conn), conn.cursor(cursor_factory=RealDictCursor) as cur:
             if note_type:
                 cur.execute(
                     """
@@ -570,7 +720,7 @@ class PostgresNoteRepository:
 
     def delete_note(self, note_id: str, user_id: str) -> bool:
         conn = self._get_connection()
-        with conn.cursor() as cur:
+        with _transaction(conn), conn.cursor() as cur:
             cur.execute(
                 "DELETE FROM public.user_notes WHERE id = %s AND user_id = %s;",
                 (note_id, user_id),

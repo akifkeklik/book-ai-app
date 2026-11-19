@@ -72,7 +72,10 @@ def test_generate_embedding_success(mock_getenv, mock_genai):
     emb = service.generate_embedding("Test text")
     assert emb == _FAKE_EMBEDDING
     assert len(emb) == _DIM
-    mock_genai.return_value.embed.assert_called_once_with("Test text", "models/gemini-embedding-2", task_type="RETRIEVAL_DOCUMENT")
+    # Default document profile = how the stored catalog vectors were requested (RETRIEVAL_DOCUMENT).
+    mock_genai.return_value.embed.assert_called_once_with(
+        "Test text", "models/gemini-embedding-2", task_type="RETRIEVAL_DOCUMENT"
+    )
 
 
 @patch("backend.services.embedding_service.GeminiRestClient")
@@ -209,11 +212,12 @@ def test_upsert_embedding():
     res = service.upsert_embedding("book1", [0.1, 0.2], "hash123")
 
     assert res is True
+    # The full embedding profile is stored, not only the model name.
     mock_port.upsert_embedding.assert_called_once_with(
         book_id="book1",
         embedding=[0.1, 0.2],
         content_hash="hash123",
-        model_version="test-model",
+        model_version="test-model;dim=3072;text=canonical_v1;task=RETRIEVAL_DOCUMENT",
     )
 
 

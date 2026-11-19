@@ -120,7 +120,7 @@ def test_cache_multithreaded_concurrency():
 @pytest.mark.unit
 def test_cache_key_user_isolation_and_anon_safety():
     mock_emb = MagicMock(spec=EmbeddingPort)
-    mock_emb.generate_embedding.return_value = [0.1]
+    mock_emb.embed_query.return_value = [0.1]
     mock_data = MagicMock(spec=BookDataPort)
     mock_data.match_query_embeddings.return_value = {"123": 0.9}
     mock_rec = MagicMock(spec=RecommenderPort)
@@ -170,7 +170,7 @@ def test_cache_key_user_isolation_and_anon_safety():
 @pytest.mark.unit
 def test_transient_recoverable_failures_are_not_cached():
     mock_emb = MagicMock(spec=EmbeddingPort)
-    mock_emb.generate_embedding.return_value = [0.1]
+    mock_emb.embed_query.return_value = [0.1]
     mock_data = MagicMock(spec=BookDataPort)
     mock_data.match_query_embeddings.return_value = {"123": 0.9}
     mock_rec = MagicMock(spec=RecommenderPort)
@@ -207,7 +207,7 @@ def test_transient_recoverable_failures_are_not_cached():
 @pytest.mark.unit
 def test_cache_hit_telemetry_and_fresh_latency():
     mock_emb = MagicMock(spec=EmbeddingPort)
-    mock_emb.generate_embedding.return_value = [0.1]
+    mock_emb.embed_query.return_value = [0.1]
     mock_data = MagicMock(spec=BookDataPort)
     mock_data.match_query_embeddings.return_value = {"123": 0.9}
     mock_rec = MagicMock(spec=RecommenderPort)

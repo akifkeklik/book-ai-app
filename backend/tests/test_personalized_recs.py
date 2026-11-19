@@ -758,9 +758,23 @@ class TestRecommendationEngineInvariantsAndAdversarial:
         # Must NOT claim user liked or read the book when provenance is empty!
         assert "Because you liked" not in reason
         assert "Because you read" not in reason
-        assert reason == "Curated based on your taste profile"
-        exp_text = explanation.get("explanation", "")
-        assert "genel okuma profiliniz" in exp_text or "Okuma zevkinize" in exp_text
+        # No preferences and no library provenance: there is no taste profile to cite either,
+        # so the neutral, truthful attribution is popularity.
+        assert reason == "Popular with Libris readers"
+        assert explanation.get("explanation_type") == "trending_catalog"
+
+    def test_explanation_cites_profile_when_one_exists(self):
+        engine = BookRecommender()
+        engine.load_from_dicts([
+            {"isbn13": "9780000000001", "title": "Dune", "authors": "Frank Herbert", "categories": "Sci-Fi", "description": "Spice on Arrakis"},
+            {"isbn13": "9780000000002", "title": "Foundation", "authors": "Isaac Asimov", "categories": "Sci-Fi", "description": "Galactic Empire"},
+        ])
+        engine.fit()
+        explanation = engine._explain_recommendation(
+            engine.df.iloc[1].to_dict(), seed_indices=[0], semantic_scores=None,
+            preferred_genres=[], seed_sources={"9780000000001": "like"},
+        )
+        assert explanation["recommendation_reason"] == "Curated based on your taste profile"
 
     def test_category_scoped_personalized_recommendations(self, recommender_with_books):
         repo = InMemoryInteractionRepo()

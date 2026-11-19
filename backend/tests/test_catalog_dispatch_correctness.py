@@ -35,7 +35,7 @@ def mock_catalog_recommender():
 @pytest.fixture
 def rag_use_case(mock_catalog_recommender):
     mock_emb = MagicMock(spec=EmbeddingPort)
-    mock_emb.generate_embedding.return_value = [0.1, 0.2]
+    mock_emb.embed_query.return_value = [0.1, 0.2]
     mock_data = MagicMock(spec=BookDataPort)
     mock_data.match_query_embeddings.return_value = {}
     mock_enr = MagicMock(spec=EnrichmentPort)
@@ -78,7 +78,7 @@ def test_positive_catalog_existence_bypasses_llm_and_embedding(rag_use_case):
         assert len(res["referenced_books"]) > 0
 
         # Test spies prove 100% bypass of expensive upstream services
-        mock_emb.generate_embedding.assert_not_called()
+        mock_emb.embed_query.assert_not_called()
         mock_llm.generate_response.assert_not_called()
         mock_data.match_query_embeddings.assert_not_called()
 
@@ -96,7 +96,7 @@ def test_turkish_dotless_and_dotted_i_matching(rag_use_case):
     assert res2["status"] == "success"
     assert any("Işık" in b["title"] for b in res2["referenced_books"])
 
-    mock_emb.generate_embedding.assert_not_called()
+    mock_emb.embed_query.assert_not_called()
     mock_llm.generate_response.assert_not_called()
 
 
@@ -119,7 +119,7 @@ def test_possessive_and_inflection_variants_author_lookup(rag_use_case):
         res = use_case.execute(q)
         assert res["status"] == "success"
         assert "George Orwell" in res["answer"]
-        mock_emb.generate_embedding.assert_not_called()
+        mock_emb.embed_query.assert_not_called()
         mock_llm.generate_response.assert_not_called()
 
 
@@ -131,7 +131,7 @@ def test_rating_lookup_and_unrated_truthful_handling(rag_use_case):
     res1 = use_case.execute("1984 kitabı kaç puan almış?")
     assert res1["status"] == "success"
     assert "4.17" in res1["answer"]
-    mock_emb.generate_embedding.assert_not_called()
+    mock_emb.embed_query.assert_not_called()
     mock_llm.generate_response.assert_not_called()
 
     # Unrated book: must NOT fabricate 0 or NaN, must truthfully report unrated
@@ -176,4 +176,4 @@ def test_semantic_query_continues_to_retrieval_does_not_false_refuse(rag_use_cas
         res = use_case.execute(q)
         # Proves it continued to semantic retrieval rather than falsely rejecting as catalog miss
         assert res["status"] != "no_match"
-        mock_emb.generate_embedding.assert_called_once()
+        mock_emb.embed_query.assert_called_once()

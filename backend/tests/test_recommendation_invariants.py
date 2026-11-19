@@ -321,7 +321,7 @@ def test_invariant_rag_prompt_sanitization_neutralizes_tags(hostile_input, forbi
 def test_invariant_rag_grounding_rejects_hallucinated_book_explanations():
     """RAG must only attach explanations to books that were genuinely retrieved."""
     mock_emb = MagicMock()
-    mock_emb.generate_embedding.return_value = [0.1] * 768
+    mock_emb.embed_query.return_value = [0.1] * 768
 
     mock_book_port = MagicMock()
     mock_book_port.match_query_embeddings.return_value = {"9780441013593": 0.9}
@@ -366,7 +366,7 @@ def test_invariant_rag_grounding_rejects_hallucinated_book_explanations():
 def test_invariant_rag_graceful_fallback_on_llm_failure():
     """When LLM provider fails, RAG must return status 'llm_fallback' with retrieved candidates."""
     mock_emb = MagicMock()
-    mock_emb.generate_embedding.return_value = [0.1] * 768
+    mock_emb.embed_query.return_value = [0.1] * 768
 
     mock_book_port = MagicMock()
     mock_book_port.match_query_embeddings.return_value = {"9780441013593": 0.9}
@@ -413,15 +413,47 @@ def test_invariant_recommendation_reasons_are_truthful(recommender_instance):
         preferred_genres=None,
         preferred_authors=None,
     )
+    from sklearn.metrics.pairwise import cosine_similarity
+
+    def seed_cosine(seed_idx, rec):
+        """Similarity recomputed from the TF-IDF matrix, not taken from the reported field."""
+        rec_idx = recommender_instance.engine.find_index(rec["isbn13"])
+        m = recommender_instance.tfidf_matrix
+        return float(cosine_similarity(m[seed_idx], m[rec_idx])[0, 0])
+
+    seed_idx = recommender_instance.engine.find_index(seed_title)
+    assert recs_unauth, "a catalog seed must produce recommendations"
+    similar_flags = []
     for r in recs_unauth:
         assert "recommendation_reason" in r
         assert "taste profile" not in r["recommendation_reason"].lower(), (
             f"Anonymous seed recommendation falsely claimed taste profile: {r['recommendation_reason']}"
         )
-        assert (
+        sim = seed_cosine(seed_idx, r)
+        assert r["raw_similarity_score"] == pytest.approx(sim, abs=1e-6)
+        cites_seed = (
             seed_title.lower() in r["recommendation_reason"].lower()
             or "similar to" in r["recommendation_reason"].lower()
         )
+        # A book may only cite the seed if it really is similar; anything else must say it is popular.
+        assert cites_seed == (sim >= 0.05), (r["title"], sim, r["recommendation_reason"])
+        if not cites_seed:
+            assert r["recommendation_reason"] == "Popular with Libris readers"
+        similar_flags.append(cites_seed)
+    # Popularity filler alone cannot satisfy the requirement: the top result must be genuinely
+    # similar to the seed, and no popularity filler may outrank a similar book.
+    assert similar_flags[0], "the best-ranked recommendation for a seed must be similar to it"
+    assert similar_flags == sorted(similar_flags, reverse=True), similar_flags
+
+    # A seed with clear neighbours yields only similar books, no popularity filler.
+    strong_seed = "Harry Potter and the Sorcerer's Stone (Book 1)"
+    strong_idx = recommender_instance.engine.find_index(strong_seed)
+    assert strong_idx is not None
+    strong = recommender_instance.recommend(seed_titles=[strong_seed], top_n=5)
+    assert len(strong) == 5
+    for r in strong:
+        assert seed_cosine(strong_idx, r) >= 0.05, r["title"]
+        assert r["recommendation_reason"] != "Popular with Libris readers"
 
     # 2. Personalized recommendation with explicit user taste profile and low similarity to seeds
     recs_profile = recommender_instance.recommend(
@@ -529,7 +561,7 @@ def test_invariant_hierarchical_rocchio_affinity_ordering():
 def test_invariant_rag_zero_hallucination_empty_candidates():
     """When vector candidates return no matches, RAG must not hallucinate book metadata or citations."""
     mock_emb = MagicMock()
-    mock_emb.generate_embedding.return_value = [0.0] * 768
+    mock_emb.embed_query.return_value = [0.0] * 768
 
     mock_book_port = MagicMock()
     mock_book_port.match_query_embeddings.return_value = {}

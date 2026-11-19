@@ -72,7 +72,7 @@ Gemini is called through its REST API rather than the `google-genai` SDK, becaus
 Requires Python 3.12, Node.js 22 and a Supabase project (see [docs/setup.md](docs/setup.md)).
 
 ~~~bash
-# Backend: copy backend/env.example to backend/.env and fill it in
+# Backend: copy backend/.env.example to backend/.env and fill it in
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -r backend/requirements-test.txt
 python -m backend.app                               # http://localhost:5000

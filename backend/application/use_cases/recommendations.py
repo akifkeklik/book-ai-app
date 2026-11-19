@@ -427,11 +427,19 @@ class GetPersonalizedRecommendationsUseCase:
                 return recs
 
             # Semantic candidate retrieval
+            # retrieval_mode is reported in diagnostics so a vector-store failure is visible instead
+            # of looking like a healthy hybrid ranking (live audit: match_book_embeddings was
+            # missing in the database and every request silently used TF-IDF only).
             semantic_scores = None
+            retrieval_mode = "tfidf"
+            semantic_error: Optional[str] = None
             if seeds and self._book_data_port:
                 try:
                     semantic_scores = self._book_data_port.get_semantic_candidates(seeds, limit=100)
+                    retrieval_mode = "hybrid_semantic" if semantic_scores else "tfidf_no_semantic_matches"
                 except Exception as e:
+                    retrieval_mode = "tfidf_fallback"
+                    semantic_error = "semantic_unavailable"
                     logger.warning(f"Semantic candidate generation failed: {e}. Degrading to TF-IDF.")
 
             recs_limit = max(limit * 3, 30) if effective_category else max(limit * 2, 20)
@@ -570,7 +578,9 @@ class GetPersonalizedRecommendationsUseCase:
                         "filtered_count": filtered_count,
                         "is_cold_start": is_cold,
                         "evidence_coverage": profile.evidence_coverage,
-                        "fallback_reason": None,
+                        "fallback_reason": semantic_error,
+                        "retrieval_mode": retrieval_mode,
+                        "degraded": semantic_error is not None,
                         "latency_ms": latency,
                     },
                 }

@@ -265,3 +265,82 @@ def test_added_books_keep_recommendations_working_and_are_recommendable():
     recs = rec.recommend(seed_titles=["9780000000101"], top_n=5)
     assert "Tiny Habits" in [r["title"] for r in recs]
     assert rec.recommend(seed_titles=[book["isbn13"]], top_n=5)
+
+
+# ── Embedding after persistence ──────────────────────────────────────────────────────────────
+class FakeEmbeddingService:
+    def __init__(self, configured=True, vector=(0.1, 0.2), upsert_ok=True, raises=False):
+        self.configured, self.vector, self.upsert_ok, self.raises = configured, vector, upsert_ok, raises
+        self.upserts = []
+
+    def is_configured(self):
+        return self.configured
+
+    def generate_canonical_text(self, book):
+        return f"Title: {book['title']}"
+
+    def generate_content_hash(self, text):
+        return "hash:" + text
+
+    def generate_embedding(self, text):
+        if self.raises:
+            raise RuntimeError("gemini down")
+        return list(self.vector) if self.vector else None
+
+    def upsert_embedding(self, book_id, embedding, content_hash):
+        self.upserts.append((book_id, embedding, content_hash))
+        return self.upsert_ok
+
+
+def _add(port, svc, run_background=lambda fn: fn()):
+    uc = AddCatalogBookUseCase(_catalog(), port, embedding_service=svc, run_background=run_background)
+    return uc.execute(USER, {"title": "Fresh Book", "authors": "A. Writer"}, user_token="jwt")
+
+
+def test_persisted_book_is_embedded_and_upserted():
+    svc = FakeEmbeddingService()
+    book, created, persisted = _add(FakePort(), svc)
+    assert created and persisted
+    assert svc.upserts == [(book["isbn13"], [0.1, 0.2], "hash:Title: Fresh Book")]
+
+
+def test_embedding_runs_off_the_request_thread_by_default():
+    svc = FakeEmbeddingService()
+    scheduled = []
+    _add(FakePort(), svc, run_background=scheduled.append)
+    assert len(scheduled) == 1 and svc.upserts == []  # nothing embedded inline
+    scheduled[0]()
+    assert len(svc.upserts) == 1
+
+
+@pytest.mark.parametrize(
+    "svc",
+    [
+        FakeEmbeddingService(configured=False),
+        FakeEmbeddingService(vector=None),
+        FakeEmbeddingService(upsert_ok=False),
+        FakeEmbeddingService(raises=True),
+    ],
+    ids=["unconfigured", "no_vector", "upsert_refused", "gemini_raises"],
+)
+def test_embedding_failures_never_fail_book_creation(svc, caplog):
+    with caplog.at_level("WARNING"):
+        book, created, persisted = _add(FakePort(), svc)
+    assert created and persisted
+    assert any("backfill will recover" in r.message for r in caplog.records)
+
+
+def test_scheduling_failure_never_fails_book_creation():
+    def boom(fn):
+        raise RuntimeError("no threads")
+
+    book, created, persisted = _add(FakePort(), FakeEmbeddingService(), run_background=boom)
+    assert created and persisted
+
+
+@pytest.mark.parametrize("port", [FakePort(ok=False), FakePort(fail=True), None], ids=["refused", "raises", "no_db"])
+def test_unpersisted_book_is_not_embedded(port):
+    svc = FakeEmbeddingService()
+    _, created, persisted = _add(port, svc)
+    assert created and not persisted
+    assert svc.upserts == []

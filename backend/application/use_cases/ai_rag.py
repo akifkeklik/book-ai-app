@@ -17,8 +17,10 @@ from ...domain.ports import (
     EnrichmentPort,
     LlmPort,
     RecommenderPort,
+    SemanticSearchUnavailable,
     UserInteractionRepository,
 )
+from ...utils.preprocess import normalize_isbn, work_id
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +53,23 @@ def _is_generic_recommendation_query(query: str) -> bool:
         r"(?:bitte\s+)?(?:ein\s+)?buch\s+empfehlen",
     )
     return any(re.fullmatch(pattern, normalized, flags=re.IGNORECASE) for pattern in generic_patterns)
+
+
+# Healthy retrieval: may be reported as "success" and cached. Anything else is degraded.
+HEALTHY_RETRIEVAL_MODES = frozenset({"semantic", "semantic_seed_hybrid", "seed_tfidf"})
+# Extra candidates requested on top of top_k to absorb post-filter losses (missing ISBN/title,
+# duplicate works). Exclusions are applied inside the recommender, so this stays small.
+_CANDIDATE_MARGIN = 5
+
+
+def _shares_edition(book: Dict[str, Any], blocked: set) -> bool:
+    """True when any ISBN of the book (isbn13, isbn10 or a merged edition) is in `blocked`."""
+    if not blocked:
+        return False
+    isbns = {normalize_isbn(book.get("isbn13")), normalize_isbn(book.get("isbn10"))}
+    isbns |= {normalize_isbn(p) for p in str(book.get("edition_isbns") or "").split("|")}
+    isbns.discard("")
+    return bool(isbns & blocked)
 
 
 def _rank_popular_books(books: pd.DataFrame) -> pd.DataFrame:
@@ -120,6 +139,56 @@ def _clean_book_dict(book: Dict[str, Any]) -> Dict[str, Any]:
             clean["page_count"] = 0
 
     return clean
+
+
+_MSG_CATALOG_MISS = {
+    "tr": "Kataloğumuzda bu aramayla eşleşen doğrulanmış bir kitap bulunamadı. Benzer bir yazar veya tür aramayı deneyebilirsiniz.",
+    "de": "In unserem Katalog wurde kein passendes Buch gefunden. Versuchen Sie es mit einem ähnlichen Autor oder Genre.",
+    "en": "We couldn't find a verified book matching this search in our catalog. Try searching for a similar author or genre.",
+}
+_MSG_CATALOG_HIT = {
+    "tr": "Evet, kütüphanemizde aradığınız kitapla eşleşen eser bulunmaktadır: {titles}. Aşağıdaki karttan detaylarını inceleyebilirsiniz.",
+    "de": "Ja, in unserer Bibliothek ist das gesuchte Buch verfügbar: {titles}. Details finden Sie unten auf der Karte.",
+    "en": "Yes, we have a matching book in our library: {titles}. You can review the details below.",
+}
+_MSG_SEARCH_UNAVAILABLE = {
+    "tr": "Anlamsal arama şu anda kullanılamıyor. Lütfen biraz sonra tekrar deneyin veya kitap adı ya da yazarla arayın.",
+    "de": "Die semantische Suche ist derzeit nicht verfügbar. Bitte versuchen Sie es später erneut oder suchen Sie nach Titel oder Autor.",
+    "en": "Semantic search is unavailable right now. Please try again later, or search by title or author.",
+}
+
+
+_MSG_ACTION = {
+    "palette": {
+        "tr": "Vurgu renginiz başarıyla uygulandı: {label}.",
+        "de": "Ihre Akzentfarbe wurde angewendet: {label}.",
+        "en": "Your accent color has been applied: {label}.",
+    },
+    "dark": {
+        "tr": "Görünüm modu Koyu Tema (Dark Mode) olarak ayarlandı.",
+        "de": "Der dunkle Modus (Dark Mode) ist jetzt aktiv.",
+        "en": "Appearance set to Dark Mode.",
+    },
+    "light": {
+        "tr": "Görünüm modu Açık Tema (Light Mode) olarak ayarlandı.",
+        "de": "Der helle Modus (Light Mode) ist jetzt aktiv.",
+        "en": "Appearance set to Light Mode.",
+    },
+    "library": {
+        "tr": "Kütüphanenize yönlendiriliyorsunuz.",
+        "de": "Sie werden zu Ihrer Bibliothek weitergeleitet.",
+        "en": "Taking you to your library.",
+    },
+    "catalog": {
+        "tr": "Kitap kataloğuna yönlendiriliyorsunuz.",
+        "de": "Sie werden zum Buchkatalog weitergeleitet.",
+        "en": "Taking you to the book catalog.",
+    },
+}
+
+
+def _localized(lang: str, messages: Dict[str, str]) -> str:
+    return messages.get(lang, messages["en"])
 
 
 class _RagQueryCache:
@@ -208,8 +277,14 @@ def _detect_clock_intent(query: str) -> Optional[Dict[str, Any]]:
         tz = datetime.timezone(datetime.timedelta(hours=3), name="TRT")
         now = datetime.datetime.now(tz)
 
-        is_tr = bool(re.search(r"[çğıöşü]|gün|saat|tarih|bugün", q))
-        is_de = bool(re.search(r"[äöüß]|heute|tag|uhr|spät", q))
+        # Same detector as every other localized reply. The clock patterns above already
+        # established the intent, so their language-specific keywords break ties.
+        lang = _detect_language(query)
+        if lang == "en" and re.search(r"g[üu]n|saat|tarih", q):
+            lang = "tr"
+        elif lang == "en" and re.search(r"heute|uhr|sp[äa]t", q):
+            lang = "de"
+        is_tr, is_de = lang == "tr", lang == "de"
 
         if is_tr:
             days_tr = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
@@ -243,20 +318,68 @@ def _detect_clock_intent(query: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+_TR_WORDS = frozenset(
+    "ve bir bu şu için gibi ile ama mı mi mu mü var yok ne nedir hangi bana beni kitap kitaplar kitabı "
+    "kitabını öner önerir öneri tavsiye hakkında üzerine tarzı tarzında olan çok daha en neler bugün saat "
+    "tarih roman romanı romanlar kütüphane okumak istiyorum dünya klasik klasikler öykü öyküler hikaye "
+    "hikayeler şiir yazar yazarı kısa uzun güzel iyi eski yeni türk polisiye bilim kurgu ödev".split()
+)
+_DE_WORDS = frozenset(
+    "und der den dem des die das ein eine einer einem einen ist sind mit von für über auf bei im nicht auch "
+    "wie welche welcher welches gibt ich mir mich mein meine meinen bitte buch bücher heute uhr empfehle "
+    "empfiehl empfehlen bibliothek zu nach aus oder etwas kein keine ein gutes guten schön roman romane "
+    "geschichte geschichten liebe krieg".split()
+)
+_EN_WORDS = frozenset(
+    "the and of a an is are with about for like books book in to that me my by on what which some "
+    "recommend any where who how novel novels story stories".split()
+)
+# Spelling that occurs in German but not in Turkish orthography (Turkish has no w/q/x and writes
+# no ch/sch/ie/ei/eu/au/ck/tz/pf), and common German noun/adjective suffixes.
+_DE_ORTHOGRAPHY = re.compile(r"sch|ch|ie|ei|eu|äu|au|ck|tz|pf|[wqxß]")
+_DE_SUFFIX = re.compile(r"(?:ung|heit|keit|schaft|lich|chen|buch|bücher)$")
+# Turkish: y next to a vowel inside a word containing ö/ü (dünya, öykü), and plural/possessive
+# suffixes that English and German words practically never end with.
+_TR_ORTHOGRAPHY = re.compile(r"[aeıioöuü]y|y[aeıioöuü]")
+_TR_SUFFIX = re.compile(r"(?:leri|ları|lerin|ların|lerde|larda|lerden|lardan|ler[ıi]m|lar[ıi]m)$")
+
+
 def _detect_language(query: str) -> str:
-    """Detects if query is in Turkish, German, or defaults to English."""
-    q = query.lower()
-    if re.search(r"[çğıöşü]|gün|saat|tarih|bugün|kitap|kütüphane|bana|öner|neler|hangi", q):
+    """
+    Turkish, German or English, by scoring script-specific letters, common function words and
+    orthographic cues. ü and ö occur in both Turkish and German, so they decide nothing on their
+    own; a word containing them is attributed by its other spelling (Bücher -> German "ch",
+    dünya/öykü -> Turkish "y" between vowels). Ties fall back to English.
+    """
+    q = _turkish_lower(query) if re.search(r"[çğışİ]", query) else query.lower()
+    words = re.findall(r"[^\W\d_]+", q)
+    tr = 3 * len(re.findall(r"[çğış]", q)) + sum(w in _TR_WORDS for w in words)
+    de = 3 * len(re.findall(r"[äß]", q)) + sum(w in _DE_WORDS for w in words)
+    en = sum(w in _EN_WORDS for w in words)
+    for w in words:
+        if w in _TR_WORDS or w in _DE_WORDS or w in _EN_WORDS:
+            continue
+        german = bool(_DE_SUFFIX.search(w)) and len(w) >= 6
+        turkish = bool(_TR_SUFFIX.search(w)) and len(w) >= 6
+        if re.search(r"[öü]", w):
+            german = german or bool(_DE_ORTHOGRAPHY.search(w))
+            turkish = turkish or (not german and bool(_TR_ORTHOGRAPHY.search(w)))
+        if german and not turkish:
+            de += 1
+        elif turkish and not german:
+            tr += 1
+    if tr > max(de, en):
         return "tr"
-    if re.search(r"[äöüß]|heute|tag|uhr|spät|buch|bücher|bibliothek|empfehle", q):
+    if de > max(tr, en):
         return "de"
     return "en"
 
 
-def _detect_action_intent(query: str) -> Optional[Dict[str, Any]]:
+def _detect_action_intent(query: str, lang: str = "tr") -> Optional[Dict[str, Any]]:
     """
     Detects safe user commands to change theme, accent palette, language, or navigate.
-    Returns typed UI action payload with verified allowlist values.
+    Returns typed UI action payload with verified allowlist values; the confirmation follows the
+    query language.
     """
     q = query.lower()
 
@@ -282,7 +405,7 @@ def _detect_action_intent(query: str) -> Optional[Dict[str, Any]]:
                 "turquoise": "Turquoise (Turkuaz)",
             }
             return {
-                "answer": f"Vurgu renginiz başarıyla uygulandı: {labels[palette_id]}.",
+                "answer": _localized(lang, _MSG_ACTION["palette"]).format(label=labels[palette_id]),
                 "referenced_books": [],
                 "status": "action_executed",
                 "action": {
@@ -296,7 +419,7 @@ def _detect_action_intent(query: str) -> Optional[Dict[str, Any]]:
         kw in q for kw in ["tema", "mod", "mode", "görünüm", "theme", "modus", "yap", "geç"]
     ):
         return {
-            "answer": "Görünüm modu Koyu Tema (Dark Mode) olarak ayarlandı.",
+            "answer": _localized(lang, _MSG_ACTION["dark"]),
             "referenced_books": [],
             "status": "action_executed",
             "action": {
@@ -308,7 +431,7 @@ def _detect_action_intent(query: str) -> Optional[Dict[str, Any]]:
         kw in q for kw in ["tema", "mod", "mode", "görünüm", "theme", "modus", "yap", "geç"]
     ):
         return {
-            "answer": "Görünüm modu Açık Tema (Light Mode) olarak ayarlandı.",
+            "answer": _localized(lang, _MSG_ACTION["light"]),
             "referenced_books": [],
             "status": "action_executed",
             "action": {
@@ -352,7 +475,7 @@ def _detect_action_intent(query: str) -> Optional[Dict[str, Any]]:
     # 4. Navigation intent
     if any(p in q for p in ["kütüphanem", "kütüphaneye git", "my library", "open library", "meine bibliothek"]):
         return {
-            "answer": "Kütüphanenize yönlendiriliyorsunuz.",
+            "answer": _localized(lang, _MSG_ACTION["library"]),
             "referenced_books": [],
             "status": "action_executed",
             "action": {
@@ -362,7 +485,7 @@ def _detect_action_intent(query: str) -> Optional[Dict[str, Any]]:
         }
     if any(p in q for p in ["kataloğu aç", "kataloga git", "open catalog", "katalog", "alle bücher"]):
         return {
-            "answer": "Kitap kataloğuna yönlendiriliyorsunuz.",
+            "answer": _localized(lang, _MSG_ACTION["catalog"]),
             "referenced_books": [],
             "status": "action_executed",
             "action": {
@@ -512,14 +635,14 @@ class ProcessRagQueryUseCase:
             return RAGResponse(**clock_result).model_dump()
 
         # Step 2: Deterministic Action Intent Check
-        action_result = _detect_action_intent(query)
+        lang = _detect_language(query)
+        action_result = _detect_action_intent(query, lang)
         if action_result is not None:
             lat = round((time.time() - t_total_start) * 1000, 2)
             action_result["latency_ms"] = lat
             action_result["metrics"] = {"source": "deterministic_action", "total_rag_latency_ms": lat}
             return RAGResponse(**action_result).model_dump()
 
-        lang = _detect_language(query)
         norm_query_key = _turkish_lower(" ".join(query.strip().split()))
         auth_tag = f"user:{user_id}" if user_id is not None else "anon"
         cache_key = f"{lang}:{auth_tag}:{norm_query_key}"
@@ -575,11 +698,10 @@ class ProcessRagQueryUseCase:
         catalog_matches = self._lookup_catalog_candidates(query)
         cat_latency = round((time.time() - t_cat_start) * 1000, 2)
 
-        # Only unqualified requests may use the deterministic popular-books fallback.
-        is_generic_rec = _is_generic_recommendation_query(query)
         # Detect if user asks for recommendations similar to a book (seed exclusion invariant)
         is_similar_query = bool(re.search(r"(benzer|benzeyen|similar\s+to|like|recommend\s+based\s+on)", query, re.IGNORECASE))
-        seed_titles = [m.get("title") for m in catalog_matches if m.get("title")] if is_similar_query else []
+        # Seeds are identified by ISBN (edition-aware), not title: different books can share a title.
+        seed_ids = [str(m.get("isbn13")) for m in catalog_matches if m.get("isbn13")] if is_similar_query else []
 
         # If it's a straightforward catalog inquiry (existence, rating, or author), bypass LLM and embeddings!
         if not is_similar_query:
@@ -602,7 +724,7 @@ class ProcessRagQueryUseCase:
                 if not catalog_matches:
                     lat = round((time.time() - t_total_start) * 1000, 2)
                     res = RAGResponse(
-                        answer="Kataloğumuzda bu aramayla eşleşen doğrulanmış bir kitap bulunamadı. Kataloğumuzdaki 6.400'den fazla diğer kitabı keşfetmek için benzer bir yazar veya tür aramayı deneyebilirsiniz.",
+                        answer=_localized(lang, _MSG_CATALOG_MISS),
                         referenced_books=[],
                         status="no_match",
                         action=None,
@@ -733,29 +855,60 @@ class ProcessRagQueryUseCase:
                 self._cache.set(cache_key, res)
                 return res
 
-        # Step 4: Semantic Discovery / Embedding
+        # Step 4: Semantic retrieval (query embedding -> vector search).
+        # Every response below carries metrics.retrieval_mode. Only HEALTHY_RETRIEVAL_MODES are
+        # reported as status "success" and cached. When the embedding provider or the vector
+        # store fails, the answer is labelled with the degraded mode, never cached, and the next
+        # request retries semantic retrieval, so a recovered backend is used immediately.
+        is_generic_rec = _is_generic_recommendation_query(query)
         t_emb_start = time.time()
         embedding = None
+        degraded_reason: Optional[str] = None
         try:
-            embedding = self._embedding_port.generate_embedding(query)
+            embedding = self._embedding_port.embed_query(query)
+        except SemanticSearchUnavailable as emb_refused:
+            # e.g. stored vectors were produced with a different embedding profile
+            degraded_reason = "semantic_unavailable"
+            logger.error(f"Query embedding refused: {emb_refused}")
         except Exception as emb_exc:
             logger.warning(f"Embedding error: {emb_exc}")
-
         emb_latency = round((time.time() - t_emb_start) * 1000, 2)
+        if not embedding and degraded_reason is None:
+            degraded_reason = "embedding_failed"
 
+        t_ret_start = time.time()
         retrieved_books: List[Dict[str, Any]] = []
+        retrieval_mode = degraded_reason or "semantic"
         if embedding:
-            t_ret_start = time.time()
-            retrieved_books = self._retrieve_books_by_embedding(
-                embedding, top_k=5, user_id=user_id, seed_titles=seed_titles
+            try:
+                retrieved_books, retrieval_mode = self._semantic_retrieval(
+                    embedding, top_k=5, user_id=user_id, seed_ids=seed_ids
+                )
+            except SemanticSearchUnavailable as vs_err:
+                degraded_reason = retrieval_mode = "semantic_unavailable"
+                logger.error(
+                    "Vector search unavailable; RAG is degrading to fallback retrieval",
+                    extra={"extra_data": {"error": str(vs_err), "status": "semantic_unavailable"}},
+                )
+        if degraded_reason and not is_generic_rec:
+            retrieved_books = self._fallback_retrieval(
+                query, lang, top_k=5, user_id=user_id, seed_ids=seed_ids
             )
-            retrieval_latency = round((time.time() - t_ret_start) * 1000, 2)
-        else:
-            retrieval_latency = 0.0
+            if retrieved_books:
+                retrieval_mode = "seed_tfidf_fallback" if seed_ids else "lexical_fallback"
+        retrieval_latency = round((time.time() - t_ret_start) * 1000, 2)
+        degraded = degraded_reason is not None or retrieval_mode not in HEALTHY_RETRIEVAL_MODES
+        response_status = retrieval_mode if degraded else "success"
 
-        if embedding is None and not catalog_matches and is_generic_rec and user_id is None:
-            # Generic anonymous recommendations must remain available when the
-            # embedding provider is temporarily unavailable. Use only catalog data.
+        def _retrieval_metrics(mode: str) -> Dict[str, Any]:
+            out: Dict[str, Any] = {"retrieval_mode": mode, "degraded": degraded}
+            if degraded:
+                out["degraded_reason"] = degraded_reason or mode
+            return out
+
+        if degraded and not catalog_matches and is_generic_rec and user_id is None:
+            # Generic anonymous recommendations stay available while semantic retrieval is down,
+            # using catalog popularity only. Labelled as a fallback and never cached.
             catalog_df = getattr(self._recommender, "df", None)
             if catalog_df is not None and not catalog_df.empty and "average_rating" in catalog_df.columns:
                 popular_df = catalog_df.copy()
@@ -792,7 +945,7 @@ class ProcessRagQueryUseCase:
                                 Recommendation(**_clean_book_dict(book))
                                 for book in enriched
                             ],
-                            status="success",
+                            status="popular_fallback",
                             action=None,
                             latency_ms=lat,
                             metrics={
@@ -800,51 +953,51 @@ class ProcessRagQueryUseCase:
                                 "candidate_count": len(enriched),
                                 "embedding_latency_ms": emb_latency,
                                 "total_rag_latency_ms": lat,
+                                **_retrieval_metrics("popular_fallback"),
                             },
                         ).model_dump()
 
-        if embedding is None and not catalog_matches:
+        if degraded and not retrieved_books and not catalog_matches:
             lat = round((time.time() - t_total_start) * 1000, 2)
             logger.warning(
-                "Embedding generation failed. RAG blocked.",
-                extra={
-                    "extra_data": {
-                        "embedding_latency_ms": emb_latency,
-                        "status": "embedding_failed",
-                    }
-                },
+                "Semantic retrieval failed and no fallback candidates were found. RAG blocked.",
+                extra={"extra_data": {"embedding_latency_ms": emb_latency, "status": retrieval_mode}},
             )
             return RAGResponse(
-                answer="I'm having trouble understanding your query right now. Please try again later.",
+                answer=_localized(lang, _MSG_SEARCH_UNAVAILABLE),
                 referenced_books=[],
-                status="embedding_failed",
+                status=retrieval_mode,
                 action=None,
                 latency_ms=lat,
-                metrics={"embedding_latency_ms": emb_latency, "total_rag_latency_ms": lat, "status": "embedding_failed"},
+                metrics={"embedding_latency_ms": emb_latency, "total_rag_latency_ms": lat,
+                         "status": retrieval_mode, **_retrieval_metrics(retrieval_mode)},
             ).model_dump()
 
-        # Combine exact catalog matches with vector retrieved books (prioritizing exact matches)
+        # Combine exact catalog matches with retrieved books (exact matches first). Duplicates are
+        # detected by ISBN and by work identity, not by title alone, so two different books that
+        # share a title both survive.
         combined_books: List[Dict[str, Any]] = []
         seen_isbns = set()
-        seen_titles = set()
+        seen_works = set()
 
-        if is_similar_query and seed_titles:
-            seed_set = {s.lower() for s in seed_titles}
-            all_candidates = [b for b in retrieved_books if str(b.get("title", "")).lower() not in seed_set]
+        if is_similar_query and seed_ids:
+            seed_editions = self._edition_closure(seed_ids)
+            all_candidates = [b for b in retrieved_books if not _shares_edition(b, seed_editions)]
         else:
             all_candidates = catalog_matches + retrieved_books
 
         for b in all_candidates:
             if not isinstance(b, dict):
                 continue
-            isbn = str(b.get("isbn13") or "").strip()
+            isbn = normalize_isbn(b.get("isbn13"))
             title = str(b.get("title") or "").strip()
             if not isbn or not title:
                 continue
-            if isbn in seen_isbns or title.lower() in seen_titles:
+            work = work_id(title, b.get("authors"))
+            if isbn in seen_isbns or work in seen_works:
                 continue
             seen_isbns.add(isbn)
-            seen_titles.add(title.lower())
+            seen_works.add(work)
             combined_books.append(b)
             if len(combined_books) >= 5:
                 break
@@ -856,7 +1009,7 @@ class ProcessRagQueryUseCase:
         enrichment_latency = round((time.time() - t_enr_start) * 1000, 2)
 
         # Check for a truly generic request without a book/topic constraint.
-        is_generic_rec = _is_generic_recommendation_query(query) and not is_similar_query
+        is_generic_rec = is_generic_rec and not is_similar_query
         if is_generic_rec and user_id is None and combined_books:
             if lang == "tr":
                 rec_msg = "Henüz oturum açmadığınız ve geçmiş okuma tercihlerinize erişim olmadığı için, Libris kataloğundaki en yüksek puanlı popüler eserlerden bir seçki sunuyorum:"
@@ -868,7 +1021,7 @@ class ProcessRagQueryUseCase:
             res = RAGResponse(
                 answer=rec_msg,
                 referenced_books=[Recommendation(**_clean_book_dict(b)) for b in combined_books],
-                status="success",
+                status=response_status,
                 action=None,
                 latency_ms=lat,
                 metrics={
@@ -879,9 +1032,11 @@ class ProcessRagQueryUseCase:
                     "total_rag_latency_ms": lat,
                     "candidate_count": len(combined_books),
                     "source": "curated_anonymous_rec",
+                    **_retrieval_metrics(retrieval_mode),
                 },
             ).model_dump()
-            self._cache.set(cache_key, res)
+            if not degraded:
+                self._cache.set(cache_key, res)
             return res
 
         # If no candidates found anywhere
@@ -899,7 +1054,8 @@ class ProcessRagQueryUseCase:
                 status="empty_retrieval",
                 action=None,
                 latency_ms=lat,
-                metrics={"total_rag_latency_ms": lat, "source": "empty_retrieval"},
+                metrics={"total_rag_latency_ms": lat, "source": "empty_retrieval",
+                         **_retrieval_metrics(retrieval_mode)},
             ).model_dump()
 
         # Step 5: Build Grounded Context
@@ -940,6 +1096,7 @@ class ProcessRagQueryUseCase:
             "total_rag_latency_ms": total_lat,
             "candidate_count": len(combined_books),
             "source": "rag_llm",
+            **_retrieval_metrics(retrieval_mode),
         }
 
         if not raw_answer:
@@ -948,7 +1105,7 @@ class ProcessRagQueryUseCase:
             is_existence_check = bool(re.search(r"(var\s*m[ıi]|kitab[ıi]|do\s+you\s+have|gibt\s+es)", query, re.IGNORECASE))
             if is_existence_check and catalog_matches:
                 titles = ", ".join([f"'{b.get('title')}' ({b.get('authors')})" for b in catalog_matches[:2]])
-                fallback_answer = f"Evet, kütüphanemizde aradığınız kitapla eşleşen eser bulunmaktadır: {titles}. Aşağıdaki karttan detaylarını inceleyebilirsiniz."
+                fallback_answer = _localized(lang, _MSG_CATALOG_HIT).format(titles=titles)
             elif lang == "tr":
                 fallback_answer = "Kişiselleştirilmiş bir yanıt oluşturulamadı, ancak aramanızla eşleşen katalog kayıtları aşağıda listelenmiştir:"
             elif lang == "de":
@@ -999,17 +1156,43 @@ class ProcessRagQueryUseCase:
         except (json.JSONDecodeError, AttributeError, TypeError, ValueError) as parse_err:
             logger.warning(f"LLM output was not valid JSON, returning raw text: {parse_err}")
 
-        logger.info("RAG request successful", extra={"extra_data": {**metrics, "status": "success"}})
+        logger.info(
+            "RAG request successful" if not degraded else "RAG request served degraded",
+            extra={"extra_data": {**metrics, "status": response_status}},
+        )
         res = RAGResponse(
             answer=answer_text,
             referenced_books=[Recommendation(**_clean_book_dict(book)) for book in combined_books],
-            status="success",
+            status=response_status,
             action=None,
             latency_ms=total_lat,
             metrics=metrics,
         ).model_dump()
-        self._cache.set(cache_key, res)
+        if not degraded:
+            # Degraded answers are not cached, so the next request retries semantic retrieval.
+            self._cache.set(cache_key, res)
         return res
+
+    def _user_library(self, user_id: Optional[str]) -> tuple:
+        """(library ISBNs, disliked ISBNs) for a signed-in user; both are used only for exclusion."""
+        library: List[str] = []
+        dislikes: List[str] = []
+        if user_id and self._interaction_repo:
+            try:
+                for f in self._interaction_repo.get_user_interactions(user_id) or []:
+                    if not isinstance(f, dict):
+                        continue
+                    bid = str(f.get("book_id") or "").strip()
+                    if not bid:
+                        continue
+                    itype = f.get("interaction_type")
+                    if itype == "dislike":
+                        dislikes.append(bid)
+                    elif itype in ("like", "favorite", "want_to_read", "reading", "finished"):
+                        library.append(bid)
+            except Exception as repo_err:
+                logger.warning(f"Failed to fetch user interactions in RAG: {repo_err}")
+        return library, dislikes
 
     def _retrieve_books_by_embedding(
         self,
@@ -1018,83 +1201,142 @@ class ProcessRagQueryUseCase:
         user_id: Optional[str] = None,
         seed_titles: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
-        dislikes: List[str] = []
-        likes: List[str] = []
-        if user_id and self._interaction_repo:
-            try:
-                interactions_data = self._interaction_repo.get_user_interactions(user_id)
-                if isinstance(interactions_data, list):
-                    for f in interactions_data:
-                        if not isinstance(f, dict):
-                            continue
-                        bid = f.get("book_id")
-                        itype = f.get("interaction_type")
-                        if not bid:
-                            continue
-                        bid_str = str(bid).strip()
-                        if not bid_str:
-                            continue
-                        if itype == "dislike":
-                            dislikes.append(bid_str)
-                        elif itype in ("like", "favorite", "want_to_read", "reading", "finished"):
-                            likes.append(bid_str)
-            except Exception as repo_err:
-                logger.warning(f"Failed to fetch user interactions in RAG: {repo_err}")
+        """Books for a query embedding; see _semantic_retrieval."""
+        return self._semantic_retrieval(embedding, top_k=top_k, user_id=user_id, seed_ids=seed_titles)[0]
 
-        semantic_scores: Dict[str, float] = {}
-        if self._book_data_port:
-            try:
-                semantic_scores = self._book_data_port.match_query_embeddings(embedding, limit=100) or {}
-            except Exception as e:
-                logger.error(f"Error in vector retrieval: {e}")
+    def _semantic_retrieval(
+        self,
+        embedding: List[float],
+        top_k: int = 5,
+        user_id: Optional[str] = None,
+        seed_ids: Optional[List[str]] = None,
+    ) -> tuple:
+        """
+        Query-embedding retrieval -> (books, retrieval_mode). The query decides relevance: the
+        user's library is only an exclusion list (books they already have), not a TF-IDF taste
+        profile competing with the question. Raises SemanticSearchUnavailable when vector search
+        cannot run.
 
-        # If neither semantic scores nor user likes are available, we cannot ground candidates
-        if not semantic_scores and not likes and not seed_titles:
+        retrieval_mode: "semantic" (vector scores only), "semantic_seed_hybrid" (vector scores
+        plus TF-IDF similarity to the seed books of a "similar to X" query) or "seed_tfidf"
+        (vector search ran but returned nothing, so only the seed TF-IDF ranking was used).
+        """
+        if not self._book_data_port:
+            raise SemanticSearchUnavailable("no book data port configured")
+        try:
+            semantic_scores = self._book_data_port.match_query_embeddings(embedding, limit=100)
+        except SemanticSearchUnavailable:
+            raise
+        except Exception as e:  # adapters raise SemanticSearchUnavailable; stay strict for others
+            raise SemanticSearchUnavailable(f"vector retrieval failed: {e}") from e
+        if semantic_scores is None:
+            semantic_scores = {}
+        if not isinstance(semantic_scores, dict):
+            raise SemanticSearchUnavailable(
+                f"vector retrieval returned {type(semantic_scores).__name__}, expected a dict"
+            )
+
+        seed_ids = list(seed_ids or [])
+        if not seed_ids:
+            mode = "semantic"
+        else:
+            mode = "semantic_seed_hybrid" if semantic_scores else "seed_tfidf"
+        if not semantic_scores and not seed_ids:
+            return [], mode
+        library, dislikes = self._user_library(user_id)
+        books = self._rank_candidates(
+            top_k, library, dislikes, seed_ids, seed_titles=seed_ids, semantic_scores=semantic_scores,
+        )
+        return books, mode
+
+    def _fallback_retrieval(
+        self, query: str, lang: str, top_k: int, user_id: Optional[str], seed_ids: List[str]
+    ) -> List[Dict[str, Any]]:
+        """
+        Used only when semantic retrieval is unavailable. "Similar to <catalog book>" queries use
+        the TF-IDF similar-books ranking, which works in any language because the seed is a
+        catalog book. Free-text queries use TF-IDF lexical search for English only: the catalog
+        text is English, so lexical matching cannot bridge Turkish/German queries (on the
+        provisional offline labels those scored far below English), and a weak lexical list is
+        not presented as an answer.
+        """
+        if not self._recommender:
+            return []
+        library, dislikes = self._user_library(user_id)
+        try:
+            if seed_ids:
+                return self._rank_candidates(top_k, library, dislikes, seed_ids, seed_titles=seed_ids)
+            if lang != "en" or not hasattr(self._recommender, "lexical_search"):
+                return []
+            exclusions = list(library) + list(dislikes)
+            # Exclusions are applied inside the ranking, so the request stays bounded no matter
+            # how large the user's library is.
+            extra = {"exclude": exclusions} if exclusions else {}
+            hits = self._recommender.lexical_search(query, limit=top_k + _CANDIDATE_MARGIN, **extra)
+            return self._filter_candidates(hits, top_k, library, dislikes, [])
+        except Exception as e:
+            logger.error(f"Fallback retrieval failed: {e}")
             return []
 
+    def _rank_candidates(self, top_k, library, dislikes, exclude_ids, **recommend_args) -> List[Dict[str, Any]]:
+        """
+        Ranks with the recommender. Library books are passed as `exclude`, which the recommender
+        applies to every edition before ranking, so a reader with hundreds of books still gets
+        top_k results; the request size stays top_k + a small margin.
+        """
+        extra = {"exclude": list(library)} if library else {}
         try:
-            seeds = seed_titles or likes
             raw_recs = self._recommender.recommend(
-                seed_titles=seeds,
-                top_n=top_k + (len(seed_titles) if seed_titles else 0),
+                top_n=top_k + _CANDIDATE_MARGIN,
                 use_diversity=True,
-                semantic_scores=semantic_scores,
                 dislikes=dislikes,
+                **extra,
+                **recommend_args,
             )
-            enriched_candidates = self._enrichment_service.enrich(raw_recs)
-
-            unique_books: List[Dict[str, Any]] = []
-            seen_isbns = set()
-            seen_titles = set()
-            dislike_set = {d.lower() for d in dislikes}
-            seed_set = {s.lower() for s in (seed_titles or [])}
-
-            for book in enriched_candidates:
-                if not isinstance(book, dict):
-                    continue
-                isbn = str(book.get("isbn13") or "").strip()
-                title = str(book.get("title") or "").strip()
-                if not isbn or not title:
-                    continue
-                # Invariant: Disliked books are strictly excluded
-                if isbn.lower() in dislike_set or title.lower() in dislike_set:
-                    continue
-                # Invariant: Seed book is excluded from similar recommendations
-                if title.lower() in seed_set:
-                    continue
-                if isbn in seen_isbns or title.lower() in seen_titles:
-                    continue
-                seen_isbns.add(isbn)
-                seen_titles.add(title.lower())
-                unique_books.append(book)
-                if len(unique_books) >= top_k:
-                    break
-
-            return unique_books
-
         except Exception as e:
             logger.error(f"Error in recommendation retrieval: {e}")
             return []
+        return self._filter_candidates(raw_recs, top_k, library, dislikes, exclude_ids)
+
+    def _edition_closure(self, isbns: List[str]) -> set:
+        """The given ISBNs plus every edition ISBN of the catalog works they belong to."""
+        ids = [str(i).strip() for i in isbns or [] if str(i or "").strip()]
+        out = {normalize_isbn(i) for i in ids}
+        expand = getattr(self._recommender, "edition_isbns", None)
+        if ids and callable(expand):
+            try:
+                extra = expand(ids)
+                if isinstance(extra, (set, frozenset, list, tuple)):
+                    out |= {normalize_isbn(x) for x in extra}
+            except Exception as e:
+                logger.warning(f"Edition lookup failed; excluding exact ISBNs only: {e}")
+        out.discard("")
+        return out
+
+    def _filter_candidates(self, books, top_k, library, dislikes, exclude_ids) -> List[Dict[str, Any]]:
+        """Drops disliked books, books already in the user's library (any edition), seeds and duplicates."""
+        enriched = self._enrichment_service.enrich(books) if self._enrichment_service else books
+        blocked = self._edition_closure(list(library) + list(dislikes) + list(exclude_ids))
+        unique_books: List[Dict[str, Any]] = []
+        seen_isbns, seen_works = set(), set()
+        for book in enriched or []:
+            if not isinstance(book, dict):
+                continue
+            isbn = normalize_isbn(book.get("isbn13"))
+            title = str(book.get("title") or "").strip()
+            if not isbn or not title:
+                continue
+            if _shares_edition(book, blocked):
+                continue
+            work = work_id(title, book.get("authors"))
+            if isbn in seen_isbns or work in seen_works:
+                continue
+            seen_isbns.add(isbn)
+            seen_works.add(work)
+            unique_books.append(book)
+            if len(unique_books) >= top_k:
+                break
+        return unique_books
 
     def _build_context(self, books: List[Dict[str, Any]]) -> str:
         parts = []

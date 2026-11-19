@@ -141,3 +141,74 @@ def disliked_violation_rate(recommended: List[str], dislikes: Set[str], k: int =
     violations = sum(1 for item in rec_k if str(item).strip().replace("-", "").lower() in clean_dislikes)
     return float(violations) / float(len(rec_k))
 
+
+
+# ── Graded relevance metrics (query-to-item and seed-to-item retrieval) ──────
+#
+# These operate on ranked lists of *work ids* (edition-aware identities, see
+# evaluation/retrieval/catalog.py) and graded judgments {work_id: 0|1|2}.
+# Repeated work ids in a ranked list earn no gain after their first occurrence,
+# so duplicate editions cannot inflate a score. Unjudged items count as 0 and
+# are surfaced separately through judged_at_k().
+
+
+def _dedup_gains(ranked: List[str], grades: dict, k: int) -> List[int]:
+    seen: Set[str] = set()
+    gains: List[int] = []
+    for item in ranked[:k]:
+        if item in seen:
+            gains.append(0)
+            continue
+        seen.add(item)
+        gains.append(int(grades.get(item, 0)))
+    return gains
+
+
+def graded_precision_at_k(ranked: List[str], grades: dict, k: int = 5, min_grade: int = 1) -> float:
+    """Fraction of the k slots holding a distinct item with grade >= min_grade."""
+    if k <= 0:
+        return 0.0
+    return sum(1 for g in _dedup_gains(ranked, grades, k) if g >= min_grade) / float(k)
+
+
+def graded_recall_at_k(ranked: List[str], grades: dict, k: int = 5, min_grade: int = 1) -> float:
+    """Recall over the judged relevant set; only meaningful when that set is complete."""
+    relevant = {i for i, g in grades.items() if g >= min_grade}
+    if not relevant:
+        return 0.0
+    hits = {i for i in ranked[:k] if i in relevant}
+    return len(hits) / float(len(relevant))
+
+
+def mean_reciprocal_rank(ranked: List[str], grades: dict, k: int = 10, min_grade: int = 1) -> float:
+    """1/rank of the first item with grade >= min_grade within the top k (0 if none)."""
+    for pos, g in enumerate(_dedup_gains(ranked, grades, k), start=1):
+        if g >= min_grade:
+            return 1.0 / pos
+    return 0.0
+
+
+def graded_ndcg_at_k(ranked: List[str], grades: dict, k: int = 5) -> float:
+    """nDCG@k with exponential gain (2^grade - 1); ideal ranking built from all judgments."""
+    gains = _dedup_gains(ranked, grades, k)
+    dcg = sum((2**g - 1) / math.log2(i + 2) for i, g in enumerate(gains))
+    ideal = sorted((int(g) for g in grades.values() if int(g) > 0), reverse=True)[:k]
+    idcg = sum((2**g - 1) / math.log2(i + 2) for i, g in enumerate(ideal))
+    return dcg / idcg if idcg > 0 else 0.0
+
+
+def judged_at_k(ranked: List[str], grades: dict, k: int = 5) -> float:
+    """Fraction of the top-k that has a judgment; low values mean the metric is unreliable."""
+    top = ranked[:k]
+    if not top:
+        return 0.0
+    return sum(1 for i in top if i in grades) / float(len(top))
+
+
+def intra_list_distance(items: List[Any], distance, k: int = 5) -> float:
+    """Mean pairwise distance(a, b) over the top-k items, for any distance function."""
+    top = items[:k]
+    pairs = [(a, b) for i, a in enumerate(top) for b in top[i + 1:]]
+    if not pairs:
+        return 0.0
+    return sum(distance(a, b) for a, b in pairs) / float(len(pairs))

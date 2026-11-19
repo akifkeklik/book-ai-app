@@ -227,7 +227,10 @@ def test_unauthenticated_generic_recommendation(client, auth_headers):
     )
     assert resp.status_code == 200
     data = resp.get_json()
-    assert data["status"] == "success"
+    # Without embeddings/vector search (the test environment) this is the popularity fallback;
+    # it may only claim "success" when semantic retrieval actually ran.
+    assert data["status"] in ("success", "popular_fallback")
+    assert (data["status"] == "success") == (data["metrics"]["degraded"] is False)
     # Transparently states that user is anonymous without history
     assert "oturum açmadığınız" in data["answer"] or "popüler" in data["answer"]
     assert len(data.get("referenced_books", [])) > 0

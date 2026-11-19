@@ -94,12 +94,24 @@ class NoteReviewRepository(Protocol):
     def delete_review_by_note_id(self, note_id: str, user_id: str) -> bool: ...
 
 
+class SemanticSearchUnavailable(RuntimeError):
+    """
+    Vector retrieval cannot run in this configuration (no pgvector table/RPC, or the vector
+    store failed). Distinct from an empty result: callers must fall back explicitly instead
+    of treating the failure as "no semantically similar books".
+    """
+
+
 class BookDataPort(Protocol):
-    def get_semantic_candidates(self, likes: List[str], limit: int = 100) -> Dict[str, float]: ...
+    def get_semantic_candidates(self, likes: List[str], limit: int = 100) -> Dict[str, float]:
+        """Books nearest the centroid of the seeds' embeddings. Raises SemanticSearchUnavailable."""
+        ...
 
     def match_query_embeddings(
         self, embedding: List[float], limit: int = 100
-    ) -> Dict[str, float]: ...
+    ) -> Dict[str, float]:
+        """{book_id: cosine similarity} for a query embedding. Raises SemanticSearchUnavailable."""
+        ...
 
     def get_books_by_isbns(self, isbns: List[str]) -> List[Dict[str, Any]]: ...
 
@@ -114,6 +126,10 @@ class BookDataPort(Protocol):
     def upsert_embedding(
         self, book_id: str, embedding: List[float], content_hash: str, model_version: str
     ) -> None: ...
+
+    def find_other_embedding_profiles(self, accepted: List[str], limit: int = 5) -> List[str]:
+        """Up to `limit` stored model_version values not in `accepted` (empty when all match)."""
+        ...
 
     def check_health(self) -> bool: ...
 
@@ -132,7 +148,13 @@ class LlmPort(Protocol):
 
 
 class EmbeddingPort(Protocol):
-    def generate_embedding(self, text: str, max_retries: int = 3) -> Optional[List[float]]: ...
+    def generate_embedding(self, text: str, max_retries: int = 3) -> Optional[List[float]]:
+        """Embedding of a catalog document (canonical book text)."""
+        ...
+
+    def embed_query(self, query: str) -> Optional[List[float]]:
+        """Embedding of a user search query, in the space of the stored document embeddings."""
+        ...
 
 
 class RecommenderPort(Protocol):
@@ -147,7 +169,10 @@ class RecommenderPort(Protocol):
         preferred_genres: Optional[List[str]] = None,
         preferred_authors: Optional[List[str]] = None,
         seed_sources: Optional[Dict[str, str]] = None,
-    ) -> List[Dict[str, Any]]: ...
+        exclude: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """`exclude`: ISBNs (any edition) never to return, applied before ranking."""
+        ...
 
 
 class CatalogPort(Protocol):
