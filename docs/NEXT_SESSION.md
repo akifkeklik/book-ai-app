@@ -6,7 +6,7 @@ Branch: `ai-subsystem-audit` · Ana commit: `9bc8f0a` (bu notu ekleyen docs comm
 
 - AI alt sistem audit'indeki tüm kaynak kod, test, değerlendirme (evaluation) verisi ve raporlar tek commit'te toplandı (`9bc8f0a`, 69 dosya).
 - `backend/env.example` → `backend/.env.example` taşıması tamamlandı. Dosya çalışma ağacında eksikti; index'teki kopyasından geri yüklendi.
-- Kök dizindeki `.env.example` silinmesi **commit edilmedi**. Dosya repoda duruyor, yalnızca yerel diskte silinmiş halde (bkz. madde 5).
+- Tek env şablonu: `backend/.env.example` (kökteki eski, eksik `.env.example` kaldırıldı). Doküman ve script'ler artık doğru hedefi, yani kök `.env`'i gösteriyor (PR #95).
 - Kökteki `launch_dev.ps1`, `status_dev.ps1`, `stop_dev.ps1` sarmalayıcıları kaldırıldı. Asıl betikler `scripts/` altında duruyor ve README de onları gösteriyor.
 - `ruff check backend/` hatasız geçecek şekilde yeni test/script dosyalarındaki 13 lint hatası düzeltildi (import sırası, kullanılmayan import, `;` ile birleştirilmiş satırlar, fixture re-export için `# ruff: noqa: F811`). Davranış değişmedi.
 - Yerel `.env` içindeki `LLM_API_KEY` ve `GEMINI_API_KEY` yeni anahtara güncellendi. `.env` git'te ignore ediliyor, commit edilmedi.
@@ -34,11 +34,10 @@ Branch: `ai-subsystem-audit` · Ana commit: `9bc8f0a` (bu notu ekleyen docs comm
 
 - `9bc8f0a`: AI subsystem audit commit'i.
 - Ardından bu dosya ayrı bir docs commit'iyle eklendi.
-- Push: `origin/ai-subsystem-audit` (force push kullanılmadı). Sonucu `git log origin/ai-subsystem-audit -2` ile kontrol edin.
+- Push: `origin/ai-subsystem-audit` (force push yok). PR: #95 (merge edilmedi). Dependabot PR'ları #87–#94 merge edildi, #91 (gotrue) supabase pini yüzünden kapatıldı.
 
 ## 5. Commit edilmeyen değişiklikler
 
-- `.env.example` (kök): yerelde silinmiş, silinmesi commit edilmedi. Kök `.env`'in şablonu buydu ve `config.py` kök `.env`'i okuyor; silmek mi tutmak mı yarın karar verilmeli. Geri getirmek için: `git restore .env.example`.
 - `.env` (kök): gizli bilgi, ignore ediliyor, asla commit edilmez.
 - `backend/evaluation/cache/` (`book_embeddings.npz`, `embedding_consistency.json`): üretim embedding snapshot'ı, ignore ediliyor.
 - `web/node_modules`, `web/.next`: `npm ci` / build çıktısı, ignore ediliyor.
@@ -62,7 +61,7 @@ Branch: `ai-subsystem-audit` · Ana commit: `9bc8f0a` (bu notu ekleyen docs comm
 
 1. **Supabase anahtar uyumsuzluğunu çöz:** ya `.env`'e Dashboard → Project Settings → API Keys → *Legacy API keys* altındaki `anon` JWT'yi koy, ya da `supabase-py`'yi ≥ 2.18'e yükselt (requirements'taki `gotrue`/`httpx` notuna dikkat). Sonra `/api/health/ready` 200 dönmeli.
 2. **Migration 05 / 09 / 10'u ve eksik vector RPC'yi incele**, staging'de dene, sonra üretime uygula. Ardından `/api/ai/chat` yanıtında `retrieval_mode` artık lexical olmamalı, `degraded` false olmalı.
-3. **Env dosyası konumunu netleştir:** kök `.env.example` silinsin mi kalsın mı, dokümanlardaki `backend/.env` talimatı düzeltilsin (madde 10). Ardından `integration` / `external` testlerini çalıştır.
+3. **PR #95'i gözden geçir ve merge et** (CI yeşilse), ardından `integration` / `external` testlerini çalıştır.
 
 ## 9. Yerelde başlatma
 
@@ -88,9 +87,7 @@ Not: `.env`'de `DEBUG=False` ve gerçek bir `SECRET_KEY` yoksa backend productio
 
 ## 10. Bilinen hatalar / dikkat
 
-- **Doküman–kod uyumsuzluğu:** README, `docs/setup.md` ve `docs/supabase_setup.md` "`backend/.env.example` → `backend/.env`" diyor, ama `backend/config.py` yalnızca **kök** `.env`'i yüklüyor. `docker-compose.yaml` da kök `.env`'i kullanıyor. `backend/.env` oluşturan biri backend'i doğrudan `python -m backend.app` ile çalıştırırsa ayarları yüklenmez (`scripts/launch_dev.ps1` ikisini de kontrol ediyor). Bu sorun branch'ten önce de vardı.
 - **Port 5000'deki Docker konteyneri** (`libris_backend`, imaj 2026-11-04 tarihli) eski kodu çalıştırıyor; bu branch'in değişikliklerini içermiyor. Güncel kodu denemek için ya imajı yeniden build edin (`docker compose up --build`) ya da başka portta yerel çalıştırın (`PORT=5001`).
-- `scripts/launch_dev.ps1` satır 292 hâlâ `.\stop_dev.ps1` (kökteki silinen sarmalayıcı) seçeneğini gösteriyor; yalnızca metin, `.\scripts\stop_dev.ps1` doğru.
 - `backend/saved_model/tfidf.pkl` (~11,7 MB) yeniden eğitilip commit edildi; ayarlar değişirse yeniden üretilmeli (`test_model_artifact_validation.py`).
 - Gemini anahtarı bu gece sohbete yapıştırıldı; gerekirse Google AI Studio'da yenisini oluşturup `.env`'de güncelleyin.
 - Windows'ta testler bittikten sonra pgserver'dan zararsız bir "I/O operation on closed file" log hatası çıkıyor; test sonucunu etkilemiyor.

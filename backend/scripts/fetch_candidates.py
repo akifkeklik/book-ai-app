@@ -20,7 +20,7 @@ Usage:
     python scripts/fetch_candidates.py --batch --dry-run
 
 Requirements:
-    GOOGLE_BOOKS_API_KEY in backend/.env  (env var, never CLI)
+    GOOGLE_BOOKS_API_KEY in the root .env  (env var, never CLI)
 """
 
 from __future__ import annotations
@@ -680,7 +680,7 @@ Examples:
         dest="api_key",
         # DEPRECATED: Passing secrets via CLI arguments exposes them in the
         # process list (ps aux, /proc/<pid>/cmdline) and shell history.
-        # Set GOOGLE_BOOKS_API_KEY in backend/.env instead.
+        # Set GOOGLE_BOOKS_API_KEY in the root .env instead.
         # This argument is accepted for backward-compatibility only and will
         # trigger a hard error if a non-empty value is supplied.
         help=argparse.SUPPRESS,
@@ -695,7 +695,7 @@ Examples:
             f"{_R}SECURITY: --api-key is deprecated and rejected.{_X}\n"
             "  Passing secrets via CLI arguments exposes them in the process\n"
             "  list (ps aux) and shell history.\n"
-            "  Set GOOGLE_BOOKS_API_KEY in backend/.env instead."
+            "  Set GOOGLE_BOOKS_API_KEY in the root .env instead."
         )
         return 1
 
@@ -703,7 +703,7 @@ Examples:
     if not api_key and not args.dry_run:
         logger.error(
             f"{_R}No Google Books API key.{_X}"
-            " Add GOOGLE_BOOKS_API_KEY to backend/.env"
+            " Add GOOGLE_BOOKS_API_KEY to the root .env"
         )
         return 1
 

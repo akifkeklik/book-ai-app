@@ -232,7 +232,7 @@ For live production execution, the four audited hardening migrations in [`backen
    - *Code Behavior:* Reads [`backend/data/books.csv`](../backend/data/books.csv) (6,448 titles) and performs `supabase.table("books").upsert(batch)` keyed on primary key `isbn13`.
    - *Rerun Safety:* **Safe on empty database.** On an existing database, it will NOT duplicate rows or delete records, but it **will overwrite any manually enriched book metadata** with raw CSV data.
    - *RLS Prerequisite:* `public.books` only permits `SELECT` for anonymous users. The ingestion script **must** be executed with `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS.
-   - *Execution Hygiene:* Because `backend/config.py` loads `backend/.env` with `override=True`, never store `service_role` in `backend/.env`. Pass it as a one-time environment variable to the process:
+   - *Execution Hygiene:* `backend/config.py` loads the root `.env` (real environment variables take precedence), but never store `service_role` in `.env`. Pass it as a one-time environment variable to the process:
    ```bash
    # Linux / macOS / Git Bash:
    SUPABASE_URL="https://<ref>.supabase.co" SUPABASE_SERVICE_ROLE_KEY="<SERVICE_ROLE_KEY>" python backend/scripts/upload_books_to_supabase.py

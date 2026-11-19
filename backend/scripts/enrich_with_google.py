@@ -16,7 +16,7 @@ Usage:
     python scripts/enrich_with_google.py --overwrite            # overwrite existing data
 
 Requirements:
-    - GOOGLE_BOOKS_API_KEY in backend/.env (env var, never CLI)
+    - GOOGLE_BOOKS_API_KEY in the root .env (env var, never CLI)
 """
 
 import argparse
@@ -338,7 +338,7 @@ Examples:
         dest="api_key",
         # DEPRECATED: Passing secrets via CLI arguments exposes them in the
         # process list (ps aux, /proc/<pid>/cmdline) and shell history.
-        # Set GOOGLE_BOOKS_API_KEY in backend/.env instead.
+        # Set GOOGLE_BOOKS_API_KEY in the root .env instead.
         # This argument triggers a hard error if a non-empty value is supplied.
         help=argparse.SUPPRESS,
     )
@@ -367,7 +367,7 @@ Examples:
             f"{_RED}SECURITY: --api-key is deprecated and rejected.{_RESET}\n"
             "  Passing secrets via CLI arguments exposes them in the process\n"
             "  list (ps aux) and shell history.\n"
-            "  Set GOOGLE_BOOKS_API_KEY in backend/.env instead."
+            "  Set GOOGLE_BOOKS_API_KEY in the root .env instead."
         )
         return 1
 
@@ -376,7 +376,7 @@ Examples:
     if not api_key and not args.dry_run:
         logger.error(
             f"{_RED}No Google Books API key found!{_RESET}\n\n"
-            f"  Add to backend/.env:\n"
+            f"  Add to the root .env:\n"
             f"    GOOGLE_BOOKS_API_KEY=<your-key>\n\n"
             f"  Or preview without key:\n"
             f"    python scripts/enrich_with_google.py --dry-run\n\n"
