@@ -11,7 +11,7 @@ pytest==8.4.2
 supabase~=2.3.0
 # supabase 2.3 does not cap gotrue; gotrue>=2.9 passes `proxy` to httpx<0.26 and the client fails to start.
 gotrue>=2.8,<2.9
-psycopg2-binary~=2.9.9
+psycopg2-binary~=2.9.13
 
 openai~=1.109.1
 PyJWT==2.15.1
