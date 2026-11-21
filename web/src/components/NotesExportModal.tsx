@@ -33,11 +33,12 @@ export function NotesExportModal({ isOpen, onClose, bookId }: NotesExportModalPr
             setContent(res.content);
             if (res.filename) setFilename(res.filename);
           } else {
-            setError(res.error || 'Failed to export notes');
+            setError(t('notes_export_error'));
           }
         }
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : 'Export failed');
+        console.warn('[notes-export]', err);
+        if (active) setError(t('notes_export_error'));
       } finally {
         if (active) setLoading(false);
       }
@@ -47,7 +48,7 @@ export function NotesExportModal({ isOpen, onClose, bookId }: NotesExportModalPr
     return () => {
       active = false;
     };
-  }, [isOpen, bookId]);
+  }, [isOpen, bookId, t]);
 
   if (!isOpen) return null;
 
@@ -91,7 +92,7 @@ export function NotesExportModal({ isOpen, onClose, bookId }: NotesExportModalPr
             }
             h1 { font-size: 24px; border-bottom: 2px solid #eaeaea; padding-bottom: 8px; margin-bottom: 16px; }
             h2 { font-size: 18px; color: #2563eb; margin-top: 24px; }
-            h3 { font-size: 14px; color: #7c3aed; margin-top: 16px; margin-bottom: 4px; }
+            h3 { font-size: 14px; color: var(--accent); margin-top: 16px; margin-bottom: 4px; }
             pre { background: #f8fafc; padding: 16px; border-radius: 8px; white-space: pre-wrap; font-family: monospace; font-size: 13px; }
             @media print {
               body { padding: 0; }

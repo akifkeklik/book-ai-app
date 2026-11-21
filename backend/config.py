@@ -8,8 +8,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Always load .env from the backend directory, regardless of CWD
-_ENV_FILE = Path(__file__).parent / ".env"
+# Load the project-root .env file
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 # Real environment variables (platform/CI/shell) take precedence over the local .env file,
 # so a stray .env in a deployed image can never override platform configuration.
 load_dotenv(dotenv_path=_ENV_FILE, override=False)

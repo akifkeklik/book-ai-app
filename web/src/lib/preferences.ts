@@ -1,16 +1,9 @@
+import { DEFAULT_THEME, normalizeThemeId, type ThemeId } from './themes';
+
 export type ThemeMode = 'light' | 'dark' | 'system';
-export type ColorPalette =
-  | 'ocean_blue'
-  | 'forest_green'
-  | 'lavender'
-  | 'terracotta'
-  | 'amber'
-  | 'turquoise'
-  | 'editorial'
-  | 'sage'
-  | 'powder_blue'
-  | 'peach'
-  | 'rose';
+
+/** One of the eight Libris themes; see src/lib/themes.ts. */
+export type ColorPalette = ThemeId;
 export type FontFamily = 'serif' | 'sans' | 'mono';
 export type FontScale = 0.9 | 1.0 | 1.15 | 1.3;
 export type LineSpacing = 'normal' | 'relaxed';
@@ -52,8 +45,8 @@ export interface LibrisPreferences {
 export const STORAGE_KEY = 'libris_user_preferences';
 
 export const DEFAULT_PREFERENCES: LibrisPreferences = {
-  themeMode: 'dark',
-  colorPalette: 'ocean_blue',
+  themeMode: 'system',
+  colorPalette: DEFAULT_THEME,
   fontFamily: 'serif',
   fontScale: 1.0,
   lineSpacing: 'normal',
@@ -64,19 +57,6 @@ export const DEFAULT_PREFERENCES: LibrisPreferences = {
 };
 
 const VALID_THEME_MODES: ThemeMode[] = ['light', 'dark', 'system'];
-const VALID_PALETTES: ColorPalette[] = [
-  'ocean_blue',
-  'forest_green',
-  'lavender',
-  'terracotta',
-  'amber',
-  'turquoise',
-  'editorial',
-  'sage',
-  'powder_blue',
-  'peach',
-  'rose',
-];
 const VALID_FONTS: FontFamily[] = ['serif', 'sans', 'mono'];
 const VALID_SCALES: FontScale[] = [0.9, 1.0, 1.15, 1.3];
 const VALID_SPACINGS: LineSpacing[] = ['normal', 'relaxed'];
@@ -97,9 +77,8 @@ export function parsePreferences(raw: unknown): LibrisPreferences {
     ? (data.themeMode as ThemeMode)
     : DEFAULT_PREFERENCES.themeMode;
 
-  const colorPalette: ColorPalette = VALID_PALETTES.includes(data.colorPalette as ColorPalette)
-    ? (data.colorPalette as ColorPalette)
-    : DEFAULT_PREFERENCES.colorPalette;
+  // Palette ids saved by earlier releases are migrated to the closest current theme.
+  const colorPalette: ColorPalette = normalizeThemeId(data.colorPalette) ?? DEFAULT_PREFERENCES.colorPalette;
 
   const fontFamily: FontFamily = VALID_FONTS.includes(data.fontFamily as FontFamily)
     ? (data.fontFamily as FontFamily)
@@ -199,6 +178,8 @@ export function resolveEffectiveTheme(mode: ThemeMode, systemIsDark: boolean): '
   return mode;
 }
 
+let themeSwitchTimer = 0;
+
 /**
  * Applies preferences as data-* attributes on document.documentElement
  */
@@ -207,6 +188,16 @@ export function applyPreferencesToDom(prefs: LibrisPreferences, systemIsDark = t
 
   const root = document.documentElement;
   const effectiveTheme = resolveEffectiveTheme(prefs.themeMode, systemIsDark);
+
+  // Cross-fade colours only when the visible theme actually changes (not on first paint).
+  const themeChanged =
+    root.hasAttribute('data-palette') &&
+    (root.getAttribute('data-theme') !== effectiveTheme || root.getAttribute('data-palette') !== prefs.colorPalette);
+  if (themeChanged && prefs.reducedMotion === false) {
+    root.classList.add('theme-switching');
+    window.clearTimeout(themeSwitchTimer);
+    themeSwitchTimer = window.setTimeout(() => root.classList.remove('theme-switching'), 260);
+  }
 
   root.setAttribute('data-theme', effectiveTheme);
   root.setAttribute('data-palette', prefs.colorPalette);

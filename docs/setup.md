@@ -45,7 +45,7 @@ Install dependencies and create the backend environment file:
 pip install -r backend/requirements-test.txt
 ~~~
 
-Copy backend/env.example to backend/.env. Set the values required by the features you use:
+Copy backend/.env.example to .env in the repository root (backend/config.py loads only the root .env). Set the values required by the features you use:
 
 - SECRET_KEY: long random secret; required for production.
 - LIBRIS_API_KEY: server/API authentication key.

@@ -1,0 +1,350 @@
+/* ==========================================================================
+   LIBRIS THEMES — 10 themes × light / dark, one per hue family
+   --------------------------------------------------------------------------
+   Each theme block sets only base colours. Every other token (borders, tints,
+   shadows, legacy aliases) is derived once below, so components never need a
+   per-theme colour. The init script in layout.tsx sets data-theme and
+   data-palette on <html> before first paint.
+   Swatches in src/lib/themes.ts must match the --background / --surface /
+   --primary / --accent values here.
+   ========================================================================== */
+
+/* ── Derived tokens (shared by all 20 combinations) ─────────────────────── */
+html[data-palette] {
+  --foreground: var(--text-primary);
+  --muted: var(--text-muted);
+  --focus: var(--primary);
+  --link: var(--primary);
+  --accent-foreground: var(--on-primary);
+
+  --card: color-mix(in srgb, var(--surface) 88%, transparent);
+  --card-hover: var(--surface-elevated);
+  --card-border: color-mix(in srgb, var(--primary) 14%, var(--hairline));
+  --border: color-mix(in srgb, var(--primary) 22%, var(--hairline));
+  --divider: color-mix(in srgb, var(--text-primary) 8%, transparent);
+
+  /* Neutral overlays that read correctly on both light and dark surfaces. */
+  --tint-1: color-mix(in srgb, var(--ink) 3%, transparent);
+  --tint-2: color-mix(in srgb, var(--ink) 5%, transparent);
+  --tint-3: color-mix(in srgb, var(--ink) 8%, transparent);
+  --tint-4: color-mix(in srgb, var(--ink) 12%, transparent);
+
+  --primary-soft: color-mix(in srgb, var(--primary) 12%, transparent);
+  --primary-softer: color-mix(in srgb, var(--primary) 7%, transparent);
+  --primary-ring: color-mix(in srgb, var(--primary) 30%, transparent);
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  /* Accent as text: the pastel accent itself in dark mode, deepened toward the text colour in light. */
+  --accent-ink: color-mix(in srgb, var(--accent) 38%, var(--text-primary));
+
+  /* Legacy aliases still referenced across the stylesheet and components. */
+  --electric-blue: var(--primary);
+  --electric-blue-hover: var(--primary-hover);
+  --electric-blue-muted: var(--primary-soft);
+  --electric-blue-border: var(--primary-ring);
+  --electric-blue-glow: 0 0 22px -6px color-mix(in srgb, var(--primary) 45%, transparent);
+  --electric-cyan-glow: 0 0 14px -4px color-mix(in srgb, var(--primary) 35%, transparent);
+  --saas-canvas-deep: var(--canvas-deep);
+  --saas-navy-950: var(--background);
+  --saas-navy-900: var(--surface);
+  --saas-navy-800: var(--surface-elevated);
+  --saas-navy-700: var(--surface-elevated);
+  --saas-charcoal: var(--surface-subtle);
+  --saas-glass-bg: color-mix(in srgb, var(--surface) 80%, transparent);
+  --saas-glass-border: var(--card-border);
+  --saas-card-shadow: 0 1px 2px var(--shadow-color), 0 8px 24px -12px var(--shadow-color);
+  --saas-card-hover-shadow: 0 2px 4px var(--shadow-color), 0 16px 32px -14px var(--shadow-color),
+    0 0 0 1px var(--primary-ring);
+  --btn-primary-gradient: linear-gradient(135deg, var(--primary-hover), var(--primary));
+  --status-want-to-read: var(--primary);
+  --wantToRead: var(--primary);
+  --favorite: var(--status-favorite);
+  --reading: var(--status-reading);
+  --finished: var(--status-finished);
+
+  /* Shape & elevation scale */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --shadow-sm: 0 1px 2px var(--shadow-color);
+  --shadow-md: 0 1px 2px var(--shadow-color), 0 8px 24px -12px var(--shadow-color);
+  --shadow-lg: 0 2px 6px var(--shadow-color), 0 24px 48px -20px var(--shadow-color);
+
+  color-scheme: light;
+}
+
+html[data-theme="dark"][data-palette] {
+  color-scheme: dark;
+  --accent-ink: var(--accent);
+  --ink: #ffffff;
+  --hairline: rgba(255, 255, 255, 0.08);
+  --shadow-color: rgba(0, 0, 0, 0.38);
+  --overlay: rgba(4, 4, 8, 0.66);
+  --disabled: #6b6f78;
+  /* Semantic colours: soft tones that stay readable on dark surfaces. */
+  --success: #4fd1a0; --warning: #f5c06a; --error: #f38b8b; --danger: #f38b8b;
+  --status-favorite: #f58fa6; --status-reading: #f5c06a; --status-finished: #4fd1a0;
+}
+
+html[data-theme="light"][data-palette] {
+  --ink: #1a1a2a;
+  --hairline: rgba(20, 20, 40, 0.08);
+  --shadow-color: rgba(30, 30, 60, 0.08);
+  --overlay: rgba(20, 20, 35, 0.38);
+  --disabled: #a3a6ae;
+  /* Semantic colours: deeper tones that meet AA on light surfaces. */
+  --success: #13795b; --warning: #9a5b07; --error: #c0362c; --danger: #c0362c;
+  --status-favorite: #be2f55; --status-reading: #9a5b07; --status-finished: #13795b;
+}
+
+/* ── 1. Cherry Red ──────────────────────────────────────────────────────── */
+html[data-theme="light"][data-palette="cherry_red"] {
+  --background: #fef7f7; --canvas-deep: #fbeceb; --surface: #ffffff;
+  --surface-elevated: #fffcfb; --surface-subtle: #fcedec;
+  --text-primary: #361717; --text-secondary: #745655; --text-muted: #7f6463;
+  --primary: #c43e45; --primary-hover: #af2934; --accent: #f28b66; --on-primary: #ffffff;
+}
+html[data-theme="dark"][data-palette="cherry_red"] {
+  --background: #170c0c; --canvas-deep: #110707; --surface: #231515;
+  --surface-elevated: #2f1f1e; --surface-subtle: #1d1111;
+  --text-primary: #fceae8; --text-secondary: #b79e9c; --text-muted: #977c7a;
+  --primary: #eb7675; --primary-hover: #f58b88; --accent: #feb79e; --on-primary: #2c0809;
+}
+
+/* ── 2. Peach Blossom ───────────────────────────────────────────────────── */
+html[data-theme="light"][data-palette="peach_blossom"] {
+  --background: #fef7f4; --canvas-deep: #faede7; --surface: #ffffff;
+  --surface-elevated: #fefcfb; --surface-subtle: #fbeee8;
+  --text-primary: #341a0b; --text-secondary: #70594e; --text-muted: #7a675e;
+  --primary: #b05315; --primary-hover: #9a4303; --accent: #dd9a5d; --on-primary: #ffffff;
+}
+html[data-theme="dark"][data-palette="peach_blossom"] {
+  --background: #160d08; --canvas-deep: #100805; --surface: #221610;
+  --surface-elevated: #2e2019; --surface-subtle: #1d120d;
+  --text-primary: #f9ebe5; --text-secondary: #b3a097; --text-muted: #927f75;
+  --primary: #da865a; --primary-hover: #e69971; --accent: #f3bf92; --on-primary: #290c00;
+}
+
+/* ── 3. Honey Gold ──────────────────────────────────────────────────────── */
+html[data-theme="light"][data-palette="honey_gold"] {
+  --background: #fdf9f1; --canvas-deep: #f5efe5; --surface: #ffffff;
+  --surface-elevated: #fffcf7; --surface-subtle: #f7f0e5;
+  --text-primary: #2c1f04; --text-secondary: #675c49; --text-muted: #72695a;
+  --primary: #8e6704; --primary-hover: #795702; --accent: #d59f5e; --on-primary: #ffffff;
+}
+html[data-theme="dark"][data-palette="honey_gold"] {
+  --background: #140f06; --canvas-deep: #0e0903; --surface: #1f180d;
+  --surface-elevated: #2a2316; --surface-subtle: #1a140a;
+  --text-primary: #f4eee3; --text-secondary: #aca394; --text-muted: #8a8170;
+  --primary: #c19746; --primary-hover: #cda861; --accent: #ecc293; --on-primary: #1f1401;
+}
+
+/* ── 4. Sage Garden ─────────────────────────────────────────────────────── */
+html[data-theme="light"][data-palette="sage_garden"] {
+  --background: #f8faf3; --canvas-deep: #eff1e8; --surface: #ffffff;
+  --surface-elevated: #fcfdf9; --surface-subtle: #f0f3e8;
+  --text-primary: #20240e; --text-secondary: #5b5f4d; --text-muted: #696c5e;
+  --primary: #68751f; --primary-hover: #576401; --accent: #92b880; --on-primary: #ffffff;
+}
+html[data-theme="dark"][data-palette="sage_garden"] {
+  --background: #0f1008; --canvas-deep: #090b05; --surface: #191b11;
+  --surface-elevated: #23251a; --surface-subtle: #14160d;
+  --text-primary: #edf0e6; --text-secondary: #a3a699; --text-muted: #808475;
+  --primary: #99a762; --primary-hover: #a9b678; --accent: #b8d5aa; --on-primary: #141900;
+}
+
+/* ── 5. Mint Breeze ─────────────────────────────────────────────────────── */
+html[data-theme="light"][data-palette="mint_breeze"] {
+  --background: #f3fbf9; --canvas-deep: #e8f3ef; --surface: #ffffff;
+  --surface-elevated: #f9fefc; --surface-subtle: #e8f4f0;
+  --text-primary: #092821; --text-secondary: #4c625b; --text-muted: #5e6f6a;
+  --primary: #057c67; --primary-hover: #066957; --accent: #61bdb7; --on-primary: #ffffff;
+}
+html[data-theme="dark"][data-palette="mint_breeze"] {
+  --background: #08120f; --canvas-deep: #040c0a; --surface: #101c19;
+  --surface-elevated: #192723; --surface-subtle: #0d1714;
+  --text-primary: #e6f2ee; --text-secondary: #98a9a4; --text-muted: #758681;
+  --primary: #57b29b; --primary-hover: #71c0ab; --accent: #98d9d4; --on-primary: #001b15;
+}
+
+/* ── 6. Ocean Mist ──────────────────────────────────────────────────────── */
+html[data-theme="light"][data-palette="ocean_mist"] {
+  --background: #f4fafe; --canvas-deep: #e6f2f9; --surface: #ffffff;
+  --surface-elevated: #fafdfe; --surface-subtle: #e7f3fb;
+  --text-primary: #082532; --text-secondary: #4c606a; --text-muted: #5d6d76;
+  --primary: #00769f; --primary-hover: #066386; --accent: #59bbd0; --on-primary: #ffffff;
+}
+html[data-theme="dark"][data-palette="ocean_mist"] {
+  --background: #071116; --canvas-deep: #040b10; --surface: #0e1b22;
+  --surface-elevated: #17262e; --surface-subtle: #0b171d;
+  --text-primary: #e5f0f7; --text-secondary: #98a7b0; --text-muted: #74858e;
+  --primary: #55a9d3; --primary-hover: #6eb8de; --accent: #93d7e7; --on-primary: #001925;
+}
+
+/* ── 7. Indigo Dusk ─────────────────────────────────────────────────────── */
+html[data-theme="light"][data-palette="indigo_dusk"] {
+  --background: #f7f9fe; --canvas-deep: #eaf0fd; --surface: #ffffff;
+  --surface-elevated: #fcfcfe; --surface-subtle: #ebf1ff;
+  --text-primary: #16213a; --text-secondary: #545d73; --text-muted: #626a7c;
+  --primary: #466ac7; --primary-hover: #3657b3; --accent: #9ca2f5; --on-primary: #ffffff;
+}
+html[data-theme="dark"][data-palette="indigo_dusk"] {
+  --background: #0b0f19; --canvas-deep: #060a13; --surface: #141926;
+  --surface-elevated: #1d2432; --surface-subtle: #101520;
+  --text-primary: #e9effb; --text-secondary: #9da5b6; --text-muted: #798294;
+  --primary: #799bee; --primary-hover: #8cacf7; --accent: #c0c5ff; --on-primary: #091431;
+}
+
+/* ── 8. Lavender Dream ──────────────────────────────────────────────────── */
+html[data-theme="light"][data-palette="lavender_dream"] {
+  --background: #fbf7ff; --canvas-deep: #f4edfa; --surface: #ffffff;
+  --surface-elevated: #fdfcff; --surface-subtle: #f5eefb;
+  --text-primary: #281b32; --text-secondary: #63596c; --text-muted: #706877;
+  --primary: #8959aa; --primary-hover: #774897; --accent: #cf93cc; --on-primary: #ffffff;
+}
+html[data-theme="dark"][data-palette="lavender_dream"] {
+  --background: #120d17; --canvas-deep: #0d0811; --surface: #1d1623;
+  --surface-elevated: #28202f; --surface-subtle: #18121d;
+  --text-primary: #f2ecf7; --text-secondary: #a9a1b0; --text-muted: #867e8e;
+  --primary: #b38bd2; --primary-hover: #c19cdd; --accent: #e7b9e5; --on-primary: #1e0c2a;
+}
+
+/* ── 9. Rose Quartz ─────────────────────────────────────────────────────── */
+html[data-theme="light"][data-palette="rose_quartz"] {
+  --background: #fef7fa; --canvas-deep: #f9ecf1; --surface: #ffffff;
+  --surface-elevated: #fefcfd; --surface-subtle: #fbedf2;
+  --text-primary: #331724; --text-secondary: #6f5761; --text-muted: #79656d;
+  --primary: #ae4b7c; --primary-hover: #9a396a; --accent: #e78c9d; --on-primary: #ffffff;
+}
+html[data-theme="dark"][data-palette="rose_quartz"] {
+  --background: #160c10; --canvas-deep: #10070b; --surface: #22151a;
+  --surface-elevated: #2e1f25; --surface-subtle: #1c1116;
+  --text-primary: #f8eaf0; --text-secondary: #b29ea6; --text-muted: #917d85;
+  --primary: #d67ea6; --primary-hover: #e291b5; --accent: #fbb4c0; --on-primary: #290819;
+}
+
+/* ── 10. Graphite ───────────────────────────────────────────────────────── */
+html[data-theme="light"][data-palette="graphite_slate"] {
+  --background: #f7f9fd; --canvas-deep: #edf0f5; --surface: #ffffff;
+  --surface-elevated: #fbfdff; --surface-subtle: #edf1f7;
+  --text-primary: #1f2226; --text-secondary: #5b5e61; --text-muted: #686a6d;
+  --primary: #646e7c; --primary-hover: #535d6a; --accent: #a3acb8; --on-primary: #ffffff;
+}
+html[data-theme="dark"][data-palette="graphite_slate"] {
+  --background: #0d1014; --canvas-deep: #080a0e; --surface: #161a1f;
+  --surface-elevated: #20242a; --surface-subtle: #12151a;
+  --text-primary: #edeef0; --text-secondary: #a3a5a7; --text-muted: #808285;
+  --primary: #969fac; --primary-hover: #a6afba; --accent: #c4cbd4; --on-primary: #12161c;
+}
+
+/* ── Theme switch transition ────────────────────────────────────────────────
+   Applied only for the instant of a user-initiated switch (see
+   applyPreferencesToDom), so normal hovers and first paint are unaffected. */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: background-color 0.22s ease, border-color 0.22s ease, color 0.22s ease,
+    fill 0.22s ease, box-shadow 0.22s ease !important;
+}
+
+html[data-motion="reduced"].theme-switching * {
+  transition: none !important;
+}
+
+/* ── Theme picker (Settings → Appearance) ───────────────────────────────── */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.theme-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.5rem 0.5rem 0.65rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+  border: 1.5px solid var(--card-border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.theme-option:hover {
+  border-color: var(--border);
+  transform: translateY(-1px);
+}
+
+.theme-option.is-selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+  color: var(--text-primary);
+}
+
+.theme-option-preview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 58px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+}
+
+.theme-option-half {
+  display: flex;
+  align-items: flex-end;
+  padding: 8px;
+}
+
+.theme-option-card {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  width: 100%;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+}
+
+.theme-option-card span {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+}
+
+.theme-option-card span:first-child { width: 55%; }
+.theme-option-card span:last-child { width: 20%; }
+
+.theme-option-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0 0.2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.theme-option-label svg { color: var(--primary); flex-shrink: 0; }
+
+@media (max-width: 480px) {
+  .theme-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  .theme-option-preview { height: 48px; }
+}
+
+/* ── Navbar quick light/dark toggle ─────────────────────────────────────── */
+.nav-icon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0 !important;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.theme-toggle > span { display: inline-flex; }
+html[data-theme="dark"] .theme-toggle-to-dark,
+html:not([data-theme="dark"]) .theme-toggle-to-light { display: none; }

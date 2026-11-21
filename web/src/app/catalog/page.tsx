@@ -139,8 +139,8 @@ export default async function CatalogPage({
                   style={{
                     padding: '0.35rem 0.75rem',
                     fontSize: '0.8rem',
-                    background: sort === 'popularity' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                    color: sort === 'popularity' ? '#fff' : 'var(--foreground)',
+                    background: sort === 'popularity' ? 'var(--primary)' : 'var(--tint-2)',
+                    color: sort === 'popularity' ? 'var(--on-primary)' : 'var(--foreground)',
                   }}
                 >
                   {t('sort_popularity')}
@@ -151,8 +151,8 @@ export default async function CatalogPage({
                   style={{
                     padding: '0.35rem 0.75rem',
                     fontSize: '0.8rem',
-                    background: sort === 'rating' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                    color: sort === 'rating' ? '#fff' : 'var(--foreground)',
+                    background: sort === 'rating' ? 'var(--primary)' : 'var(--tint-2)',
+                    color: sort === 'rating' ? 'var(--on-primary)' : 'var(--foreground)',
                   }}
                 >
                   {t('sort_rating')}
@@ -163,8 +163,8 @@ export default async function CatalogPage({
                   style={{
                     padding: '0.35rem 0.75rem',
                     fontSize: '0.8rem',
-                    background: sort === 'title' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                    color: sort === 'title' ? '#fff' : 'var(--foreground)',
+                    background: sort === 'title' ? 'var(--primary)' : 'var(--tint-2)',
+                    color: sort === 'title' ? 'var(--on-primary)' : 'var(--foreground)',
                   }}
                 >
                   {t('sort_title')}
@@ -175,8 +175,8 @@ export default async function CatalogPage({
                   style={{
                     padding: '0.35rem 0.75rem',
                     fontSize: '0.8rem',
-                    background: sort === 'newest' ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                    color: sort === 'newest' ? '#fff' : 'var(--foreground)',
+                    background: sort === 'newest' ? 'var(--primary)' : 'var(--tint-2)',
+                    color: sort === 'newest' ? 'var(--on-primary)' : 'var(--foreground)',
                   }}
                 >
                   {t('sort_newest')}
@@ -195,7 +195,7 @@ export default async function CatalogPage({
                   style={{
                     padding: '0.35rem 0.65rem',
                     fontSize: '0.8rem',
-                    background: !minRating ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)',
+                    background: !minRating ? 'var(--tint-4)' : 'var(--tint-2)',
                     color: 'var(--foreground)',
                   }}
                 >
@@ -207,7 +207,7 @@ export default async function CatalogPage({
                   style={{
                     padding: '0.35rem 0.65rem',
                     fontSize: '0.8rem',
-                    background: minRating === 4 ? '#fbbf24' : 'rgba(255,255,255,0.05)',
+                    background: minRating === 4 ? '#fbbf24' : 'var(--tint-2)',
                     color: minRating === 4 ? '#000' : 'var(--foreground)',
                     fontWeight: minRating === 4 ? 600 : 400,
                   }}
@@ -220,7 +220,7 @@ export default async function CatalogPage({
                   style={{
                     padding: '0.35rem 0.65rem',
                     fontSize: '0.8rem',
-                    background: minRating === 3 ? '#fbbf24' : 'rgba(255,255,255,0.05)',
+                    background: minRating === 3 ? '#fbbf24' : 'var(--tint-2)',
                     color: minRating === 3 ? '#000' : 'var(--foreground)',
                     fontWeight: minRating === 3 ? 600 : 400,
                   }}
@@ -271,7 +271,7 @@ export default async function CatalogPage({
                       alignItems: 'center',
                       padding: '0.4rem 0.6rem',
                       borderRadius: '8px',
-                      background: !category ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                      background: !category ? 'color-mix(in srgb, var(--primary) 15%, transparent)' : 'transparent',
                       fontWeight: !category ? 600 : 400,
                     }}
                   >
@@ -292,7 +292,7 @@ export default async function CatalogPage({
                           alignItems: 'center',
                           padding: '0.4rem 0.6rem',
                           borderRadius: '8px',
-                          background: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                          background: isSelected ? 'color-mix(in srgb, var(--primary) 15%, transparent)' : 'transparent',
                           fontWeight: isSelected ? 600 : 400,
                         }}
                       >
@@ -348,7 +348,7 @@ export default async function CatalogPage({
                       <Link
                         href="/catalog"
                         className="btn filter-chip"
-                        style={{ padding: '0.5rem 1rem', background: 'rgba(255, 255, 255, 0.06)' }}
+                        style={{ padding: '0.5rem 1rem', background: 'var(--tint-3)' }}
                       >
                         {t('clear_filters')}
                       </Link>
@@ -374,7 +374,7 @@ export default async function CatalogPage({
                           style={{
                             padding: '0.4rem 0.85rem',
                             fontSize: '0.8rem',
-                            background: 'rgba(255, 255, 255, 0.06)',
+                            background: 'var(--tint-3)',
                             border: '1px solid var(--card-border)',
                             color: 'var(--foreground)',
                           }}

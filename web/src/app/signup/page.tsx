@@ -47,7 +47,8 @@ function SignUpForm() {
         setConfirmationSent(true);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to sign up');
+      console.warn('[signup]', err);
+      setError(t('signup_error'));
     } finally {
       setLoading(false);
     }

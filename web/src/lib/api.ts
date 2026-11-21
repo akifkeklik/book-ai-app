@@ -585,7 +585,8 @@ export class ApiService {
       bookId: String(item.book_id || item.id),
       status: (item.status as LibraryCollectionStatus) || 'favorite',
       isFavorite: Boolean(item.is_favorite ?? (item.status === 'favorite')),
-      addedAt: (item.added_at as string) || new Date().toISOString(),
+      // Empty when the backend has no timestamp; never invent one (it would show as fresh activity).
+      addedAt: typeof item.added_at === 'string' ? item.added_at : '',
       book: normalizeBook(
         (item.book as Record<string, unknown>) || { isbn13: item.book_id }
       ),

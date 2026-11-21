@@ -50,6 +50,13 @@ def create_app(config_class=Config) -> Flask:
             raise ValueError(
                 "Critical Security Misconfiguration: DEBUG mode cannot be enabled when running in production."
             )
+        # TESTING skips the authentication hook in before_request, so a stray TESTING=true in a
+        # production environment would leave every /api/ endpoint unauthenticated.
+        if app.config.get("TESTING"):
+            raise ValueError(
+                "Critical Security Misconfiguration: TESTING mode cannot be enabled when running in "
+                "production; it disables API authentication."
+            )
         secret_key = str(app.config.get("SECRET_KEY", "")).strip()
         if not secret_key or secret_key in ("replace-with-a-long-random-string", "dev-insecure-secret-key"):
             raise ValueError(

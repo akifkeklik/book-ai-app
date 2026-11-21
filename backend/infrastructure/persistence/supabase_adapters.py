@@ -4,6 +4,13 @@ from typing import Any, Dict, List, Optional
 
 from supabase import Client
 
+try:
+    from ...domain.ports import SemanticSearchUnavailable
+    from .vector_rows import parse_similarity_rows
+except ImportError:  # imported as a top-level package by scripts/backfill_embeddings.py
+    from domain.ports import SemanticSearchUnavailable
+    from infrastructure.persistence.vector_rows import parse_similarity_rows
+
 logger = logging.getLogger(__name__)
 
 
@@ -290,42 +297,33 @@ class SupabaseBookDataPort:
         self._supabase = supabase_client
 
     def get_semantic_candidates(self, likes: List[str], limit: int = 100) -> Dict[str, float]:
-        if not self._supabase or not likes:
+        if not likes:
             return {}
-        try:
-            rpc_resp = self._supabase.rpc(
-                "match_book_embeddings",
-                {
-                    "seed_book_ids": list(likes),
-                    "match_threshold": 0.0,
-                    "match_count": limit,
-                },
-            ).execute()
-            rpc_data = getattr(rpc_resp, "data", [])
-            if rpc_data:
-                return {row["book_id"]: row["similarity"] for row in rpc_data}
-        except Exception as e:
-            logger.warning(f"Semantic candidate generation failed: {e}")
-        return {}
+        return self._rpc_similarities(
+            "match_book_embeddings",
+            {"seed_book_ids": list(likes), "match_threshold": 0.0, "match_count": limit},
+        )
 
     def match_query_embeddings(self, embedding: List[float], limit: int = 100) -> Dict[str, float]:
-        if not self._supabase:
+        if not embedding:
             return {}
+        return self._rpc_similarities(
+            "match_query_embeddings",
+            {"query_embedding": embedding, "match_threshold": 0.0, "match_count": limit},
+        )
+
+    def _rpc_similarities(self, fn: str, params: Dict[str, Any]) -> Dict[str, float]:
+        """
+        Runs a vector RPC. Failures raise SemanticSearchUnavailable rather than returning {}:
+        an empty dict means "no similar books", which must not be confused with "could not search".
+        """
+        if not self._supabase:
+            raise SemanticSearchUnavailable("Supabase client is not configured")
         try:
-            response = self._supabase.rpc(
-                "match_query_embeddings",
-                {
-                    "query_embedding": embedding,
-                    "match_threshold": 0.0,
-                    "match_count": limit,
-                },
-            ).execute()
-            matches = getattr(response, "data", [])
-            if matches:
-                return {m["book_id"]: m["similarity"] for m in matches}
+            response = self._supabase.rpc(fn, params).execute()
         except Exception as e:
-            logger.error(f"Error in match_query_embeddings: {e}")
-        return {}
+            raise SemanticSearchUnavailable(f"{fn} RPC failed: {e}") from e
+        return parse_similarity_rows(getattr(response, "data", None), f"{fn} RPC")
 
     def get_books_by_isbns(self, isbns: List[str]) -> List[Dict[str, Any]]:
         if not self._supabase or not isbns:
@@ -372,34 +370,64 @@ class SupabaseBookDataPort:
             logger.warning(f"add_catalog_book RPC failed (is migration 15 applied?): {e}")
             return False
 
+    # PostgREST caps each response at the server's max-rows setting (1000 by default, but it can be
+    # configured lower). Pages advance by the number of rows actually returned and stop only on an
+    # empty page, so a smaller server cap can no longer end the loop early and truncate the catalog.
+    PAGE_SIZE = 1000
+    MAX_PAGES = 10_000  # guard against a server that ignores Range and repeats rows forever
+
+    def _paged_select(self, table: str, columns: str, order: str) -> List[Dict[str, Any]]:
+        rows_out: List[Dict[str, Any]] = []
+        start = 0
+        for _ in range(self.MAX_PAGES):
+            resp = (
+                self._supabase.table(table).select(columns).order(order)
+                .range(start, start + self.PAGE_SIZE - 1).execute()
+            )
+            rows = getattr(resp, "data", None)
+            if rows is None:
+                rows = []
+            if not isinstance(rows, list):
+                raise RuntimeError(f"{table} page at offset {start} returned {type(rows).__name__}")
+            if not rows:
+                return rows_out
+            rows_out.extend(rows)
+            start += len(rows)
+        raise RuntimeError(f"{table} paging did not terminate after {self.MAX_PAGES} pages")
+
     def get_all_isbns(self) -> List[str]:
-        """All catalog ISBNs, paged (PostgREST returns at most 1000 rows per request)."""
+        """All catalog ISBNs, paged in a stable order."""
         if not self._supabase:
             return []
-        isbns: List[str] = []
-        page = 1000
         try:
-            start = 0
-            while True:
-                resp = self._supabase.table("books").select("isbn13").range(start, start + page - 1).execute()
-                rows = getattr(resp, "data", []) or []
-                isbns.extend(r["isbn13"] for r in rows if r.get("isbn13"))
-                if len(rows) < page:
-                    return isbns
-                start += page
+            rows = self._paged_select("books", "isbn13", "isbn13")
         except Exception as e:
             logger.error(f"Failed to get_all_isbns: {e}")
-            return isbns
+            return []
+        return [r["isbn13"] for r in rows if isinstance(r, dict) and r.get("isbn13")]
 
     def get_all_books_raw(self) -> List[Dict[str, Any]]:
+        """Whole catalog, paged: an unpaged select silently trained on a truncated catalog.
+        Returns [] on any error so the caller falls back explicitly instead of training on a
+        partial catalog."""
         if not self._supabase:
             return []
         try:
-            response = self._supabase.table("books").select("*").execute()
-            return getattr(response, "data", [])
+            return self._paged_select("books", "*", "isbn13")
         except Exception as e:
             logger.error(f"Failed to get_all_books_raw: {e}")
             return []
+
+    def find_other_embedding_profiles(self, accepted: List[str], limit: int = 5) -> List[str]:
+        """Stored model_version values outside `accepted` (one small filtered request)."""
+        if not self._supabase:
+            return []
+        query = self._supabase.table("book_embeddings").select("model_version")
+        for value in accepted:
+            query = query.neq("model_version", value)
+        resp = query.limit(max(1, int(limit))).execute()
+        rows = getattr(resp, "data", None) or []
+        return sorted({str(r["model_version"]) for r in rows if isinstance(r, dict) and r.get("model_version")})
 
     def get_embedding_metadata(self, book_id: str) -> Optional[Dict[str, Any]]:
         if not self._supabase:

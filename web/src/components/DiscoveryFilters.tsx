@@ -100,7 +100,7 @@ export function DiscoveryFilters({
           className={`library-tab-btn ${activeFilter === 'category' ? 'active' : ''}`}
           id="filter-category"
         >
-          <BookOpen size={16} color="var(--accent)" />
+          <BookOpen size={16} color="var(--accent-ink)" />
           <span>{t('filter_genre_category')}</span>
           <span style={{ fontSize: '0.75rem', opacity: 0.75 }}>
             ({selectedCategory !== 'all' ? displayedCount : filterCounts.categoryCount})
@@ -132,8 +132,8 @@ export function DiscoveryFilters({
               fontSize: '0.78rem',
               padding: '0.3rem 0.85rem',
               borderRadius: '9999px',
-              background: selectedCategory === 'all' ? 'var(--primary)' : 'rgba(255, 255, 255, 0.05)',
-              color: selectedCategory === 'all' ? '#ffffff' : 'var(--foreground)',
+              background: selectedCategory === 'all' ? 'var(--primary)' : 'var(--tint-2)',
+              color: selectedCategory === 'all' ? 'var(--on-primary)' : 'var(--foreground)',
               border: '1px solid var(--card-border)',
               cursor: 'pointer',
               transition: 'all 0.2s',
@@ -154,10 +154,10 @@ export function DiscoveryFilters({
                 background:
                   selectedCategory.toLowerCase() === cat.toLowerCase()
                     ? 'var(--primary)'
-                    : 'rgba(255, 255, 255, 0.05)',
+                    : 'var(--tint-2)',
                 color:
                   selectedCategory.toLowerCase() === cat.toLowerCase()
-                    ? '#ffffff'
+                    ? 'var(--on-primary)'
                     : 'var(--foreground)',
                 border: '1px solid var(--card-border)',
                 cursor: 'pointer',

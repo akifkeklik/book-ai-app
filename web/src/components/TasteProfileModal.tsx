@@ -72,10 +72,11 @@ export function TasteProfileModal({
         if (onSaved) onSaved(selectedGenres);
         onClose();
       } else {
-        setError(res.error || 'Failed to save taste profile');
+        setError(t('taste_save_error'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save preferences');
+      console.warn('[taste-profile]', err);
+      setError(t('taste_save_error'));
     } finally {
       setIsSaving(false);
     }
@@ -146,7 +147,7 @@ export function TasteProfileModal({
               gap: '0.4rem',
               padding: '0.35rem 0.85rem',
               borderRadius: '9999px',
-              background: 'rgba(99, 102, 241, 0.12)',
+              background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
               border: '1px solid var(--card-border)',
               marginBottom: '0.75rem',
               fontSize: '0.8rem',
@@ -215,10 +216,10 @@ export function TasteProfileModal({
                   fontWeight: isSelected ? 700 : 500,
                   cursor: 'pointer',
                   border: `1.5px solid ${isSelected ? 'var(--primary)' : 'var(--card-border)'}`,
-                  background: isSelected ? 'rgba(99, 102, 241, 0.18)' : 'var(--surface-subtle)',
+                  background: isSelected ? 'color-mix(in srgb, var(--primary) 18%, transparent)' : 'var(--surface-subtle)',
                   color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
                   transition: 'all 0.15s ease',
-                  boxShadow: isSelected ? '0 2px 8px rgba(99, 102, 241, 0.25)' : 'none',
+                  boxShadow: isSelected ? '0 2px 8px color-mix(in srgb, var(--primary) 25%, transparent)' : 'none',
                 }}
               >
                 {isSelected ? <Check size={14} /> : null}

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./themes.css";
 import { cookies } from "next/headers";
 import { translate } from "@/lib/i18n";
 import { resolveLanguage } from "@/lib/preferences";
+import { DEFAULT_THEME, LEGACY_THEME_MAP, THEME_IDS } from "@/lib/themes";
 import { AuthProvider } from "@/components/AuthProvider";
 import { PreferencesProvider } from "@/components/PreferencesProvider";
 import { Navbar } from "@/components/Navbar";
@@ -19,7 +21,9 @@ const themeInitScript = `
   try {
     var raw = localStorage.getItem('libris_user_preferences');
     var theme = 'dark';
-    var palette = 'ocean_blue';
+    var palette = '${DEFAULT_THEME}';
+    var themes = ${JSON.stringify(THEME_IDS)};
+    var legacy = ${JSON.stringify(LEGACY_THEME_MAP)};
     var font = 'serif';
     var scale = '1.0';
     var spacing = 'normal';
@@ -34,7 +38,8 @@ const themeInitScript = `
       else if (p.themeMode === 'system') {
         theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
-      if (p.colorPalette) palette = p.colorPalette;
+      if (themes.indexOf(p.colorPalette) !== -1) palette = p.colorPalette;
+      else if (legacy.hasOwnProperty(p.colorPalette)) palette = legacy[p.colorPalette];
       if (p.fontFamily) font = p.fontFamily;
       if (p.fontScale) scale = String(p.fontScale);
       if (p.lineSpacing) spacing = p.lineSpacing;
@@ -56,7 +61,10 @@ const themeInitScript = `
     doc.setAttribute('data-motion', motion);
     doc.setAttribute('data-density', density);
     doc.setAttribute('lang', lang);
-  } catch (e) {}
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    document.documentElement.setAttribute('data-palette', '${DEFAULT_THEME}');
+  }
 })();
 `;
 

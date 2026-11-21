@@ -27,6 +27,9 @@ class FakeEmbeddingPort(EmbeddingPort):
     def generate_embedding(self, text: str, max_retries: int = 3) -> Optional[List[float]]:
         return self.embedding
 
+    def embed_query(self, query: str) -> Optional[List[float]]:
+        return self.embedding
+
 
 class FakeBookDataPort(BookDataPort):
     def __init__(self, candidates: Dict[str, float] = None, books: List[Dict[str, Any]] = None):
@@ -98,9 +101,11 @@ class FakeRecommender:
         self.engine = FakeEngine()
 
     def recommend(
-        self, seed_titles, top_n=10, use_diversity=True, semantic_scores=None, dislikes=None
+        self, seed_titles, top_n=10, use_diversity=True, semantic_scores=None, dislikes=None,
+        exclude=None,
     ):
-        return self.recs
+        blocked = set(exclude or [])
+        return [r for r in self.recs if r.get("isbn13") not in blocked]
 
     def get_popular_books(self, limit=10):
         return self.recs

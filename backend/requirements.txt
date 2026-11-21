@@ -6,7 +6,7 @@ pandas~=2.3.3
 scipy~=1.17.1
 python-dotenv==1.2.4
 requests==2.34.2
-gunicorn==21.2.0
+gunicorn==23.0.0
 pytest==8.4.2
 supabase~=2.3.0
 # supabase 2.3 does not cap gotrue; gotrue>=2.9 passes `proxy` to httpx<0.26 and the client fails to start.

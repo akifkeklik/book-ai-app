@@ -194,6 +194,26 @@ describe('Personalized Discovery Hub: Attribution Classification & Filtering', (
     assert.equal(classifyRecommendation(trTaste), 'category');
   });
 
+  test('classifyRecommendation: popular and search-match labels are general, not reading history', () => {
+    // "Popular with Libris readers" contains "read"; it must not land in the Reading tab.
+    const popular: Book = {
+      ...mockBook4,
+      recommendationReason: 'Popular with Libris readers',
+      explanationType: 'trending_catalog',
+    };
+    const popularNoType: Book = { ...mockBook4, recommendationReason: 'Popular with Libris readers' };
+    const searchMatch: Book = {
+      ...mockBook4,
+      recommendationReason: 'Found by semantic search',
+      explanationType: 'semantic_match',
+    };
+    assert.equal(classifyRecommendation(popular), 'general');
+    assert.equal(classifyRecommendation(popularNoType), 'general');
+    assert.equal(classifyRecommendation(searchMatch), 'general');
+    // Real reading attributions are unaffected.
+    assert.equal(classifyRecommendation(mockBook2), 'reading');
+  });
+
   test('filterRecommendations: correctly partitions books across discovery tabs', () => {
     const list = [mockBook1, mockBook2, mockBook3, mockBook4];
 

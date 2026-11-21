@@ -1,0 +1,24 @@
+{
+ "vector_source": "synthetic (TF-IDF SVD, not Gemini)",
+ "pgvector": "0.8.6",
+ "rows": 6446,
+ "probes": 100,
+ "match_query_embeddings": {
+  "requested": 100,
+  "hnsw.ef_search": "40",
+  "rows_returned_mean": 100.0,
+  "rows_returned_min": 100,
+  "recall@5": 0.996,
+  "recall@10": 1.0,
+  "recall@100_of_requested": 1.0
+ },
+ "match_book_embeddings": {
+  "requested": 100,
+  "hnsw.ef_search": "40",
+  "rows_returned_mean": 100.0,
+  "rows_returned_min": 100,
+  "recall@5": 1.0,
+  "recall@10": 0.998,
+  "recall@100_of_requested": 1.0
+ }
+}

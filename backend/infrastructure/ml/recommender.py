@@ -12,12 +12,13 @@ import os
 import pickle
 import re
 import sys
-from typing import Any, Dict, List, Optional
+from dataclasses import asdict, dataclass, fields
+from typing import Any, Dict, Iterable, List, Optional, Set
 
 import numpy as np
 import pandas as pd
 from backend.domain.taxonomy import CANONICAL_CATEGORIES_ORDERED, CANONICAL_CATEGORY_MAP
-from backend.utils.preprocess import preprocess_dataframe
+from backend.utils.preprocess import clean_text, normalize_isbn, preprocess_dataframe, work_id
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -28,16 +29,24 @@ from sklearn.metrics.pairwise import cosine_similarity
 sys.modules["backend.recommender"] = sys.modules[__name__]
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-MODEL_VERSION = "2.1.0"
-# TF-IDF will ignore words that appear in more than this % of documents
+# Bump whenever the persisted artifact's meaning changes (TF-IDF recipe, preprocessing, row
+# layout). 2.3.0: EngineConfig is stored on the instance (earlier pickles stored no config at all,
+# so their version could not be checked) and rows carry merged `edition_isbns`.
+MODEL_VERSION = "2.3.0"
+# TF-IDF recipe picked with the offline harness in backend/evaluation (see its README). Those
+# comparisons use provisional LLM-generated labels that were also used for the tuning itself, so
+# they indicate a direction, not an independently validated improvement. sublinear_tf is the
+# change that moved the provisional seed-to-item scores most: it keeps the 3x-repeated title
+# from dominating similarity on incidental title words.
 TFIDF_MAX_DF = 0.8
-# TF-IDF will ignore words that appear in fewer than this many documents
-TFIDF_MIN_DF = 5
-# Maximum number of features to generate for TF-IDF
-TFIDF_MAX_FEATURES = 10000
+TFIDF_MIN_DF = 2
+TFIDF_MAX_FEATURES = None
+TFIDF_SUBLINEAR_TF = True
 
-# For diversity calculations (MMR)
-DIVERSITY_LAMBDA = 0.6
+# MMR trade-off on max-normalised relevance (see _get_diverse_recommendations). With lambda 0.6
+# on raw scores the similarity penalty (0-1 scale) outweighed TF-IDF relevance (~0.1-0.3), which
+# filled lists with unrelated popular books.
+DIVERSITY_LAMBDA = 0.85
 
 # For hybrid scoring
 WEIGHT_SIMILARITY = 0.7
@@ -63,13 +72,22 @@ def _optional_column_contains(df, column: str, query: str):
     return df[column].astype(str).str.contains(query, case=False, na=False, regex=False)
 
 
+@dataclass
 class EngineConfig:
-    """Typed configuration for the recommendation engine."""
+    """
+    Typed configuration for the recommendation engine.
+
+    A dataclass, so every value lives in the instance __dict__ and is pickled with the model.
+    (As a plain class with class attributes, a pickled config carried no values: reading
+    `model_version` from an unpickled artifact returned the *current* code's constant, so the
+    version check could never fail.)
+    """
 
     model_version: str = MODEL_VERSION
     tfidf_max_df: float = TFIDF_MAX_DF
     tfidf_min_df: int = TFIDF_MIN_DF
-    tfidf_max_features: int = TFIDF_MAX_FEATURES
+    tfidf_max_features: Optional[int] = TFIDF_MAX_FEATURES
+    tfidf_sublinear_tf: bool = TFIDF_SUBLINEAR_TF
     diversity_lambda: float = DIVERSITY_LAMBDA
 
     # Hybrid Weights
@@ -78,19 +96,62 @@ class EngineConfig:
     weight_popularity: float = 0.2
 
 
+def artifact_incompatibility(saved_config: Any, expected: EngineConfig) -> Optional[str]:
+    """
+    Why a persisted config cannot be used with the running code, or None when it matches.
+
+    Reads the values actually stored on the instance (vars()), never class-level fallbacks, so an
+    artifact that predates stored configs is reported as such instead of silently passing.
+    """
+    if saved_config is None:
+        return "artifact has no config"
+    stored = vars(saved_config) if hasattr(saved_config, "__dict__") else {}
+    if "model_version" not in stored:
+        return "artifact predates stored model configs (no model_version saved with it)"
+    if stored["model_version"] != expected.model_version:
+        return f"model_version {stored['model_version']!r} != expected {expected.model_version!r}"
+    wanted = asdict(expected)
+    diff = sorted(f.name for f in fields(EngineConfig) if stored.get(f.name, "<missing>") != wanted[f.name])
+    if diff:
+        return "config differs from the running code in: " + ", ".join(diff)
+    return None
+
+
+def _engine_integrity_problem(engine: "RecommenderEngine") -> Optional[str]:
+    """A fitted artifact must have a vectorizer and one TF-IDF row per catalog row."""
+    if not getattr(engine, "is_fitted", False):
+        return "artifact is not fitted"
+    matrix = getattr(engine, "tfidf_matrix", None)
+    df = getattr(engine, "df", None)
+    if matrix is None or getattr(engine, "tfidf_vectorizer", None) is None or df is None:
+        return "artifact is missing its TF-IDF state"
+    if matrix.shape[0] != len(df):
+        return f"TF-IDF rows ({matrix.shape[0]}) != catalog rows ({len(df)})"
+    return None
+
+
+def _row_identity(row) -> str:
+    """Edition-aware book identity of a catalog row (folded title + first-author surname)."""
+    return work_id(row.get("title", ""), row.get("authors", ""))
+
+
 # ── Core Engine ───────────────────────────────────────────────────────────────
 class RecommenderEngine:
     """
     Handles data loading, TF-IDF vectorization, and core similarity calculations.
     """
 
-    def __init__(self, config: EngineConfig = EngineConfig()):
-        self.config = config
+    _ISBN_COLUMNS = ("isbn13", "isbn10", "edition_isbns")
+
+    def __init__(self, config: Optional[EngineConfig] = None):
+        self.config = config if config is not None else EngineConfig()
         self.df: pd.DataFrame = pd.DataFrame()
         self.tfidf_vectorizer: Optional[TfidfVectorizer] = None
         self.tfidf_matrix = None
         self.cosine_sim = None
         self.is_fitted = False
+        self._isbn_index: Dict[str, List[int]] = {}
+        self._isbn_index_key: Optional[tuple] = None
 
     @property
     def vectorizer(self):
@@ -111,41 +172,24 @@ class RecommenderEngine:
 
         logger.info("Fitting TF-IDF vectorizer...")
         min_df = self.config.tfidf_min_df
-        self.tfidf_vectorizer = TfidfVectorizer(
-            stop_words="english",
-            max_df=self.config.tfidf_max_df,
-            min_df=min_df,
-            max_features=self.config.tfidf_max_features,
-            ngram_range=(1, 2),
-        )
-
+        docs = self.df["combined_features"]
         try:
-            self.tfidf_matrix = self.tfidf_vectorizer.fit_transform(self.df["combined_features"])
+            self.tfidf_vectorizer = self._make_vectorizer(min_df)
+            self.tfidf_matrix = self.tfidf_vectorizer.fit_transform(docs)
         except ValueError:
-            # Small/dev datasets can be too sparse for min_df=5; fallback keeps engine usable.
+            # Small/dev datasets can be too sparse for min_df>1; fallback keeps engine usable.
             logger.warning("TF-IDF fit failed with min_df=%s; retrying with min_df=1", min_df)
-            self.tfidf_vectorizer = TfidfVectorizer(
-                stop_words="english",
-                max_df=self.config.tfidf_max_df,
-                min_df=1,
-                max_features=self.config.tfidf_max_features,
-                ngram_range=(1, 2),
-            )
-            self.tfidf_matrix = self.tfidf_vectorizer.fit_transform(self.df["combined_features"])
+            min_df = 1
+            self.tfidf_vectorizer = self._make_vectorizer(1)
+            self.tfidf_matrix = self.tfidf_vectorizer.fit_transform(docs)
 
         # If any row has no features, similarity on that row collapses; retry with min_df=1.
         if (self.tfidf_matrix.getnnz(axis=1) == 0).any() and min_df != 1:
             logger.warning(
                 "Detected empty TF-IDF rows with min_df=%s; refitting with min_df=1", min_df
             )
-            self.tfidf_vectorizer = TfidfVectorizer(
-                stop_words="english",
-                max_df=self.config.tfidf_max_df,
-                min_df=1,
-                max_features=self.config.tfidf_max_features,
-                ngram_range=(1, 2),
-            )
-            self.tfidf_matrix = self.tfidf_vectorizer.fit_transform(self.df["combined_features"])
+            self.tfidf_vectorizer = self._make_vectorizer(1)
+            self.tfidf_matrix = self.tfidf_vectorizer.fit_transform(docs)
 
         logger.info(f"TF-IDF matrix created with shape: {self.tfidf_matrix.shape}")
 
@@ -153,7 +197,58 @@ class RecommenderEngine:
         self.cosine_sim = None
         self.is_fitted = True
 
-    def find_all_indices(self, book_identifier: str) -> List[int]:
+    def _make_vectorizer(self, min_df: int) -> TfidfVectorizer:
+        return TfidfVectorizer(
+            stop_words="english",
+            max_df=self.config.tfidf_max_df,
+            min_df=min_df,
+            max_features=self.config.tfidf_max_features,
+            ngram_range=(1, 2),
+            sublinear_tf=self.config.tfidf_sublinear_tf,
+        )
+
+    def _isbn_fingerprint(self) -> tuple:
+        """
+        Identity of the ISBN data the index was built from. Covers reassignment (id/len) and
+        in-place edits of the ISBN columns (content hash), e.g. a startup sync that merges a new
+        edition ISBN into an existing row's edition_isbns. About 0.2 ms on the 6.4k-row catalog.
+        """
+        cols = tuple(c for c in self._ISBN_COLUMNS if c in self.df.columns)
+        content = hash(tuple(hash(tuple(self.df[c].astype(str).tolist())) for c in cols))
+        return (id(self.df), len(self.df), tuple(self.df.index[:1]), tuple(self.df.index[-1:]), cols, content)
+
+    def _isbn_lookup(self, validate: bool = True) -> Dict[str, List[int]]:
+        """
+        ISBN -> row indices, covering every edition ISBN merged into a row (edition_isbns).
+
+        validate=False skips the content fingerprint and only checks the cheap (id, len) part;
+        callers use it for repeated lookups inside one operation after validating once.
+        """
+        key = self._isbn_index_key
+        cheap = (id(self.df), len(self.df))
+        if key is not None and not validate and key[:2] == cheap:
+            return self._isbn_index
+        fingerprint = self._isbn_fingerprint()
+        if key != fingerprint:
+            index: Dict[str, List[int]] = {}
+            for col in fingerprint[4]:
+                for idx, raw in zip(self.df.index, self.df[col].astype(str)):
+                    for part in raw.split("|"):
+                        isbn = normalize_isbn(part)
+                        if isbn and isbn not in ("NAN", "NONE") and idx not in index.setdefault(isbn, []):
+                            index[isbn].append(idx)
+            self._isbn_index, self._isbn_index_key = index, fingerprint
+        return self._isbn_index
+
+    def indices_for_isbns(self, isbns: Iterable[str], validate: bool = True) -> Set[int]:
+        """Row indices of every catalog row that carries any of the ISBNs, on any edition."""
+        lookup = self._isbn_lookup(validate=validate)
+        out: Set[int] = set()
+        for raw in isbns or []:
+            out.update(lookup.get(normalize_isbn(raw), []))
+        return out
+
+    def find_all_indices(self, book_identifier: str, validate: bool = True) -> List[int]:
         """Find all DataFrame indices for a book by its title or ISBN (handling duplicates)."""
         if not isinstance(book_identifier, str):
             if isinstance(book_identifier, (int, float)):
@@ -165,23 +260,8 @@ class RecommenderEngine:
         if not clean_id or self.df.empty:
             return []
 
-        # Normalize hyphens and float strings (e.g. '9780441013593.0')
-        norm_id = clean_id.replace("-", "")
-        if norm_id.endswith(".0"):
-            norm_id = norm_id[:-2]
-
-        matched = set()
-        # Prioritize exact ISBN matching
-        if "isbn13" in self.df.columns:
-            for idx in self.df.index[self.df["isbn13"] == clean_id].tolist():
-                matched.add(idx)
-            if norm_id != clean_id:
-                for idx in self.df.index[self.df["isbn13"] == norm_id].tolist():
-                    matched.add(idx)
-
-        if "isbn10" in self.df.columns:
-            for idx in self.df.index[self.df["isbn10"] == norm_id].tolist():
-                matched.add(idx)
+        # Exact ISBN match on any edition (hyphens and float suffixes like '….0' normalised)
+        matched = set(self._isbn_lookup(validate=validate).get(normalize_isbn(clean_id), []))
 
         # Fallback to title matching
         if "title" in self.df.columns:
@@ -195,9 +275,9 @@ class RecommenderEngine:
 
         return sorted(matched)
 
-    def find_index(self, book_identifier: str) -> Optional[int]:
+    def find_index(self, book_identifier: str, validate: bool = True) -> Optional[int]:
         """Find the primary DataFrame index for a book by its title or ISBN."""
-        indices = self.find_all_indices(book_identifier)
+        indices = self.find_all_indices(book_identifier, validate=validate)
         return indices[0] if indices else None
 
 
@@ -211,9 +291,9 @@ class BookRecommender:
     CANONICAL_CATEGORIES_ORDERED = CANONICAL_CATEGORIES_ORDERED
     CANONICAL_CATEGORY_MAP = CANONICAL_CATEGORY_MAP
 
-    def __init__(self, config: EngineConfig = EngineConfig()):
-        self.config = config
-        self.engine = RecommenderEngine(config)
+    def __init__(self, config: Optional[EngineConfig] = None):
+        self.config = config if config is not None else EngineConfig()
+        self.engine = RecommenderEngine(self.config)
         self.is_fitted = False
 
     @property
@@ -280,39 +360,50 @@ class BookRecommender:
             logger.error(f"Error saving model: {e}")
 
     def load_model(self, path: str) -> bool:
-        """Load a model from a pickle file."""
+        """
+        Load a model from a pickle file. Returns False (leaving this instance untouched) when the
+        artifact is missing, unreadable, or incompatible with the running code; callers then
+        retrain (BookService._bootstrap), so an old artifact never silently serves stale state.
+        """
         if not os.path.exists(path):
             logger.info(f"Model file not found at {path}.")
             return False
         try:
             with open(path, "rb") as f:
                 loaded_model = pickle.load(f)
-
-            # Legacy compatibility: old flows persist only RecommenderEngine.
-            if isinstance(loaded_model, RecommenderEngine):
-                self.engine = loaded_model
-                self.config = loaded_model.config
-                self.is_fitted = loaded_model.is_fitted
-                logger.info("Legacy RecommenderEngine loaded successfully from %s.", path)
-                return self.is_fitted
-
-            if (
-                not hasattr(loaded_model, "config")
-                or loaded_model.config.model_version != self.config.model_version
-            ):
-                logger.warning(
-                    f"Model version mismatch. Found {getattr(loaded_model, 'config', 'N/A')}, "
-                    f"expected {self.config.model_version}. Refusing to load."
-                )
-                return False
-
-            self.__dict__.update(loaded_model.__dict__)
-            self.is_fitted = getattr(self, "is_fitted", False)
-            logger.info(f"Model loaded successfully from {path}.")
-            return self.is_fitted
         except Exception as e:
-            logger.error(f"Error loading model: {e}")
+            logger.error(f"Error loading model from {path}: {e}")
             return False
+
+        # Older flows persisted only a RecommenderEngine; it gets the same checks.
+        if isinstance(loaded_model, RecommenderEngine):
+            engine, saved_config = loaded_model, getattr(loaded_model, "config", None)
+        elif isinstance(loaded_model, BookRecommender):
+            engine, saved_config = getattr(loaded_model, "engine", None), getattr(loaded_model, "config", None)
+        else:
+            logger.warning("Refusing to load %s: unexpected artifact type %s.", path, type(loaded_model).__name__)
+            return False
+
+        problem = artifact_incompatibility(saved_config, self.config)
+        if problem is None and engine is not None:
+            problem = artifact_incompatibility(getattr(engine, "config", None), self.config)
+        if problem is None:
+            problem = _engine_integrity_problem(engine) if engine is not None else "artifact has no engine"
+        if problem:
+            logger.warning("Refusing to load model %s: %s. It must be retrained.", path, problem)
+            return False
+
+        if isinstance(loaded_model, RecommenderEngine):
+            self.engine = loaded_model
+            self.config = loaded_model.config
+            self.is_fitted = True
+            logger.info("Legacy RecommenderEngine artifact loaded from %s.", path)
+            return True
+
+        self.__dict__.update(loaded_model.__dict__)
+        self.is_fitted = True
+        logger.info(f"Model {self.config.model_version} loaded from {path}.")
+        return True
 
     def recommend(
         self,
@@ -325,10 +416,15 @@ class BookRecommender:
         preferred_genres: Optional[List[str]] = None,
         preferred_authors: Optional[List[str]] = None,
         seed_sources: Optional[Dict[str, str]] = None,
+        exclude: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Generate personalized book recommendations with Rocchio relevance feedback,
         profile affinity fusion, and strict dislike suppression.
+
+        `exclude` lists ISBNs (of any edition) that must not be returned, e.g. books already in
+        the user's library. Unlike `dislikes` it carries no negative taste signal, and unlike a
+        post-filter it is applied before ranking, so excluded books never use up result slots.
         """
         if not self.is_fitted:
             logger.info("Model not fitted. Fitting now...")
@@ -342,12 +438,16 @@ class BookRecommender:
         elif seed_titles is None:
             seed_titles = []
 
+        # Validate the ISBN index once; the many lookups below reuse it.
+        self.engine._isbn_lookup(validate=True)
+        excluded_indices = self.engine.indices_for_isbns(exclude or [], validate=False)
+
         # Find all valid indices for seeds (handling duplicates and editions)
         seed_indices = []
         all_seed_indices = set()
         weights_by_idx: Dict[int, float] = {}
         for title in seed_titles:
-            indices = self.engine.find_all_indices(title)
+            indices = self.engine.find_all_indices(title, validate=False)
             if not indices:
                 continue
             primary_idx = indices[0]
@@ -368,7 +468,7 @@ class BookRecommender:
         disliked_authors = set()
         if dislikes:
             for d in dislikes:
-                indices = self.engine.find_all_indices(d)
+                indices = self.engine.find_all_indices(d, validate=False)
                 for d_idx in indices:
                     all_disliked_indices.add(d_idx)
                     if d_idx not in disliked_indices:
@@ -424,24 +524,10 @@ class BookRecommender:
         else:
             # Zero positive signals: fallback to popular books filtering dislikes
             logger.info("No positive seeds or profile signals provided. Returning popular books.")
-            extra = len(all_disliked_indices) + 10 if all_disliked_indices else 0
-            pop_books = self.get_popular_books(limit=top_n + extra)
-            if all_disliked_indices or dislikes:
-                dislike_clean_set = set(
-                    str(d).strip().replace("-", "").lower() for d in (dislikes or [])
-                )
-                for d_idx in all_disliked_indices:
-                    dislike_clean_set.add(
-                        str(self.df.iloc[d_idx].get("isbn13", "")).strip().replace("-", "").lower()
-                    )
-                    dislike_clean_set.add(str(self.df.iloc[d_idx].get("title", "")).strip().lower())
-                pop_books = [
-                    b
-                    for b in pop_books
-                    if str(b.get("isbn13", "")).strip().replace("-", "").lower()
-                    not in dislike_clean_set
-                    and str(b.get("title", "")).strip().lower() not in dislike_clean_set
-                ]
+            pop_books = self.get_popular_books(
+                limit=top_n, exclude_indices=all_disliked_indices | excluded_indices,
+                exclude_isbns=list(dislikes or []) + list(exclude or []),
+            )
             for b in pop_books:
                 if "recommendation_reason" not in b:
                     b["recommendation_reason"] = "Trending on Libris right now"
@@ -449,11 +535,14 @@ class BookRecommender:
 
         # Process semantic scores if provided
         semantic_vec = np.zeros(len(self.df))
+        # Catalog rows that received a vector score (any edition); used only to label results.
+        semantic_indices: set = set()
         if semantic_scores:
             for isbn, score in semantic_scores.items():
-                indices = self.engine.find_all_indices(isbn)
+                indices = self.engine.find_all_indices(isbn, validate=False)
                 for idx in indices:
                     semantic_vec[idx] = score
+                    semantic_indices.add(idx)
 
         # Compute Profile Affinity Bonuses
         affinity_scores = np.zeros(len(self.df))
@@ -510,16 +599,18 @@ class BookRecommender:
         if all_seed_indices:
             final_scores[list(all_seed_indices)] = -1.0
 
-        # Strict hard filter for ALL dislikes
+        # Strict hard filter for ALL dislikes and caller exclusions (every edition)
         if all_disliked_indices:
             final_scores[list(all_disliked_indices)] = -1.0
+        if excluded_indices:
+            final_scores[list(excluded_indices)] = -1.0
 
         if use_diversity:
             # Maximal Marginal Relevance (MMR) for diversity
             recs = self._get_diverse_recommendations(final_scores, top_n)
         else:
             # Deterministic top-N recommendations excluding suppressed candidates
-            suppressed = all_seed_indices.union(all_disliked_indices)
+            suppressed = all_seed_indices | all_disliked_indices | excluded_indices
             valid_indices = [
                 i
                 for i in range(len(final_scores))
@@ -537,19 +628,16 @@ class BookRecommender:
             )
             top_indices = []
             seen_isbns = set()
-            seen_titles = set()
+            seen_works = set()
             for idx in sorted_indices:
                 row = self.df.iloc[idx]
-                isbn = str(row.get("isbn13", "")).strip().replace("-", "").lower()
-                title = str(row.get("title", "")).strip().lower()
-                if isbn and isbn in seen_isbns:
-                    continue
-                if title and title in seen_titles:
+                isbn = normalize_isbn(row.get("isbn13", ""))
+                work = _row_identity(row)
+                if (isbn and isbn in seen_isbns) or work in seen_works:
                     continue
                 if isbn:
                     seen_isbns.add(isbn)
-                if title:
-                    seen_titles.add(title)
+                seen_works.add(work)
                 top_indices.append(idx)
                 if len(top_indices) >= top_n:
                     break
@@ -558,40 +646,30 @@ class BookRecommender:
             for i, rec in enumerate(recs):
                 rec["final_score"] = float(final_scores[top_indices[i]])
 
-        # Strict post-filter safeguard against dislikes and seeds
-        dislike_clean_set = set()
-        if dislikes or all_disliked_indices:
-            for d in (dislikes or []):
-                dislike_clean_set.add(str(d).strip().replace("-", "").lower())
-            for d_idx in all_disliked_indices:
-                dislike_clean_set.add(
-                    str(self.df.iloc[d_idx].get("isbn13", "")).strip().replace("-", "").lower()
-                )
-                dislike_clean_set.add(str(self.df.iloc[d_idx].get("title", "")).strip().lower())
-
-        seed_clean_set = set()
-        if seed_titles or all_seed_indices:
-            for s in seed_titles:
-                seed_clean_set.add(str(s).strip().replace("-", "").lower())
-            for s_idx in all_seed_indices:
-                seed_clean_set.add(
-                    str(self.df.iloc[s_idx].get("isbn13", "")).strip().replace("-", "").lower()
-                )
-                seed_clean_set.add(str(self.df.iloc[s_idx].get("title", "")).strip().lower())
-
-        if dislike_clean_set or seed_clean_set:
+        # Strict post-filter safeguard against dislikes, seeds and exclusions. Rows are matched by
+        # ISBN (any edition) and by work identity, never by title alone: two different books can
+        # share a title ("The Complete Stories" by Hurston and by O'Connor).
+        blocked_rows = all_disliked_indices | all_seed_indices | excluded_indices
+        blocked_isbns = {normalize_isbn(x) for x in list(dislikes or []) + list(seed_titles) + list(exclude or [])}
+        blocked_works = set()
+        for b_idx in blocked_rows:
+            row = self.df.iloc[b_idx]
+            blocked_works.add(_row_identity(row))
+            for part in str(row.get("edition_isbns", "") or "").split("|") + [str(row.get("isbn13", ""))]:
+                if normalize_isbn(part):
+                    blocked_isbns.add(normalize_isbn(part))
+        blocked_isbns.discard("")
+        if blocked_isbns or blocked_works:
             recs = [
                 r
                 for r in recs
-                if str(r.get("isbn13", "")).strip().replace("-", "").lower() not in dislike_clean_set
-                and str(r.get("title", "")).strip().lower() not in dislike_clean_set
-                and str(r.get("isbn13", "")).strip().replace("-", "").lower() not in seed_clean_set
-                and str(r.get("title", "")).strip().lower() not in seed_clean_set
+                if normalize_isbn(r.get("isbn13", "")) not in blocked_isbns
+                and _row_identity(r) not in blocked_works
             ]
 
         # Add explanations
         for rec in recs:
-            rec_idx = self.engine.find_index(rec.get("isbn13", ""))
+            rec_idx = self.engine.find_index(rec.get("isbn13", ""), validate=False)
             rec["raw_similarity_score"] = float(raw_scores[rec_idx]) if rec_idx is not None else 0.0
             rec.update(
                 self._explain_recommendation(
@@ -601,6 +679,7 @@ class BookRecommender:
                     preferred_genres=preferred_genres,
                     preferred_authors=preferred_authors,
                     seed_sources=seed_sources,
+                    semantic_indices=semantic_indices,
                 )
             )
 
@@ -612,40 +691,49 @@ class BookRecommender:
         valid_indices = [int(i) for i in np.argsort(scores)[::-1] if scores[i] > -0.5]
         candidate_indices = valid_indices[: max(100, top_n * 10)]
 
-        # Start with the highest-scoring item
         if not candidate_indices:
             return []
+        # Relevance is rescaled by the best candidate's score so it shares the [0, 1] range of
+        # the cosine-similarity penalty; otherwise lambda's effect depends on the score scale.
+        top_score = float(scores[candidate_indices[0]])
+        relevance = scores / top_score if top_score > 1e-9 else scores
 
         selected_indices = []
         seen_isbns = set()
-        seen_titles = set()
+        seen_works = set()
 
         def _is_duplicate_book(idx: int) -> bool:
             row = self.df.iloc[idx]
-            isbn = str(row.get("isbn13", "")).strip().replace("-", "").lower()
-            title = str(row.get("title", "")).strip().lower()
-            if isbn and isbn in seen_isbns:
-                return True
-            if title and title in seen_titles:
-                return True
-            return False
+            isbn = normalize_isbn(row.get("isbn13", ""))
+            return bool(isbn and isbn in seen_isbns) or _row_identity(row) in seen_works
 
         def _record_book(idx: int) -> None:
             row = self.df.iloc[idx]
-            isbn = str(row.get("isbn13", "")).strip().replace("-", "").lower()
-            title = str(row.get("title", "")).strip().lower()
+            isbn = normalize_isbn(row.get("isbn13", ""))
             if isbn:
                 seen_isbns.add(isbn)
-            if title:
-                seen_titles.add(title)
+            seen_works.add(_row_identity(row))
+
+        # Candidate-candidate similarities are computed once (<= ~100x100) instead of one sparse
+        # cosine call per candidate per step (~1,000 calls for top_n=10): same values, same
+        # selection rule and tie-breaking. Live audit: similar-books p50 was ~1.3 s in-process.
+        pos = {idx: i for i, idx in enumerate(candidate_indices)}
+        pair_sim = cosine_similarity(self.tfidf_matrix[candidate_indices])
+        max_sim_to_selected = np.zeros(len(candidate_indices))
+
+        def _select(idx: int) -> None:
+            nonlocal max_sim_to_selected
+            selected_indices.append(idx)
+            _record_book(idx)
+            candidate_indices.remove(idx)
+            max_sim_to_selected = np.maximum(max_sim_to_selected, pair_sim[pos[idx]])
 
         for idx in list(candidate_indices):
             if not _is_duplicate_book(idx):
-                selected_indices.append(idx)
-                _record_book(idx)
-                candidate_indices.remove(idx)
+                _select(idx)
                 break
 
+        lam = self.config.diversity_lambda
         while len(selected_indices) < top_n and candidate_indices:
             max_mmr = -np.inf
             best_candidate_idx = -1
@@ -653,45 +741,24 @@ class BookRecommender:
             for cand_idx in candidate_indices:
                 if _is_duplicate_book(cand_idx):
                     continue
-
-                if selected_indices:
-                    sim_scores = cosine_similarity(
-                        self.tfidf_matrix[cand_idx], self.tfidf_matrix[selected_indices]
-                    )[0]
-                    sim_to_selected = sim_scores.max()
-                else:
-                    sim_to_selected = 0.0
-                mmr = (self.config.diversity_lambda * scores[cand_idx]) - (
-                    (1 - self.config.diversity_lambda) * sim_to_selected
-                )
-
+                sim_to_selected = max_sim_to_selected[pos[cand_idx]] if selected_indices else 0.0
+                mmr = (lam * relevance[cand_idx]) - ((1 - lam) * sim_to_selected)
                 if mmr > max_mmr:
                     max_mmr = mmr
                     best_candidate_idx = cand_idx
 
             if best_candidate_idx != -1:
-                selected_indices.append(best_candidate_idx)
-                _record_book(best_candidate_idx)
-                candidate_indices.remove(best_candidate_idx)
+                _select(best_candidate_idx)
             else:
                 break  # No more candidates to add
 
         recs = self.df.iloc[selected_indices].to_dict(orient="records")
         # Add scores and diversity penalty for transparency
-        for rec in recs:
-            idx = self.engine.find_index(rec["isbn13"])
-            if idx is not None:
-                if selected_indices:
-                    sim_scores = cosine_similarity(
-                        self.tfidf_matrix[idx], self.tfidf_matrix[selected_indices]
-                    )[0]
-                    sim_to_selected = sim_scores.max()
-                else:
-                    sim_to_selected = 0.0
-                rec["final_score"] = float(scores[idx])
-                rec["diversity_penalty"] = float(
-                    (1 - self.config.diversity_lambda) * sim_to_selected
-                )
+        sel_pos = [pos[i] for i in selected_indices]
+        for idx, rec in zip(selected_indices, recs):
+            sim_to_selected = float(pair_sim[pos[idx], sel_pos].max()) if sel_pos else 0.0
+            rec["final_score"] = float(scores[idx])
+            rec["diversity_penalty"] = float((1 - lam) * sim_to_selected)
         return recs[:top_n]
 
     def _explain_recommendation(
@@ -702,17 +769,29 @@ class BookRecommender:
         preferred_genres: Optional[List[str]] = None,
         preferred_authors: Optional[List[str]] = None,
         seed_sources: Optional[Dict[str, str]] = None,
+        semantic_indices: Optional[set] = None,
     ) -> Dict[str, str]:
-        """Generate an explainability payload and natural reasoning for a recommendation."""
-        rec_idx = self.engine.find_index(recommended_book["isbn13"])
+        """
+        Generate an explainability payload and natural reasoning for a recommendation.
+
+        `semantic_indices` holds the catalog rows that received a vector score in this request
+        (recommend() passes it). A book is called a semantic match only if its row is in it, so a
+        book that ranked on popularity alone is never described as matching the search.
+        """
+        rec_idx = self.engine.find_index(recommended_book["isbn13"], validate=False)
         if rec_idx is None:
             return {}
 
-        isbn = recommended_book.get("isbn13", "")
-        has_semantic_match = semantic_scores and isbn in semantic_scores
+        if semantic_indices is not None:
+            has_semantic_match = rec_idx in semantic_indices
+        else:
+            isbn = normalize_isbn(recommended_book.get("isbn13", ""))
+            has_semantic_match = bool(semantic_scores) and isbn in {normalize_isbn(k) for k in semantic_scores}
 
-        rec_cats = set(re.split(r"\s*[,|]\s*", str(recommended_book.get("categories", "")).lower()))
-        cat_list = [c for c in rec_cats if c]
+        # Catalog order, not set order, so the explanation text is the same on every run.
+        cat_list = list(dict.fromkeys(
+            c for c in re.split(r"\s*[,|]\s*", str(recommended_book.get("categories", "")).lower()) if c
+        ))
 
         if not seed_indices:
             # Check profile matches first
@@ -738,16 +817,29 @@ class BookRecommender:
                             "confidence": "medium",
                             "is_cold_start": False,
                         }
-            # Pure semantic search case
-            if cat_list:
-                explanation = f"Bu kitap, aramanızla anlamsal olarak eşleşti ve {cat_list[0]} kategorisinde yer alıyor."
+            # No seeds: the book either received a vector score (a semantic match), or it ranked
+            # on the profile / popularity terms. Only the first is described as matching the search.
+            # confidence / is_cold_start keep their previous values: they describe the user's
+            # evidence (none without seeds), not the match.
+            if has_semantic_match:
+                if cat_list:
+                    explanation = f"Bu kitap, aramanız için anlamsal arama sonuçlarında yer aldı ve {cat_list[0]} kategorisinde."
+                else:
+                    explanation = "Bu kitap, aramanız için anlamsal arama sonuçlarında yer aldı."
+                # A vector score only means the book is among the nearest neighbours (the RPC threshold is
+                # 0.0), so the label says "found by semantic search", never "matches".
+                reason, explanation_type = "Found by semantic search", "semantic_match"
+            elif preferred_genres or preferred_authors:
+                explanation = "Bu kitap, belirttiğiniz okuma tercihleri doğrultusunda seçildi."
+                reason, explanation_type = "Curated based on your taste profile", "category_affinity"
             else:
-                explanation = "Bu kitap, arama niyetinizle en yüksek anlamsal benzerliğe sahip olduğu için önerildi."
+                explanation = "Bu kitap, Libris genelindeki popüler ve yüksek puanlı eserler arasından seçildi."
+                reason, explanation_type = "Popular with Libris readers", "trending_catalog"
             return {
                 "explanation": explanation,
                 "explanation_source_book": "",
-                "recommendation_reason": "Trending on Libris right now",
-                "explanation_type": "trending_catalog",
+                "recommendation_reason": reason,
+                "explanation_type": explanation_type,
                 "confidence": "cold_start",
                 "is_cold_start": True,
             }
@@ -784,11 +876,23 @@ class BookRecommender:
                             "confidence": "medium",
                             "is_cold_start": False,
                         }
+            # A signed-in user's library seeds (seed_sources) or explicit preferences are a real profile.
+            if preferred_genres or preferred_authors or seed_sources:
+                return {
+                    "explanation": "Bu kitap, genel okuma profiliniz ve beğenileriniz doğrultusunda önerildi.",
+                    "explanation_source_book": "",
+                    "recommendation_reason": "Curated based on your taste profile",
+                    "explanation_type": "category_affinity",
+                    "confidence": "medium",
+                    "is_cold_start": False,
+                }
+            # Not similar to the seed and no profile to point to: it ranked on popularity, so say so
+            # rather than claiming a taste profile the user never provided.
             return {
-                "explanation": "Bu kitap, genel okuma profiliniz ve beğenileriniz doğrultusunda önerildi.",
+                "explanation": "Bu kitap, Libris genelindeki popüler ve yüksek puanlı eserler arasından seçildi.",
                 "explanation_source_book": "",
-                "recommendation_reason": "Curated based on your taste profile",
-                "explanation_type": "category_affinity",
+                "recommendation_reason": "Popular with Libris readers",
+                "explanation_type": "trending_catalog",
                 "confidence": "medium",
                 "is_cold_start": False,
             }
@@ -796,7 +900,9 @@ class BookRecommender:
         most_similar_seed_idx = seed_indices[np.argmax(sim_scores)]
         source_book = self.df.iloc[most_similar_seed_idx]
         source_cats = set(re.split(r"\s*[,|]\s*", str(source_book.get("categories", "")).lower()))
-        common_genres = rec_cats.intersection(source_cats)
+        # In the recommended book's catalog order: a set intersection made the named genre depend
+        # on PYTHONHASHSEED, so the same request could explain itself differently per process.
+        common_genres = [c for c in cat_list if c in source_cats]
 
         # Determine source interaction type for personalized attribution
         src_clean_isbn = str(source_book.get("isbn13", "")).strip().replace("-", "").lower()
@@ -867,9 +973,9 @@ class BookRecommender:
             if has_semantic_match:
                 # Acknowledge both user preference and semantic query
                 if common_genres:
-                    explanation = f"Aramanızla eşleşmesinin yanı sıra, {verb_tr} '{source_book['title']}' kitabıyla ortak ({list(common_genres)[0]}) türünde olduğu için önerildi."
+                    explanation = f"Anlamsal arama sonuçlarında yer aldı; ayrıca {verb_tr} '{source_book['title']}' kitabıyla ortak ({common_genres[0]}) türünde olduğu için önerildi."
                 else:
-                    explanation = f"Aramanızla güçlü bir eşleşme sağladı ve okuma geçmişinizdeki '{source_book['title']}' kitabına benzer bir atmosfere sahip."
+                    explanation = f"Anlamsal arama sonuçlarında yer aldı ve okuma geçmişinizdeki '{source_book['title']}' kitabına benzer bir atmosfere sahip."
             else:
                 # Standard personalized recommendation
                 if common_genres:
@@ -900,6 +1006,56 @@ class BookRecommender:
             "is_cold_start": False,
         }
 
+    LEXICAL_SEARCH_MAX_LIMIT = 50
+
+    def lexical_search(
+        self, query: str, limit: int = 10, exclude: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Ranks the catalog by TF-IDF cosine to a free-text query. This is RAG's fallback when
+        vector search is unavailable. The catalog text is English, so lexical matching cannot
+        bridge Turkish or German queries; on the provisional offline labels the English scores
+        were clearly higher than the Turkish/German ones, and callers should not rely on it for
+        non-English queries.
+
+        `limit` is capped at LEXICAL_SEARCH_MAX_LIMIT. `exclude` (ISBNs of any edition) is
+        applied while ranking, so excluded books do not consume result slots and callers do not
+        need to over-fetch by the size of a user's library.
+        """
+        if not self.is_fitted or self.engine.tfidf_vectorizer is None:
+            return []
+        text = clean_text(query)
+        if not text:
+            return []
+        limit = max(1, min(int(limit), self.LEXICAL_SEARCH_MAX_LIMIT))
+        excluded = self.engine.indices_for_isbns(exclude or [])
+        scores = cosine_similarity(
+            self.engine.tfidf_vectorizer.transform([text]), self.tfidf_matrix
+        ).ravel()
+        books: List[Dict[str, Any]] = []
+        for idx in np.argsort(-scores):
+            if scores[idx] <= 0 or len(books) >= limit:
+                break
+            if int(idx) in excluded:
+                continue
+            book = self.df.iloc[int(idx)].to_dict()
+            book["similarity_score"] = float(scores[idx])
+            books.append(book)
+        return books
+
+    def edition_isbns(self, isbns: Iterable[str]) -> Set[str]:
+        """
+        Every normalised ISBN of every catalog work that carries one of `isbns` on any edition,
+        plus the given ISBNs themselves (so books missing from the catalog still match exactly).
+        """
+        out = {normalize_isbn(i) for i in isbns or []}
+        for idx in self.engine.indices_for_isbns(isbns or []):
+            row = self.df.iloc[idx]
+            for part in str(row.get("edition_isbns", "") or "").split("|") + [str(row.get("isbn13", ""))]:
+                out.add(normalize_isbn(part))
+        out.discard("")
+        return out
+
     def search_books(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search for books by title, author, or description."""
         if not self.is_fitted:
@@ -911,16 +1067,40 @@ class BookRecommender:
         results = self.df[mask].head(limit)
         return results.to_dict(orient="records")
 
-    def get_popular_books(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get the most popular books based on the pre-calculated popularity score with deduplication."""
+    def get_popular_books(
+        self,
+        limit: int = 10,
+        exclude_indices: Optional[Set[int]] = None,
+        exclude_isbns: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Most popular books by the pre-calculated popularity score, one per work. Deduplication is
+        by ISBN and work identity (title + first-author surname), not by title alone, so distinct
+        books that share a title are both eligible.
+        """
         if self.df.empty:
             return []
-        sorted_df = self.df.sort_values(by="popularity_score", ascending=False)
-        if "isbn13" in sorted_df.columns:
-            sorted_df = sorted_df.drop_duplicates(subset=["isbn13"])
-        if "title" in sorted_df.columns:
-            sorted_df = sorted_df.drop_duplicates(subset=["title"])
-        books = sorted_df.head(limit).to_dict(orient="records")
+        excluded = set(exclude_indices or ())
+        if exclude_isbns:
+            excluded |= self.engine.indices_for_isbns(exclude_isbns)
+        blocked_isbns = {normalize_isbn(i) for i in exclude_isbns or []} - {""}
+        sorted_df = self.df.sort_values(by="popularity_score", ascending=False, kind="stable")
+        picked: List[int] = []
+        seen_isbns, seen_works = set(), set()
+        col = lambda name: sorted_df[name].tolist() if name in sorted_df.columns else [""] * len(sorted_df)  # noqa: E731
+        for idx, raw_isbn, title, authors in zip(sorted_df.index, col("isbn13"), col("title"), col("authors")):
+            if idx in excluded:
+                continue
+            isbn = normalize_isbn(raw_isbn)
+            work = work_id(title, authors)
+            if (isbn and (isbn in seen_isbns or isbn in blocked_isbns)) or work in seen_works:
+                continue
+            seen_isbns.add(isbn)
+            seen_works.add(work)
+            picked.append(idx)
+            if len(picked) >= limit:
+                break
+        books = self.df.loc[picked].to_dict(orient="records")
         for b in books:
             if "recommendation_reason" not in b or not b.get("recommendation_reason"):
                 b["recommendation_reason"] = "Trending on Libris right now"

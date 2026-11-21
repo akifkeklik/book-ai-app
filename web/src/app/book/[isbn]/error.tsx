@@ -70,7 +70,7 @@ export default function BookDetailError({
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.5rem',
-              background: 'rgba(255, 255, 255, 0.08)',
+              background: 'var(--tint-3)',
             }}
           >
             <ArrowLeft size={16} /> {t('back_to_catalog')}

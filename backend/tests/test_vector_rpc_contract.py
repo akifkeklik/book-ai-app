@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock
 
+import pytest
+from backend.domain.ports import SemanticSearchUnavailable
 from backend.infrastructure.persistence.supabase_adapters import SupabaseBookDataPort
 
 
@@ -40,15 +42,14 @@ def test_get_semantic_candidates_empty_seeds_noop():
     mock_supabase.rpc.assert_not_called()
 
 
-def test_get_semantic_candidates_handles_rpc_failure_gracefully():
-    """Verify that if match_book_embeddings RPC is missing or fails, it degrades to empty dict."""
+def test_get_semantic_candidates_rpc_failure_is_explicit():
+    """A missing/failing match_book_embeddings RPC raises instead of posing as 'no similar books'."""
     mock_supabase = MagicMock()
     mock_supabase.rpc.side_effect = Exception("PGRST202: Could not find function match_book_embeddings")
 
     port = SupabaseBookDataPort(mock_supabase)
-    result = port.get_semantic_candidates(["9780001"])
-
-    assert result == {}
+    with pytest.raises(SemanticSearchUnavailable, match="match_book_embeddings"):
+        port.get_semantic_candidates(["9780001"])
 
 
 def test_match_query_embeddings_normal_contract():
@@ -76,10 +77,23 @@ def test_match_query_embeddings_normal_contract():
     assert result == {"9780003": 0.92}
 
 
-def test_match_query_embeddings_handles_rpc_failure_gracefully():
-    """Verify match_query_embeddings returns empty dict on RPC error."""
+def test_match_query_embeddings_rpc_failure_is_explicit():
+    """An RPC error raises SemanticSearchUnavailable so RAG can fall back explicitly."""
     mock_supabase = MagicMock()
     mock_supabase.rpc.side_effect = Exception("Internal DB error")
 
     port = SupabaseBookDataPort(mock_supabase)
-    assert port.match_query_embeddings([0.0] * 10) == {}
+    with pytest.raises(SemanticSearchUnavailable, match="Internal DB error"):
+        port.match_query_embeddings([0.0] * 10)
+
+
+def test_match_query_embeddings_empty_result_is_not_an_error():
+    """Zero matches is a valid answer and must stay distinguishable from a failure."""
+    mock_supabase = MagicMock()
+    mock_supabase.rpc.return_value.execute.return_value.data = []
+    assert SupabaseBookDataPort(mock_supabase).match_query_embeddings([0.1] * 10) == {}
+
+
+def test_missing_client_is_explicit():
+    with pytest.raises(SemanticSearchUnavailable):
+        SupabaseBookDataPort(None).match_query_embeddings([0.1] * 10)

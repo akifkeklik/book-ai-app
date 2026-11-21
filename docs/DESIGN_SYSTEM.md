@@ -84,13 +84,13 @@ Both Web and Mobile store and validate the identical schema:
 ```json
 {
   "themeMode": "light" | "dark" | "system",
-  "colorPalette": "editorial" | "lavender" | "sage" | "powder_blue" | "peach" | "rose",
+  "colorPalette": "lavender_dream" | "rose_quartz" | "mint_breeze" | "ocean_mist" | "peach_blossom" | "sage_garden" | "vanilla_cream" | "arctic_sky",
   "fontFamily": "serif" | "sans" | "mono",
   "fontScale": 0.9 | 1.0 | 1.15 | 1.3,
   "lineSpacing": "normal" | "relaxed",
   "highContrast": false,
   "reducedMotion": false,
-  "language": "en" | "tr" | "de",
+  "language": "en" | "tr" | "de" | "es" | "fr" | "it",
   "density": "comfortable" | "compact"
 }
 ```
@@ -98,6 +98,7 @@ Both Web and Mobile store and validate the identical schema:
 ### 5.2 Zero-FOUC Web Implementation
 - An inline script in `<head>` reads `localStorage` before paint and applies attributes to `document.documentElement` (`data-theme`, `data-palette`, `data-font`, `data-scale`, `data-contrast`, `data-spacing`, `data-motion`, `lang`).
 - React `PreferencesProvider` provides reactive state, system media-query subscriptions, and live updates.
+- Themes: 10 themes × light/dark, one per hue family (red, coral, gold, olive, mint, azure, indigo, violet, rose, neutral graphite) so no two look alike. Base colours per combination live in `web/src/app/themes.css`; borders, tints, shadows and legacy aliases are derived there once with `color-mix`, so components use tokens only. Palette ids saved by earlier releases are migrated (`LEGACY_THEME_MAP` in `web/src/lib/themes.ts`). `src/__tests__/themes.test.ts` checks WCAG AA for all 20 combinations and a minimum perceptual distance (OKLab) between the themes' primary colours.
 - Robust corruption recovery: any invalid or unparsable JSON falls back gracefully to `DEFAULT_PREFERENCES`.
 
 ---

@@ -88,7 +88,7 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                background: 'rgba(255, 255, 255, 0.08)',
+                background: 'var(--tint-3)',
               }}
             >
               <ArrowLeft size={16} /> {t('back_to_catalog')}
@@ -193,14 +193,14 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
           
           {/* Metadata Badges */}
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--tint-2)', padding: '0.5rem 1rem', borderRadius: '10px' }}>
               <Star size={18} color="#fbbf24" fill="#fbbf24" />
               <span style={{ fontWeight: 600 }}>{book.averageRating > 0 ? formatRating(book.averageRating, lang) : t('no_rating')}</span>
               {book.ratingsCount > 0 && <span className="text-muted" style={{ fontSize: '0.85rem' }}>({formatCount(book.ratingsCount, lang)})</span>}
             </div>
             
             {book.pageCount > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--tint-2)', padding: '0.5rem 1rem', borderRadius: '10px' }}>
                 <FileText size={16} color="var(--muted)" />
                 <span className="text-muted">{t('book_pages_label')}</span>
                 <span style={{ fontWeight: 600 }}>{book.pageCount}</span>
@@ -208,14 +208,14 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
             )}
             
             {book.publishedDate && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--tint-2)', padding: '0.5rem 1rem', borderRadius: '10px' }}>
                 <Calendar size={16} color="var(--muted)" />
                 <span className="text-muted">{t('book_published_label')}</span>
                 <span style={{ fontWeight: 600 }}>{book.publishedDate}</span>
               </div>
             )}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--tint-2)', padding: '0.5rem 1rem', borderRadius: '10px' }}>
               <Hash size={16} color="var(--muted)" />
               <span className="text-muted">ISBN:</span>
               <span style={{ fontWeight: 500, fontSize: '0.85rem' }}>{book.isbn13}</span>
@@ -238,9 +238,9 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
                     key={cat}
                     href={`/catalog?category=${encodeURIComponent(cat)}`}
                     style={{
-                      background: 'rgba(139, 92, 246, 0.15)',
-                      color: 'var(--accent)',
-                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                      background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                      color: 'var(--accent-ink)',
+                      border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
                       padding: '0.35rem 0.85rem',
                       borderRadius: '9999px',
                       fontSize: '0.85rem',
@@ -262,7 +262,18 @@ export default async function BookPage({ params }: { params: Promise<{ isbn: str
           {/* Synopsis */}
           <div style={{ marginBottom: '2.5rem' }}>
             <h3 style={{ fontSize: '1.2rem', marginBottom: '0.75rem' }}>{t('book_synopsis')}</h3>
-            <p style={{ lineHeight: '1.8', color: 'rgba(255,255,255,0.85)', fontSize: '1rem', whiteSpace: 'pre-line' }}>
+            {/* Catalog descriptions come from Google Books / Open Library in English. Say so instead of
+                presenting an English paragraph as if it were the page language, and mark its language
+                so screen readers pronounce it correctly. */}
+            {book.description && lang !== 'en' && (
+              <p className="text-muted" style={{ fontSize: '0.85rem', margin: '-0.25rem 0 0.5rem' }}>
+                {t('book_synopsis_english_note')}
+              </p>
+            )}
+            <p
+              lang={book.description ? 'en' : undefined}
+              style={{ lineHeight: '1.8', color: 'var(--text-secondary)', fontSize: '1rem', whiteSpace: 'pre-line' }}
+            >
               {book.description || t('book_no_description')}
             </p>
           </div>

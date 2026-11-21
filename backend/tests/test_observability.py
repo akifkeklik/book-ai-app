@@ -78,7 +78,7 @@ def test_ai_rag_observability_metrics(caplog):
     caplog.set_level(logging.INFO)
 
     embedding_port = MagicMock()
-    embedding_port.generate_embedding.return_value = [0.1, 0.2]
+    embedding_port.embed_query.return_value = [0.1, 0.2]
 
     book_data_port = MagicMock()
     book_data_port.match_query_embeddings.return_value = {"123": 0.9}

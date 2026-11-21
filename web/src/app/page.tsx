@@ -113,15 +113,15 @@ export default async function Home({
             gap: '0.5rem',
             padding: '0.4rem 1rem',
             borderRadius: '9999px',
-            background: 'rgba(99, 102, 241, 0.1)',
-            border: '1px solid rgba(99, 102, 241, 0.25)',
+            background: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--primary) 25%, transparent)',
             marginBottom: '1.5rem',
             fontSize: '0.85rem',
             fontWeight: 600,
-            color: '#a5b4fc',
+            color: 'var(--primary)',
           }}
         >
-          <Sparkles size={14} color="#818cf8" />
+          <Sparkles size={14} color="var(--primary)" />
           <span>{t('hero_badge')}</span>
         </div>
 
@@ -205,7 +205,7 @@ export default async function Home({
                 fontSize: '0.8rem',
                 padding: '0.3rem 0.75rem',
                 borderRadius: '9999px',
-                background: 'rgba(255, 255, 255, 0.05)',
+                background: 'var(--tint-2)',
                 border: '1px solid var(--card-border)',
                 color: 'var(--foreground)',
                 transition: 'all 0.2s ease',
@@ -302,7 +302,7 @@ export default async function Home({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1.75rem' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                <Bookmark size={22} color="var(--accent)" />
+                <Bookmark size={22} color="var(--accent-ink)" />
                 <h2 style={{ fontSize: '2rem', margin: 0 }}>{t('your_reading_list')}</h2>
               </div>
               <p className="text-muted" style={{ margin: 0, fontSize: '0.95rem' }}>
@@ -396,7 +396,7 @@ export default async function Home({
           <div className="glass-panel" style={{ padding: '2rem' }}>
             <div
               style={{
-                background: 'rgba(99, 102, 241, 0.12)',
+                background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
                 width: '52px',
                 height: '52px',
                 borderRadius: '14px',
@@ -417,7 +417,7 @@ export default async function Home({
           <div className="glass-panel" style={{ padding: '2rem' }}>
             <div
               style={{
-                background: 'rgba(139, 92, 246, 0.12)',
+                background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
                 width: '52px',
                 height: '52px',
                 borderRadius: '14px',
@@ -427,7 +427,7 @@ export default async function Home({
                 marginBottom: '1.25rem',
               }}
             >
-              <PenTool size={26} color="var(--accent)" />
+              <PenTool size={26} color="var(--accent-ink)" />
             </div>
             <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem' }}>{t('home_feature_ai')}</h3>
             <p className="text-muted" style={{ lineHeight: '1.6', fontSize: '0.95rem' }}>

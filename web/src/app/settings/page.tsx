@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePreferences } from '@/components/PreferencesProvider';
 import { useAuth } from '@/components/AuthProvider';
-import { LANGUAGES, LANGUAGE_NAMES, type ThemeMode, type ColorPalette, type FontFamily, type FontScale, type LineSpacing, type Language } from '@/lib/preferences';
+import { LANGUAGES, LANGUAGE_NAMES, type ThemeMode, type FontFamily, type FontScale, type LineSpacing, type Language } from '@/lib/preferences';
 import {
   Sun,
   Moon,
@@ -29,29 +29,9 @@ import Link from 'next/link';
 import { AVAILABLE_GENRES } from '@/components/TasteProfileModal';
 import { getUserPreferencesAction, updateUserPreferencesAction } from '@/app/actions/user';
 import { translateGenre } from '@/lib/i18n';
+import { THEME_IDS, THEME_SWATCHES } from '@/lib/themes';
 
-interface PaletteOption {
-  id: ColorPalette;
-  nameKey:
-    | 'palette_ocean_blue'
-    | 'palette_forest_green'
-    | 'palette_lavender'
-    | 'palette_terracotta'
-    | 'palette_amber'
-    | 'palette_turquoise';
-  accentHex: string;
-  darkBg: string;
-  lightBg: string;
-}
-
-const PALETTES: PaletteOption[] = [
-  { id: 'ocean_blue', nameKey: 'palette_ocean_blue', accentHex: '#0284c7', darkBg: '#0c1929', lightBg: '#f0f7ff' },
-  { id: 'forest_green', nameKey: 'palette_forest_green', accentHex: '#059669', darkBg: '#0e1c14', lightBg: '#f0f8f4' },
-  { id: 'lavender', nameKey: 'palette_lavender', accentHex: '#7c3aed', darkBg: '#161329', lightBg: '#f7f5fc' },
-  { id: 'terracotta', nameKey: 'palette_terracotta', accentHex: '#c2410c', darkBg: '#221611', lightBg: '#fdf6f0' },
-  { id: 'amber', nameKey: 'palette_amber', accentHex: '#d97706', darkBg: '#1c1608', lightBg: '#fffdf5' },
-  { id: 'turquoise', nameKey: 'palette_turquoise', accentHex: '#0d9488', darkBg: '#091b1a', lightBg: '#f0fdfa' },
-];
+const THEME_OPTIONS = THEME_IDS.map((id) => ({ id, nameKey: `palette_${id}` as const }));
 
 export default function SettingsPage() {
   const {
@@ -112,10 +92,11 @@ export default function SettingsPage() {
         setGenreSaveSuccess(true);
         router.refresh();
       } else {
-        setGenreError(res.error || 'Failed to update taste profile');
+        setGenreError(t('taste_save_error'));
       }
     } catch (err) {
-      setGenreError(err instanceof Error ? err.message : 'Error updating preferences');
+      console.warn('[settings]', err);
+      setGenreError(t('taste_save_error'));
     } finally {
       setIsSavingGenres(false);
     }
@@ -132,7 +113,7 @@ export default function SettingsPage() {
             gap: '0.5rem',
             padding: '0.4rem 1rem',
             borderRadius: '9999px',
-            background: 'rgba(99, 102, 241, 0.1)',
+            background: 'color-mix(in srgb, var(--primary) 10%, transparent)',
             border: '1px solid var(--card-border)',
             marginBottom: '1rem',
             fontSize: '0.85rem',
@@ -186,7 +167,7 @@ export default function SettingsPage() {
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              color: '#ffffff',
+              color: 'var(--on-primary)',
               boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
               padding: '0.75rem',
               textAlign: 'center',
@@ -263,7 +244,7 @@ export default function SettingsPage() {
                       justifyContent: 'center',
                       padding: '0.85rem 1rem',
                       borderColor: isSelected ? 'var(--primary)' : 'var(--card-border)',
-                      background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'var(--surface-subtle)',
+                      background: isSelected ? 'color-mix(in srgb, var(--primary) 15%, transparent)' : 'var(--surface-subtle)',
                       color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
                       fontWeight: isSelected ? 700 : 500,
                     }}
@@ -276,59 +257,39 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* 6 Pastel Palettes */}
+          {/* 10 themes, one per hue family — each previews its light and dark variant */}
           <div style={{ marginBottom: '2rem' }}>
-            <label className="input-label" style={{ marginBottom: '0.75rem', display: 'block' }}>
+            <div className="input-label" id="theme-picker-label" style={{ marginBottom: '0.75rem', display: 'block' }}>
               {t('color_palette')}
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
-              {PALETTES.map((pal) => {
-                const isSelected =
-                  preferences.colorPalette === pal.id ||
-                  (pal.id === 'ocean_blue' && (preferences.colorPalette === 'powder_blue' || preferences.colorPalette === 'editorial')) ||
-                  (pal.id === 'forest_green' && preferences.colorPalette === 'sage') ||
-                  (pal.id === 'terracotta' && preferences.colorPalette === 'peach');
+            </div>
+            <div className="theme-grid" role="radiogroup" aria-labelledby="theme-picker-label">
+              {THEME_OPTIONS.map((theme) => {
+                const isSelected = preferences.colorPalette === theme.id;
+                const { light, dark } = THEME_SWATCHES[theme.id];
                 return (
                   <button
-                    key={pal.id}
+                    key={theme.id}
                     type="button"
-                    onClick={() => setColorPalette(pal.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.85rem',
-                      padding: '0.85rem 1rem',
-                      borderRadius: '12px',
-                      background: isSelected ? 'rgba(99, 102, 241, 0.12)' : 'var(--surface-subtle)',
-                      border: `1.5px solid ${isSelected ? pal.accentHex : 'var(--card-border)'}`,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 0.2s ease',
-                    }}
+                    role="radio"
+                    aria-checked={isSelected}
+                    data-theme-option={theme.id}
+                    onClick={() => setColorPalette(theme.id)}
+                    className={`theme-option${isSelected ? ' is-selected' : ''}`}
                   >
-                    <div
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        background: pal.accentHex,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: `0 0 10px ${pal.accentHex}66`,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {isSelected && <Check size={16} color="#ffffff" strokeWidth={3} />}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.9rem', fontWeight: isSelected ? 700 : 500, color: 'var(--text-primary)' }}>
-                        {t(pal.nameKey)}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {pal.id}
-                      </div>
-                    </div>
+                    <span className="theme-option-preview" aria-hidden="true">
+                      {[light, dark].map((sw, i) => (
+                        <span key={i} className="theme-option-half" style={{ background: sw.bg }}>
+                          <span className="theme-option-card" style={{ background: sw.surface }}>
+                            <span style={{ background: sw.primary }} />
+                            <span style={{ background: sw.accent }} />
+                          </span>
+                        </span>
+                      ))}
+                    </span>
+                    <span className="theme-option-label">
+                      <span>{t(theme.nameKey)}</span>
+                      {isSelected && <Check size={15} strokeWidth={3} aria-hidden="true" />}
+                    </span>
                   </button>
                 );
               })}
@@ -383,7 +344,7 @@ export default function SettingsPage() {
                   style={{
                     padding: '0.4rem 0.8rem',
                     fontSize: '0.8rem',
-                    background: preferences.density === 'comfortable' ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+                    background: preferences.density === 'comfortable' ? 'color-mix(in srgb, var(--primary) 20%, transparent)' : 'transparent',
                     borderColor: preferences.density === 'comfortable' ? 'var(--primary)' : 'var(--card-border)',
                   }}
                 >
@@ -396,7 +357,7 @@ export default function SettingsPage() {
                   style={{
                     padding: '0.4rem 0.8rem',
                     fontSize: '0.8rem',
-                    background: preferences.density === 'compact' ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+                    background: preferences.density === 'compact' ? 'color-mix(in srgb, var(--primary) 20%, transparent)' : 'transparent',
                     borderColor: preferences.density === 'compact' ? 'var(--primary)' : 'var(--card-border)',
                   }}
                 >
@@ -439,7 +400,7 @@ export default function SettingsPage() {
                       justifyContent: 'center',
                       padding: '0.85rem 1rem',
                       borderColor: isSelected ? 'var(--primary)' : 'var(--card-border)',
-                      background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'var(--surface-subtle)',
+                      background: isSelected ? 'color-mix(in srgb, var(--primary) 15%, transparent)' : 'var(--surface-subtle)',
                       color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
                       fontWeight: isSelected ? 700 : 500,
                       ...item.style,
@@ -475,7 +436,7 @@ export default function SettingsPage() {
                       justifyContent: 'center',
                       padding: '0.75rem 1rem',
                       borderColor: isSelected ? 'var(--primary)' : 'var(--card-border)',
-                      background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'var(--surface-subtle)',
+                      background: isSelected ? 'color-mix(in srgb, var(--primary) 15%, transparent)' : 'var(--surface-subtle)',
                       color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
                       fontWeight: isSelected ? 700 : 500,
                     }}
@@ -508,7 +469,7 @@ export default function SettingsPage() {
                       justifyContent: 'center',
                       padding: '0.75rem 1rem',
                       borderColor: isSelected ? 'var(--primary)' : 'var(--card-border)',
-                      background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'var(--surface-subtle)',
+                      background: isSelected ? 'color-mix(in srgb, var(--primary) 15%, transparent)' : 'var(--surface-subtle)',
                       color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
                       fontWeight: isSelected ? 700 : 500,
                     }}
@@ -545,7 +506,7 @@ export default function SettingsPage() {
                     justifyContent: 'space-between',
                     padding: '1rem 1.25rem',
                     borderRadius: '12px',
-                    background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'var(--surface-subtle)',
+                    background: isSelected ? 'color-mix(in srgb, var(--primary) 15%, transparent)' : 'var(--surface-subtle)',
                     border: `1.5px solid ${isSelected ? 'var(--primary)' : 'var(--card-border)'}`,
                     cursor: 'pointer',
                     color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
@@ -603,7 +564,7 @@ export default function SettingsPage() {
                 gap: '0.75rem',
                 padding: '0.85rem 1.15rem',
                 borderRadius: '12px',
-                background: 'rgba(99, 102, 241, 0.08)',
+                background: 'color-mix(in srgb, var(--primary) 8%, transparent)',
                 border: '1px solid var(--card-border)',
                 marginBottom: '1.25rem',
                 flexWrap: 'wrap',
@@ -704,7 +665,7 @@ export default function SettingsPage() {
                         fontWeight: isSelected ? 700 : 500,
                         cursor: 'pointer',
                         border: `1.5px solid ${isSelected ? 'var(--primary)' : 'var(--card-border)'}`,
-                        background: isSelected ? 'rgba(99, 102, 241, 0.18)' : 'var(--surface-subtle)',
+                        background: isSelected ? 'color-mix(in srgb, var(--primary) 18%, transparent)' : 'var(--surface-subtle)',
                         color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
                         transition: 'all 0.15s ease',
                       }}

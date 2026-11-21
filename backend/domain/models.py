@@ -30,7 +30,7 @@ class Recommendation(Book):
     recommendation_reason: Optional[str] = Field(default=None)
     explanation_type: Optional[str] = Field(
         default=None,
-        description="liked_book, favorite_book, finished_book, reading_journey, takeaway_affinity, category_affinity, author_affinity, trending_catalog",
+        description="liked_book, favorite_book, finished_book, reading_journey, takeaway_affinity, category_affinity, author_affinity, trending_catalog, semantic_match",
     )
     confidence: Optional[str] = Field(default="medium", description="high, medium, cold_start")
     is_cold_start: bool = Field(default=False)

@@ -122,7 +122,7 @@ export default function BookNotesWidget({
         setNotes((prev) => prev.filter((n) => n.id !== tempId));
         setNewContent(previousContent);
         setIsAdding(true);
-        setError(res.error || 'Failed to save note');
+        setError(t('notes_save_error'));
       }
     } catch {
       setNotes((prev) => prev.filter((n) => n.id !== tempId));
@@ -170,7 +170,7 @@ export default function BookNotesWidget({
       } else {
         // Rollback
         setNotes((prev) => prev.map((n) => (n.id === noteId ? prevNote : n)));
-        setError(res.error || 'Failed to update note');
+        setError(t('notes_update_error'));
       }
     } catch {
       setNotes((prev) => prev.map((n) => (n.id === noteId ? prevNote : n)));
@@ -195,7 +195,7 @@ export default function BookNotesWidget({
       if (!res.success) {
         // Rollback
         setNotes((prev) => [prevNote, ...prev]);
-        setError(res.error || 'Failed to delete note');
+        setError(t('notes_delete_error'));
       }
     } catch {
       setNotes((prev) => [prevNote, ...prev]);
@@ -228,9 +228,9 @@ export default function BookNotesWidget({
         return {
           icon: <FileText size={13} />,
           label: t('note_type_personal'),
-          bg: 'rgba(139, 92, 246, 0.15)',
-          border: 'rgba(139, 92, 246, 0.3)',
-          color: 'var(--accent, #a78bfa)',
+          bg: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+          border: 'color-mix(in srgb, var(--accent) 30%, transparent)',
+          color: 'var(--accent, var(--accent))',
         };
     }
   };
@@ -242,7 +242,7 @@ export default function BookNotesWidget({
       style={{
         marginTop: '2.5rem',
         paddingTop: '2rem',
-        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+        borderTop: '1px solid var(--tint-4)',
       }}
     >
       {/* Header */}
@@ -265,8 +265,8 @@ export default function BookNotesWidget({
               width: '36px',
               height: '36px',
               borderRadius: '10px',
-              background: 'rgba(139, 92, 246, 0.18)',
-              color: 'var(--accent, #a78bfa)',
+              background: 'color-mix(in srgb, var(--accent) 18%, transparent)',
+              color: 'var(--accent, var(--accent))',
             }}
           >
             <PenTool size={18} />
@@ -364,8 +364,8 @@ export default function BookNotesWidget({
           style={{
             padding: '1.5rem',
             borderRadius: '12px',
-            background: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'var(--tint-2)',
+            border: '1px solid var(--tint-3)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -375,7 +375,7 @@ export default function BookNotesWidget({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <Lock size={18} color="var(--muted)" />
-            <span style={{ fontSize: '0.95rem', color: 'rgba(255, 255, 255, 0.8)' }}>
+            <span style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
               {t('sign_in_to_add_notes')}
             </span>
           </div>
@@ -397,8 +397,8 @@ export default function BookNotesWidget({
             padding: '1.25rem',
             borderRadius: '12px',
             marginBottom: '1.5rem',
-            border: '1px solid rgba(139, 92, 246, 0.3)',
-            background: 'rgba(30, 27, 75, 0.25)',
+            border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+            background: 'color-mix(in srgb, var(--surface) 25%, transparent)',
           }}
         >
           {/* Note Type Selector */}
@@ -427,8 +427,8 @@ export default function BookNotesWidget({
                     fontWeight: isSelected ? 600 : 500,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
-                    background: isSelected ? badge.bg : 'rgba(255, 255, 255, 0.05)',
-                    border: `1px solid ${isSelected ? badge.border : 'rgba(255, 255, 255, 0.1)'}`,
+                    background: isSelected ? badge.bg : 'var(--tint-2)',
+                    border: `1px solid ${isSelected ? badge.border : 'var(--tint-4)'}`,
                     color: isSelected ? badge.color : 'var(--muted)',
                   }}
                 >
@@ -450,9 +450,9 @@ export default function BookNotesWidget({
               width: '100%',
               padding: '0.75rem',
               borderRadius: '8px',
-              background: 'rgba(0, 0, 0, 0.25)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#fff',
+              background: 'var(--surface-subtle)',
+              border: '1px solid var(--tint-4)',
+              color: 'var(--text-primary)',
               fontSize: '0.95rem',
               lineHeight: 1.5,
               resize: 'vertical',
@@ -484,7 +484,7 @@ export default function BookNotesWidget({
                 }}
                 className="btn"
                 style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
+                  background: 'var(--tint-3)',
                   padding: '0.4rem 0.9rem',
                   fontSize: '0.85rem',
                 }}
@@ -523,8 +523,8 @@ export default function BookNotesWidget({
             padding: '2rem 1.5rem',
             textAlign: 'center',
             borderRadius: '12px',
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px dashed rgba(255, 255, 255, 0.12)',
+            background: 'var(--tint-1)',
+            border: '1px dashed var(--tint-4)',
           }}
         >
           <FileText size={32} color="var(--muted)" style={{ margin: '0 auto 0.75rem' }} />
@@ -562,8 +562,8 @@ export default function BookNotesWidget({
                   style={{
                     padding: '1.25rem',
                     borderRadius: '12px',
-                    border: '1px solid rgba(139, 92, 246, 0.3)',
-                    background: 'rgba(30, 27, 75, 0.25)',
+                    border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+                    background: 'color-mix(in srgb, var(--surface) 25%, transparent)',
                   }}
                 >
                   <div
@@ -586,8 +586,8 @@ export default function BookNotesWidget({
                             borderRadius: '9999px',
                             fontSize: '0.8rem',
                             cursor: 'pointer',
-                            background: isSel ? b.bg : 'rgba(255, 255, 255, 0.05)',
-                            border: `1px solid ${isSel ? b.border : 'rgba(255, 255, 255, 0.1)'}`,
+                            background: isSel ? b.bg : 'var(--tint-2)',
+                            border: `1px solid ${isSel ? b.border : 'var(--tint-4)'}`,
                             color: isSel ? b.color : 'var(--muted)',
                           }}
                         >
@@ -606,9 +606,9 @@ export default function BookNotesWidget({
                       width: '100%',
                       padding: '0.75rem',
                       borderRadius: '8px',
-                      background: 'rgba(0, 0, 0, 0.25)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      color: '#fff',
+                      background: 'var(--surface-subtle)',
+                      border: '1px solid var(--tint-4)',
+                      color: 'var(--text-primary)',
                       fontSize: '0.95rem',
                       lineHeight: 1.5,
                       resize: 'vertical',
@@ -629,7 +629,7 @@ export default function BookNotesWidget({
                       onClick={handleCancelEdit}
                       className="btn"
                       style={{
-                        background: 'rgba(255, 255, 255, 0.08)',
+                        background: 'var(--tint-3)',
                         padding: '0.35rem 0.8rem',
                         fontSize: '0.85rem',
                       }}
@@ -658,8 +658,8 @@ export default function BookNotesWidget({
                 style={{
                   padding: '1rem 1.25rem',
                   borderRadius: '12px',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid var(--tint-3)',
+                  background: 'var(--tint-1)',
                   opacity: isDeleting ? 0.5 : 1,
                   transition: 'all 0.2s ease',
                 }}
@@ -743,7 +743,7 @@ export default function BookNotesWidget({
                     margin: 0,
                     fontSize: '0.95rem',
                     lineHeight: 1.6,
-                    color: 'rgba(255, 255, 255, 0.9)',
+                    color: 'var(--text-secondary)',
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
                   }}

@@ -142,3 +142,13 @@ def test_dev_mode_permits_startup_without_custom_secret():
     app = create_app(DevConfig)
     assert app is not None
 
+
+
+class TestingEnabledProdConfig(ValidProdConfig):
+    TESTING = True
+
+
+def test_production_fails_when_testing_mode_enabled():
+    # TESTING bypasses the auth hook; production must refuse to start with it on.
+    with pytest.raises(ValueError, match="TESTING mode cannot be enabled"):
+        create_app(TestingEnabledProdConfig)

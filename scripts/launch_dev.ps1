@@ -96,12 +96,12 @@ if ($ChromePath) {
 # -- Step 2: Environment Configuration Check -----------------------------------
 Write-Header "STEP 2: CONFIGURATION AUDIT"
 
-$backendEnvFile = Join-Path $RepoRoot "backend\.env"
 $rootEnvFile    = Join-Path $RepoRoot ".env"
 $webEnvFile     = Join-Path $RepoRoot "web\.env.local"
 
-if (-not (Test-Path $backendEnvFile) -and -not (Test-Path $rootEnvFile)) {
-    Write-Warn "Neither backend\.env nor root .env found. Backend will run in unconfigured test mode."
+# backend/config.py loads only the repository-root .env.
+if (-not (Test-Path $rootEnvFile)) {
+    Write-Warn "Root .env not found (copy backend\.env.example to .env). Backend will run in unconfigured test mode."
 } else {
     Write-Success "Environment configuration found."
 }
@@ -289,7 +289,7 @@ Write-Host '   - Database readiness is independently audited via /api/health/rea
 Write-Host ""
 Write-Host "  Safe Termination:" -ForegroundColor Yellow
 Write-Host "   To stop all services safely, run:" -ForegroundColor Yellow
-Write-Host '   .\scripts\stop_dev.ps1 (or .\stop_dev.ps1)' -ForegroundColor White
+Write-Host '   .\scripts\stop_dev.ps1' -ForegroundColor White
 Write-Host ""
 Write-Host "================================================================================" -ForegroundColor Cyan
 

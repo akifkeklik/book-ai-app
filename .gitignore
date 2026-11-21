@@ -19,7 +19,6 @@ backend/.env.*
 web/.env.local
 web/.env.*.local
 !.env.example
-!backend/env.example
 !backend/.env.example
 !web/.env.example
 
@@ -58,3 +57,7 @@ ruff_bin/
 scratch/
 artifacts/
 emulator_*.png
+
+# Exported embedding snapshots for offline evaluation (production data; regenerate with
+# backend/scripts/export_embedding_snapshot.py)
+backend/evaluation/cache/

@@ -6,6 +6,7 @@ import {
   DEFAULT_PREFERENCES,
   type LibrisPreferences,
 } from '../lib/preferences';
+import { THEME_IDS } from '../lib/themes';
 import { translate, DICTIONARIES, localizeRecommendationReason, type TranslationKey } from '../lib/i18n';
 
 test('parsePreferences: returns default preferences when given null, undefined, or empty input', () => {
@@ -22,7 +23,7 @@ test('parsePreferences: returns default preferences when given null, undefined, 
 test('parsePreferences: preserves valid complete preferences', () => {
   const input: LibrisPreferences = {
     themeMode: 'light',
-    colorPalette: 'sage',
+    colorPalette: 'sage_garden',
     fontFamily: 'sans',
     fontScale: 1.15,
     lineSpacing: 'relaxed',
@@ -104,32 +105,45 @@ test('i18n completeness: ensures 100% key parity across EN, TR, and DE dictionar
   }
 });
 
-test('six palettes x two appearance modes: validates all 12 combinations in parsePreferences and resolveEffectiveTheme', () => {
-  const canonicalSix = ['ocean_blue', 'forest_green', 'lavender', 'terracotta', 'amber', 'turquoise'] as const;
+test('ten themes x two appearance modes: all 20 combinations survive parsePreferences and resolveEffectiveTheme', () => {
   const modes = ['light', 'dark'] as const;
-
-  for (const palette of canonicalSix) {
+  let combinations = 0;
+  for (const palette of THEME_IDS) {
     for (const mode of modes) {
-      const parsed = parsePreferences({
-        themeMode: mode,
-        colorPalette: palette,
-      });
+      const parsed = parsePreferences({ themeMode: mode, colorPalette: palette });
       assert.equal(parsed.colorPalette, palette);
       assert.equal(parsed.themeMode, mode);
-      assert.equal(resolveEffectiveTheme(mode, false), mode);
+      assert.equal(resolveEffectiveTheme(mode, mode === 'light'), mode);
+      combinations++;
     }
   }
+  assert.equal(combinations, 20);
 });
 
-test('i18n: translations exist for all 6 canonical palettes and Information Architecture keys in EN, TR, and DE', () => {
-  const requiredPaletteKeys: TranslationKey[] = [
-    'palette_ocean_blue',
-    'palette_forest_green',
-    'palette_lavender',
-    'palette_terracotta',
-    'palette_amber',
-    'palette_turquoise',
-  ];
+test('parsePreferences: palettes saved by earlier releases migrate to the closest current theme', () => {
+  assert.equal(parsePreferences({ colorPalette: 'ocean_blue' }).colorPalette, 'ocean_mist');
+  assert.equal(parsePreferences({ colorPalette: 'lavender' }).colorPalette, 'lavender_dream');
+  assert.equal(parsePreferences({ colorPalette: 'sage' }).colorPalette, 'sage_garden');
+  assert.equal(parsePreferences({ colorPalette: 'peach' }).colorPalette, 'peach_blossom');
+  assert.equal(parsePreferences({ colorPalette: 'rose' }).colorPalette, 'rose_quartz');
+  assert.equal(parsePreferences({ colorPalette: 'powder_blue' }).colorPalette, 'ocean_mist');
+  assert.equal(parsePreferences({ colorPalette: 'amber' }).colorPalette, 'honey_gold');
+  // Retired near-duplicate themes of the eight-theme set.
+  assert.equal(parsePreferences({ colorPalette: 'vanilla_cream' }).colorPalette, 'honey_gold');
+  assert.equal(parsePreferences({ colorPalette: 'arctic_sky' }).colorPalette, 'ocean_mist');
+  // Other saved fields are untouched by the migration.
+  const migrated = parsePreferences({ colorPalette: 'forest_green', themeMode: 'light', language: 'tr' });
+  assert.deepEqual([migrated.colorPalette, migrated.themeMode, migrated.language], ['mint_breeze', 'light', 'tr']);
+});
+
+test('first visit follows the system appearance (matches the pre-paint init script, so no flash)', () => {
+  assert.equal(DEFAULT_PREFERENCES.themeMode, 'system');
+  assert.equal(resolveEffectiveTheme(DEFAULT_PREFERENCES.themeMode, true), 'dark');
+  assert.equal(resolveEffectiveTheme(DEFAULT_PREFERENCES.themeMode, false), 'light');
+});
+
+test('i18n: translations exist for all 8 themes and Information Architecture keys in EN, TR, and DE', () => {
+  const requiredPaletteKeys: TranslationKey[] = THEME_IDS.map((id) => `palette_${id}` as const);
 
   const requiredIaKeys: TranslationKey[] = [
     'nav_discover',
@@ -186,6 +200,18 @@ test('localizeRecommendationReason: translates reasons deterministically across 
       tr: "Cyberpunk türünü sevdiğiniz için",
       de: "Weil Sie Cyberpunk mögen",
     },
+    {
+      raw: "Found by semantic search",
+      en: "Found by semantic search",
+      tr: "Anlamsal aramayla bulundu",
+      de: "Über die semantische Suche gefunden",
+    },
+    {
+      raw: "Popular with Libris readers",
+      en: "Popular with Libris readers",
+      tr: "Libris okurları arasında popüler",
+      de: "Beliebt bei Libris-Lesern",
+    },
   ];
 
   for (const c of cases) {
@@ -198,3 +224,14 @@ test('localizeRecommendationReason: translates reasons deterministically across 
 });
 
 
+
+test('explanation labels: every language names the semantic_match and popular explanation types', () => {
+  for (const [lang, dict] of Object.entries(DICTIONARIES)) {
+    for (const key of ['exp_type_semantic_match', 'reason_matches_search', 'reason_popular_catalog'] as const) {
+      const value = (dict as Record<string, string>)[key];
+      assert.ok(value && value.trim().length > 0, `${lang} is missing ${key}`);
+    }
+    assert.ok(!/trend/i.test((dict as Record<string, string>)['exp_type_semantic_match'] ?? 'trend'),
+      `${lang} labels a semantic match as trending`);
+  }
+});

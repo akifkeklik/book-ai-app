@@ -5,6 +5,7 @@ All functions are pure and stateless for easy testing.
 
 import math
 import re
+import unicodedata
 from typing import Optional
 
 import pandas as pd
@@ -23,6 +24,44 @@ def clean_text(text: str) -> str:
     text = re.sub(r"[^a-z0-9\s]", " ", text)  # keep alphanumeric
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
+
+def normalize_isbn(value) -> str:
+    """Canonical ISBN string: no hyphens/spaces, no float suffix ('9780…0.0'), upper-case X."""
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    text = str(value).strip().replace("-", "").replace(" ", "").upper()
+    return text[:-2] if text.endswith(".0") else text
+
+
+def _fold(text: str) -> str:
+    """Case- and accent-insensitive form, keeping letters and digits of any script."""
+    text = str(text or "").replace("İ", "i").casefold()
+    text = "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c))
+    return " ".join(re.sub(r"[\W_]+", " ", text).split())
+
+
+def work_id(title, authors) -> str:
+    """
+    Edition-aware book identity: folded title + first author's surname.
+
+    Two catalog rows with the same work_id are editions of one book (e.g. 'JOHN IRVING'
+    vs 'John Irving'); rows that only share a title ('The Complete Stories' by Hurston
+    and by O'Connor) stay distinct. Authors are ';' or '|' separated, either
+    'First Last' or 'Last, First'.
+    """
+    first = re.split(r"[;|]", str(authors or ""))[0].strip()
+    if "," in first:
+        surname = first.split(",")[0]
+    else:
+        tokens = _fold(first).split()
+        surname = tokens[-1] if tokens else ""
+    surname = _fold(surname)
+    if surname in ("", "unknown author", "author", "nan", "none"):
+        surname = ""
+    return f"{_fold(title)}|{surname}"
 
 
 def extract_year(date_str: Optional[str]) -> int:
@@ -134,9 +173,15 @@ def preprocess_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df["popularity_score"] = 0.7 * df["_norm_rating"] + 0.3 * df["_norm_count"]
     df = df.drop(columns=["_norm_rating", "_norm_count"])
 
-    # Deduplicate by lowercase title.
-    df["_title_lower"] = df["title"].str.lower().str.strip()
-    df = df.drop_duplicates(subset=["_title_lower"], keep="first")
-    df = df.drop(columns=["_title_lower"])
+    # Collapse editions of one work (same folded title + first-author surname) into one row.
+    # Deduplicating on title alone used to drop distinct books that share a title (e.g. Hurston's
+    # and O'Connor's "The Complete Stories"). The surviving row keeps every edition's ISBN in
+    # `edition_isbns` so an ISBN from another source (embeddings, user shelves) still resolves.
+    df["_work"] = [work_id(t, a) for t, a in zip(df["title"], df["authors"])]
+    isbns = df["isbn13"].map(normalize_isbn)
+    editions = isbns.groupby(df["_work"]).agg(lambda s: "|".join(dict.fromkeys(i for i in s if i)))
+    df = df.drop_duplicates(subset=["_work"], keep="first")
+    df["edition_isbns"] = df["_work"].map(editions).fillna("")
+    df = df.drop(columns=["_work"])
 
     return df.reset_index(drop=True)

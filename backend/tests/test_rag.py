@@ -24,7 +24,7 @@ def test_process_rag_query_success():
     mock_enrichment = MagicMock(spec=EnrichmentPort)
     mock_llm = MagicMock(spec=LlmPort)
 
-    mock_embedding.generate_embedding.return_value = [0.1, 0.2, 0.3]
+    mock_embedding.embed_query.return_value = [0.1, 0.2, 0.3]
 
     # Mock retrieval
     mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
@@ -49,7 +49,7 @@ def test_process_rag_query_success():
     assert response["answer"] == "This is a great fantasy book."
     assert len(response["referenced_books"]) == 1
 
-    mock_embedding.generate_embedding.assert_called_once()
+    mock_embedding.embed_query.assert_called_once()
     mock_data_port.match_query_embeddings.assert_called_once()
     mock_llm.generate_response.assert_called_once()
 
@@ -61,7 +61,7 @@ def test_process_rag_query_empty_retrieval():
     mock_enrichment = MagicMock(spec=EnrichmentPort)
     mock_llm = MagicMock(spec=LlmPort)
 
-    mock_embedding.generate_embedding.return_value = [0.1, 0.2, 0.3]
+    mock_embedding.embed_query.return_value = [0.1, 0.2, 0.3]
     mock_data_port.match_query_embeddings.return_value = {}
     mock_recommender.recommend.return_value = []
     mock_enrichment.enrich.side_effect = lambda books: books
@@ -84,7 +84,7 @@ def test_process_rag_query_empty_retrieval():
 @pytest.mark.unit
 def test_process_rag_query_embedding_failure():
     mock_embedding = MagicMock(spec=EmbeddingPort)
-    mock_embedding.generate_embedding.return_value = None
+    mock_embedding.embed_query.return_value = None
 
     use_case = ProcessRagQueryUseCase(
         embedding_port=mock_embedding,
@@ -97,7 +97,7 @@ def test_process_rag_query_embedding_failure():
     response = use_case.execute("Fail me")
 
     assert response["status"] == "embedding_failed"
-    assert response["answer"] == "I'm having trouble understanding your query right now. Please try again later."
+    assert response["answer"] == "Semantic search is unavailable right now. Please try again later, or search by title or author."
     assert len(response.get("referenced_books", [])) == 0
 
 
@@ -110,7 +110,7 @@ def test_process_rag_query_json_parsing_success():
     mock_enrichment = MagicMock(spec=EnrichmentPort)
     mock_llm = MagicMock(spec=LlmPort)
 
-    mock_embedding.generate_embedding.return_value = [0.1]
+    mock_embedding.embed_query.return_value = [0.1]
     mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
     mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book", "authors": "Author"}]
     mock_enrichment.enrich.side_effect = lambda books: books
@@ -136,7 +136,7 @@ def test_process_rag_query_json_markdown_parsing():
     mock_enrichment = MagicMock(spec=EnrichmentPort)
     mock_llm = MagicMock(spec=LlmPort)
 
-    mock_embedding.generate_embedding.return_value = [0.1]
+    mock_embedding.embed_query.return_value = [0.1]
     mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
     mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book", "authors": "Author"}]
     mock_enrichment.enrich.side_effect = lambda books: books
@@ -162,7 +162,7 @@ def test_process_rag_query_legacy_fallback():
     mock_enrichment = MagicMock(spec=EnrichmentPort)
     mock_llm = MagicMock(spec=LlmPort)
 
-    mock_embedding.generate_embedding.return_value = [0.1]
+    mock_embedding.embed_query.return_value = [0.1]
     mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
     mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book", "authors": "Author"}]
     mock_enrichment.enrich.side_effect = lambda books: books
@@ -185,7 +185,7 @@ def test_process_rag_query_llm_exception_fallback():
     mock_enrichment = MagicMock(spec=EnrichmentPort)
     mock_llm = MagicMock(spec=LlmPort)
 
-    mock_embedding.generate_embedding.return_value = [0.1, 0.2]
+    mock_embedding.embed_query.return_value = [0.1, 0.2]
     mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
     mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book", "authors": "Author"}]
     mock_enrichment.enrich.side_effect = lambda books: books
@@ -211,7 +211,7 @@ def test_process_rag_query_malformed_json_types():
     mock_enrichment = MagicMock(spec=EnrichmentPort)
     mock_llm = MagicMock(spec=LlmPort)
 
-    mock_embedding.generate_embedding.return_value = [0.1]
+    mock_embedding.embed_query.return_value = [0.1]
     mock_data_port.match_query_embeddings.return_value = {"123": 0.9}
     mock_recommender.recommend.return_value = [{"isbn13": "123", "title": "Fantasy Book", "authors": "Author"}]
     mock_enrichment.enrich.side_effect = lambda books: books
@@ -239,7 +239,7 @@ def test_process_rag_query_user_signal_isolation_and_dislikes():
     mock_llm = MagicMock(spec=LlmPort)
     mock_repo = MagicMock(spec=UserInteractionRepository)
 
-    mock_embedding.generate_embedding.return_value = [0.1]
+    mock_embedding.embed_query.return_value = [0.1]
     mock_data_port.match_query_embeddings.return_value = {"999": 0.8}
     mock_enrichment.enrich.side_effect = lambda books: books
     mock_llm.generate_response.return_value = "Grounding test answer."
@@ -249,7 +249,12 @@ def test_process_rag_query_user_signal_isolation_and_dislikes():
         {"book_id": "disliked-isbn", "interaction_type": "dislike"},
         {"book_id": "liked-isbn", "interaction_type": "like"},
     ]
-    mock_recommender.recommend.return_value = [{"isbn13": "999", "title": "Good Book", "authors": "Author"}]
+    # The ranker returns the user's own books too; RAG must still drop them.
+    mock_recommender.recommend.return_value = [
+        {"isbn13": "liked-isbn", "title": "Already In Library", "authors": "Someone"},
+        {"isbn13": "disliked-isbn", "title": "Disliked Book", "authors": "Other"},
+        {"isbn13": "999", "title": "Good Book", "authors": "Author"},
+    ]
 
     use_case = ProcessRagQueryUseCase(
         embedding_port=mock_embedding,
@@ -262,14 +267,12 @@ def test_process_rag_query_user_signal_isolation_and_dislikes():
 
     response = use_case.execute("query", user_id="user-123")
 
+    # Only this user's signals are read.
     mock_repo.get_user_interactions.assert_called_once_with("user-123")
-    mock_recommender.recommend.assert_called_once_with(
-        seed_titles=["liked-isbn"],
-        top_n=5,
-        use_diversity=True,
-        semantic_scores={"999": 0.8},
-        dislikes=["disliked-isbn"],
-    )
+    # The query decides relevance: the liked book is not a TF-IDF seed competing with the query.
+    assert mock_recommender.recommend.call_args.kwargs["seed_titles"] == []
+    # Library and disliked books never reach the answer; the relevant book does.
+    assert [b["isbn13"] for b in response["referenced_books"]] == ["999"]
     assert response["status"] == "success"
 
 
@@ -295,7 +298,7 @@ def test_generic_recommendation_intent_excludes_topic_constraints(query, expecte
 @pytest.mark.unit
 def test_anonymous_topic_recommendation_keeps_semantic_retrieval():
     mock_embedding = MagicMock()
-    mock_embedding.generate_embedding.return_value = [0.1, 0.2, 0.3]
+    mock_embedding.embed_query.return_value = [0.1, 0.2, 0.3]
     mock_data_port = MagicMock()
     mock_data_port.match_query_embeddings.return_value = {"fantasy-isbn": 0.99}
     mock_recommender = MagicMock()
@@ -351,3 +354,21 @@ def test_popular_book_ranking_discounts_low_vote_rating_outliers():
 
     assert ranked.iloc[0]["title"] == "Well-rated popular book"
     assert "_popularity_score" not in ranked.columns
+
+
+@pytest.mark.unit
+def test_unseeded_semantic_query_ranks_without_mmr_but_seeded_keeps_it():
+    """Regression: MMR diversity put "All Creatures Great and Small" (cosine 0.62) into the top 5
+    of "George Orwell's books". Pure semantic queries must rank by relevance; seeded queries keep MMR."""
+    use_case = ProcessRagQueryUseCase(
+        embedding_port=MagicMock(), book_data_port=MagicMock(), interaction_repo=None,
+        recommender=MagicMock(), enrichment_service=None, llm_port=MagicMock(),
+    )
+    use_case._recommender.recommend.return_value = []
+    use_case._book_data_port.match_query_embeddings.return_value = {"9780000000001": 0.7}
+
+    use_case._semantic_retrieval([0.1], top_k=5)
+    assert use_case._recommender.recommend.call_args.kwargs["use_diversity"] is False
+
+    use_case._semantic_retrieval([0.1], top_k=5, seed_ids=["9780000000002"])
+    assert use_case._recommender.recommend.call_args.kwargs["use_diversity"] is True

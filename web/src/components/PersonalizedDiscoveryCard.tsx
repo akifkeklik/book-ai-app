@@ -73,7 +73,7 @@ export function PersonalizedDiscoveryCard({
         opacity: isDismissing ? 0.4 : isUpdating ? 0.7 : 1,
         transition: 'all 0.25s ease',
         position: 'relative',
-        background: 'var(--card-bg, rgba(255, 255, 255, 0.03))',
+        background: 'var(--card-bg, var(--tint-1))',
       }}
       data-isbn={book.isbn13}
     >
@@ -187,7 +187,7 @@ export function PersonalizedDiscoveryCard({
                   borderRadius: '6px',
                   fontSize: '0.65rem',
                   fontWeight: 600,
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  border: '1px solid var(--tint-4)',
                 }}
               >
                 {t(`confidence_${book.confidence}` as TranslationKey) || book.confidence}
@@ -265,14 +265,14 @@ export function PersonalizedDiscoveryCard({
               alignItems: 'flex-start',
               gap: '6px',
               padding: '6px 10px',
-              background: 'rgba(139, 92, 246, 0.09)',
+              background: 'color-mix(in srgb, var(--accent) 9%, transparent)',
               borderRadius: '8px',
-              border: '1px solid rgba(139, 92, 246, 0.22)',
+              border: '1px solid color-mix(in srgb, var(--accent) 22%, transparent)',
               marginTop: 'auto',
             }}
             title={localizedReason}
           >
-            <Sparkles size={13} color="var(--accent)" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <Sparkles size={13} color="var(--accent-ink)" style={{ flexShrink: 0, marginTop: '2px' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
               {book.explanationType && (
                 <span
@@ -281,7 +281,7 @@ export function PersonalizedDiscoveryCard({
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: '0.04em',
-                    color: 'var(--accent)',
+                    color: 'var(--accent-ink)',
                   }}
                 >
                   {t(`exp_type_${book.explanationType}` as TranslationKey) || book.explanationType}
@@ -290,7 +290,7 @@ export function PersonalizedDiscoveryCard({
               <p
                 style={{
                   fontSize: '0.78rem',
-                  color: 'var(--accent)',
+                  color: 'var(--accent-ink)',
                   fontWeight: 500,
                   lineHeight: '1.35',
                   margin: 0,
@@ -490,7 +490,7 @@ export function PersonalizedDiscoveryCard({
                 cursor: 'pointer',
                 borderRadius: '8px',
                 border: '1px solid var(--card-border)',
-                background: 'rgba(255, 255, 255, 0.05)',
+                background: 'var(--tint-2)',
               }}
               aria-label={t('library_change_status_label', { title: book.title })}
             >

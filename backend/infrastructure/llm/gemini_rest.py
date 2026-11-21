@@ -69,7 +69,12 @@ class GeminiRestClient:
         text = "".join(p.get("text", "") for p in parts).strip()
         return text or None
 
-    def embed(self, text: str, model: str, task_type: str = "RETRIEVAL_DOCUMENT", timeout: float = 20.0) -> List[float]:
-        payload = {"model": _model_path(model), "content": {"parts": [{"text": text}]}, "taskType": task_type}
+    def embed(self, text: str, model: str, task_type: Optional[str] = None, timeout: float = 20.0) -> List[float]:
+        """task_type is sent only when given: the docs say gemini-embedding-2 does not support the
+        field (the task goes into the text instead); gemini-embedding-001 uses it to separate
+        queries (RETRIEVAL_QUERY) from documents (RETRIEVAL_DOCUMENT)."""
+        payload: dict = {"model": _model_path(model), "content": {"parts": [{"text": text}]}}
+        if task_type:
+            payload["taskType"] = task_type
         data = self._post(model, "embedContent", payload, timeout)
         return list((data.get("embedding") or {}).get("values") or [])

@@ -13,7 +13,7 @@ Libris uses Supabase services with PostgreSQL as its relational database. The au
 
 Use the environment templates:
 
-- Backend: backend/env.example → backend/.env
+- Backend: backend/.env.example → .env (repository root; loaded by backend/config.py)
 - Web: web/.env.example → web/.env.local
 
 The backend uses SUPABASE_URL and SUPABASE_ANON_KEY. The web app uses NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.

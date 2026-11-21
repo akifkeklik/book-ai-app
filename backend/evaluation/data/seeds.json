@@ -1,0 +1,355 @@
+{
+ "description": "Task 2: seed-to-item ('similar books') topics. 50 widely read seeds spanning genres. Relevance comes from pooled graded judgments in judgments_seeds.csv; the relevant set is not complete, so recall is not reported.",
+ "topics": [
+  {
+   "id": "s01",
+   "seed_isbn": "9780439554930",
+   "seed_title": "Harry Potter and the Sorcerer's Stone (Book 1)",
+   "seed_authors": "Rowling, J.K.",
+   "seed_categories": "Juvenile Fiction"
+  },
+  {
+   "id": "s02",
+   "seed_isbn": "9780316015844",
+   "seed_title": "Twilight",
+   "seed_authors": "Stephenie Meyer",
+   "seed_categories": "Young Adult Fiction"
+  },
+  {
+   "id": "s03",
+   "seed_isbn": "9781416524793",
+   "seed_title": "Angels & Demons",
+   "seed_authors": "Dan Brown",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s04",
+   "seed_isbn": "9780140283334",
+   "seed_title": "Lord of the Flies",
+   "seed_authors": "William Golding",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s05",
+   "seed_isbn": "9780743477116",
+   "seed_title": "Romeo and Juliet",
+   "seed_authors": "William Shakespeare",
+   "seed_categories": "Drama"
+  },
+  {
+   "id": "s06",
+   "seed_isbn": "9780061122415",
+   "seed_title": "The Alchemist",
+   "seed_authors": "Paulo Coelho",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s07",
+   "seed_isbn": "9780385732550",
+   "seed_title": "The Giver",
+   "seed_authors": "Lois Lowry",
+   "seed_categories": "Juvenile Fiction"
+  },
+  {
+   "id": "s08",
+   "seed_isbn": "9780142437209",
+   "seed_title": "Jane Eyre",
+   "seed_authors": "Charlotte Brontë",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s09",
+   "seed_isbn": "9780143038412",
+   "seed_title": "Eat, Pray, Love",
+   "seed_authors": "Elizabeth Gilbert",
+   "seed_categories": "Biography & Autobiography"
+  },
+  {
+   "id": "s10",
+   "seed_isbn": "9780385490818",
+   "seed_title": "The Handmaid's Tale",
+   "seed_authors": "Margaret Atwood",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s11",
+   "seed_isbn": "9780450040184",
+   "seed_title": "The Shining",
+   "seed_authors": "Stephen King",
+   "seed_categories": "Boys"
+  },
+  {
+   "id": "s12",
+   "seed_isbn": "9780141439471",
+   "seed_title": "Frankenstein, Or, The Modern Prometheus",
+   "seed_authors": "Mary Wollstonecraft Shelley",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s13",
+   "seed_isbn": "9780743247542",
+   "seed_title": "The Glass Castle",
+   "seed_authors": "Jeannette Walls",
+   "seed_categories": "Biography & Autobiography"
+  },
+  {
+   "id": "s14",
+   "seed_isbn": "9780345418265",
+   "seed_title": "The Princess Bride",
+   "seed_authors": "William Goldman",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s15",
+   "seed_isbn": "9780440498056",
+   "seed_title": "A Wrinkle in Time",
+   "seed_authors": "Madeleine L'Engle",
+   "seed_categories": "Juvenile Fiction"
+  },
+  {
+   "id": "s16",
+   "seed_isbn": "9780440242949",
+   "seed_title": "Outlander",
+   "seed_authors": "Diana Gabaldon",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s17",
+   "seed_isbn": "9780553381696",
+   "seed_title": "A Clash of Kings",
+   "seed_authors": "George R. R. Martin",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s18",
+   "seed_isbn": "9780307265432",
+   "seed_title": "The Road",
+   "seed_authors": "Cormac McCarthy",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s19",
+   "seed_isbn": "9780060531041",
+   "seed_title": "One Hundred Years of Solitude",
+   "seed_authors": "Gabriel Garcia Marquez",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s20",
+   "seed_isbn": "9780451207142",
+   "seed_title": "The pillars of the earth",
+   "seed_authors": "Ken Follett",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s21",
+   "seed_isbn": "9780582418271",
+   "seed_title": "The Firm",
+   "seed_authors": "John Grisham",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s22",
+   "seed_isbn": "9780141439587",
+   "seed_title": "Emma",
+   "seed_authors": "Jane Austen",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s23",
+   "seed_isbn": "9780743269513",
+   "seed_title": "The 7 Habits of Highly Effective People",
+   "seed_authors": "Stephen R. Covey",
+   "seed_categories": "Self-Help"
+  },
+  {
+   "id": "s24",
+   "seed_isbn": "9780393327342",
+   "seed_title": "Fight Club: A Novel",
+   "seed_authors": "Chuck Palahniuk",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s25",
+   "seed_isbn": "9780061139376",
+   "seed_title": "Coraline",
+   "seed_authors": "Neil Gaiman",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s26",
+   "seed_isbn": "9780060853983",
+   "seed_title": "Good Omens",
+   "seed_authors": "Neil Gaiman;Terry Pratchett",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s27",
+   "seed_isbn": "9780156030304",
+   "seed_title": "Flowers for Algernon",
+   "seed_authors": "Daniel Keyes",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s28",
+   "seed_isbn": "9780385494786",
+   "seed_title": "Into Thin Air",
+   "seed_authors": "Jon Krakauer",
+   "seed_categories": "Biography & Autobiography"
+  },
+  {
+   "id": "s29",
+   "seed_isbn": "9780452011878",
+   "seed_title": "Atlas Shrugged",
+   "seed_authors": "Ayn Rand",
+   "seed_categories": "Capitalism"
+  },
+  {
+   "id": "s30",
+   "seed_isbn": "9780143034902",
+   "seed_title": "The Shadow of the Wind",
+   "seed_authors": "Carlos Ruiz Zafón",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s31",
+   "seed_isbn": "9780307279460",
+   "seed_title": "A Walk in the Woods",
+   "seed_authors": "Bill Bryson",
+   "seed_categories": "Sports & Recreation"
+  },
+  {
+   "id": "s32",
+   "seed_isbn": "9780345453747",
+   "seed_title": "The Ultimate Hitchhiker's Guide to the Galaxy",
+   "seed_authors": "Douglas Adams",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s33",
+   "seed_isbn": "9780767908184",
+   "seed_title": "A Short History of Nearly Everything",
+   "seed_authors": "Bill Bryson",
+   "seed_categories": "Science"
+  },
+  {
+   "id": "s34",
+   "seed_isbn": "9780553803709",
+   "seed_title": "I, Robot",
+   "seed_authors": "Isaac Asimov",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s35",
+   "seed_isbn": "9781590302255",
+   "seed_title": "The Art of War",
+   "seed_authors": "Sun-Tzu;Sunzi",
+   "seed_categories": "Philosophy"
+  },
+  {
+   "id": "s36",
+   "seed_isbn": "9781400079278",
+   "seed_title": "Kafka on the Shore",
+   "seed_authors": "Haruki Murakami",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s37",
+   "seed_isbn": "9780394541556",
+   "seed_title": "Maus",
+   "seed_authors": "Art Spiegelman",
+   "seed_categories": "Children of Holocaust survivors"
+  },
+  {
+   "id": "s38",
+   "seed_isbn": "9780192833983",
+   "seed_title": "War and Peace",
+   "seed_authors": "Leo Tolstoy;graf Leo Tolstoy",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s39",
+   "seed_isbn": "9780553380958",
+   "seed_title": "Snow Crash",
+   "seed_authors": "Neal Stephenson",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s40",
+   "seed_isbn": "9780553383041",
+   "seed_title": "A Wizard of Earthsea",
+   "seed_authors": "Ursula K. Le Guin",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s41",
+   "seed_isbn": "9780425200452",
+   "seed_title": "Murder on the Orient Express",
+   "seed_authors": "Agatha Christie",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s42",
+   "seed_isbn": "9781577314806",
+   "seed_title": "The Power of Now",
+   "seed_authors": "Eckhart Tolle",
+   "seed_categories": "Body, Mind & Spirit"
+  },
+  {
+   "id": "s43",
+   "seed_isbn": "9780140449143",
+   "seed_title": "The Republic",
+   "seed_authors": "Plato;Sir Henry Desmond Pritchard Lee",
+   "seed_categories": "Philosophy"
+  },
+  {
+   "id": "s44",
+   "seed_isbn": "9780060652890",
+   "seed_title": "The Screwtape Letters",
+   "seed_authors": "C. S. Lewis",
+   "seed_categories": "Religion"
+  },
+  {
+   "id": "s45",
+   "seed_isbn": "9780743270755",
+   "seed_title": "Team of Rivals",
+   "seed_authors": "Doris Kearns Goodwin",
+   "seed_categories": "Biography & Autobiography"
+  },
+  {
+   "id": "s46",
+   "seed_isbn": "9780394758282",
+   "seed_title": "The Big Sleep",
+   "seed_authors": "Raymond Chandler",
+   "seed_categories": "Fiction"
+  },
+  {
+   "id": "s47",
+   "seed_isbn": "9780142000281",
+   "seed_title": "Getting Things Done",
+   "seed_authors": "David Allen",
+   "seed_categories": "Business & Economics"
+  },
+  {
+   "id": "s48",
+   "seed_isbn": "9780060899226",
+   "seed_title": "Kitchen Confidential Updated Ed",
+   "seed_authors": "Anthony Bourdain",
+   "seed_categories": "Biography & Autobiography"
+  },
+  {
+   "id": "s49",
+   "seed_isbn": "9780836218053",
+   "seed_title": "The Essential Calvin And Hobbes",
+   "seed_authors": "Bill Watterson",
+   "seed_categories": "Comics & Graphic Novels"
+  },
+  {
+   "id": "s50",
+   "seed_isbn": "9780060541811",
+   "seed_title": "The Andromeda Strain",
+   "seed_authors": "Michael Crichton",
+   "seed_categories": "Fiction"
+  }
+ ]
+}
