@@ -1,0 +1,68 @@
+{
+ "pool": 100,
+ "default_popularity_weight": 0.3,
+ "metrics": {
+  "proposed/pop_off_nomm": {
+   "ndcg@5": 0.553,
+   "precision@5": 0.46,
+   "recall@5": 0.58,
+   "mrr@5": 0.657,
+   "n": 20
+  },
+  "proposed/production": {
+   "ndcg@5": 0.41,
+   "precision@5": 0.28,
+   "recall@5": 0.367,
+   "mrr@5": 0.702,
+   "n": 20
+  },
+  "proposed/production_nomm": {
+   "ndcg@5": 0.598,
+   "precision@5": 0.48,
+   "recall@5": 0.6,
+   "mrr@5": 0.725,
+   "n": 20
+  },
+  "proposed/semantic_only": {
+   "ndcg@5": 0.546,
+   "precision@5": 0.45,
+   "recall@5": 0.57,
+   "mrr@5": 0.657,
+   "n": 20
+  },
+  "rule_derived/pop_off_nomm": {
+   "ndcg@5": 0.958,
+   "precision@5": 0.475,
+   "recall@5": 0.975,
+   "mrr@5": 0.969,
+   "n": 16
+  },
+  "rule_derived/production": {
+   "ndcg@5": 0.941,
+   "precision@5": 0.425,
+   "recall@5": 0.925,
+   "mrr@5": 1.0,
+   "n": 16
+  },
+  "rule_derived/production_nomm": {
+   "ndcg@5": 0.979,
+   "precision@5": 0.475,
+   "recall@5": 0.975,
+   "mrr@5": 1.0,
+   "n": 16
+  },
+  "rule_derived/semantic_only": {
+   "ndcg@5": 0.958,
+   "precision@5": 0.475,
+   "recall@5": 0.975,
+   "mrr@5": 0.969,
+   "n": 16
+  }
+ },
+ "author_foreign_share@5": {
+  "production": 0.2,
+  "production_nomm": 0.067,
+  "pop_off_nomm": 0.067,
+  "semantic_only": 0.067
+ }
+}

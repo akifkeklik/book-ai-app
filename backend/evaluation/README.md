@@ -157,6 +157,50 @@ recall@100 = 1.0, and `halfvec` precision costs 0.4% recall@5. When the HNSW ind
 used, the RPCs return at most `hnsw.ef_search` (default 40) rows even though 100 are
 requested. See *Remaining limitations* in the change report.
 
+## Live RAG quality evaluation (Turkish / English)
+
+`python -m backend.scripts.run_rag_quality_eval run` runs the **production pipeline, live**
+(Gemini + Supabase, read-only, roughly 120 API calls, about 15 minutes) on
+[data/rag_eval_tr_en.json](data/rag_eval_tr_en.json): 20 intents asked in both English and
+Turkish, plus 4 Turkish queries typed without Turkish letters (44 queries). It also runs the
+answer-reliability probes in [data/rag_eval_adversarial.json](data/rag_eval_adversarial.json).
+It is never part of CI.
+
+- **What it records per query:**
+  - cold (empty query cache) and warm (repeat) end-to-end latency;
+  - the semantic stage production actually used (query embedding, then the vector RPC; the
+    real objects are wrapped, not reimplemented);
+  - an exact cosine top-10 over the exported snapshot;
+  - every Gemini HTTP attempt (status, retries, latency, `usageMetadata` tokens);
+  - the ISBNs in the prompt Gemini received.
+- **Retrieval metrics** (work level, so editions of one book count once; `rel` = works graded ≥ 1):
+  - Hit@5 = 1 if any of the top 5 is relevant, else 0;
+  - R@k = |top-k ∩ rel| / min(k, |rel|), capped so a 39-book author set can reach 1.0;
+  - P@k = |top-k ∩ rel| / k;
+  - MRR@k = 1 / rank of the first relevant result within the top k (0 if none);
+  - nDCG@k = DCG@k / IDCG@k with gain 2^grade − 1 and discount log2(rank + 1).
+
+  Production answers with at most 5 books, so its @10 metrics are reported as "–", not as a
+  number. A query with no labelled set is excluded from a metric rather than scored 0.
+- **Grounding checks.** Deterministic, recomputed offline by
+  `python -m backend.scripts.run_rag_quality_eval report`:
+  - ISBNs outside the context;
+  - catalog titles and author names outside the context;
+  - the answer language versus the query language;
+  - quoted titles that match nothing, flagged for human review;
+  - the adversarial expectations (abstain, stay on books, ignore injection).
+- **Labels.** `label_tier` is `rule_derived` (identity rules: the book's own title or author, or
+  a known item), `proposed` (genre, topic and similar-book sets, pending review) or `open` (no
+  fixed set). Known-item intents set `single_work`, so any edition of the wanted book is a hit.
+  **No label is human-verified yet.** Reviewers fill `human_grade` (0/1/2) and `reviewed_by` in
+  [data/rag_eval_judgments.csv](data/rag_eval_judgments.csv). `report` then scores those intents
+  on the human grades and lists them as `human_verified`.
+- **Outputs:** [reports/rag_quality_eval.json](reports/rag_quality_eval.json) (everything, per
+  query), [reports/rag_quality_eval.md](reports/rag_quality_eval.md) (summary), and
+  `cache/rag_eval_query_embeddings.npz` (query vectors, for offline re-runs).
+- **Offline protection.** `backend/tests/test_rag_quality_eval_harness.py` pins the measurement
+  rules. `test_rag_grounding.py` and `test_ai_streaming.py` pin the defects found live.
+
 ## What a human-reviewed evaluation set needs
 
 1. **Reviewers and protocol.** At least two people who read in the topic's language (EN, TR,
