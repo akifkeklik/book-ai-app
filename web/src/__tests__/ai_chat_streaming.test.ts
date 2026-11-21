@@ -307,3 +307,91 @@ test('AI Grounding Integrity: verified books derive isGrounded true while empty 
   };
   assert.strictEqual(deriveGrounding([sampleBook]), true);
 });
+
+function withMockStream(chunks: string[], run: () => Promise<void>): Promise<void> {
+  const originalFetch = global.fetch;
+  global.fetch = (async () =>
+    new Response(createMockStream(chunks), {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    })) as typeof fetch;
+  return run().finally(() => {
+    global.fetch = originalFetch;
+  });
+}
+
+test('AI Chat Streaming: a stream that closes without done/error reports a network error', async () => {
+  const errors: { msg: string; network?: boolean }[] = [];
+  let doneCalled = false;
+  await withMockStream(
+    ['event: metadata\ndata: {"referenced_books":[],"status":"streaming"}\n\n', 'event: chunk\ndata: {"delta":"Half an ans"}\n\n'],
+    () =>
+      streamAiChat('Truncated', {
+        onDone: () => { doneCalled = true; },
+        onError: (msg, info) => { errors.push({ msg, network: info?.network }); },
+      })
+  );
+  assert.strictEqual(doneCalled, false);
+  assert.strictEqual(errors.length, 1, 'caller must be released from its loading state exactly once');
+  assert.strictEqual(errors[0].network, true);
+});
+
+test('AI Chat Streaming: a final done event without the trailing blank line is still delivered', async () => {
+  let done: StreamDonePayload | null = null;
+  let errorCalled = false;
+  await withMockStream(
+    ['event: chunk\ndata: {"delta":"Hi"}\n\n', 'event: done\ndata: {"answer":"Hi","referenced_books":[],"status":"success","source":"rag_llm"}'],
+    () =>
+      streamAiChat('No trailing newline', {
+        onDone: (d) => { done = d; },
+        onError: () => { errorCalled = true; },
+      })
+  );
+  assert.strictEqual(errorCalled, false);
+  assert.ok(done);
+  assert.strictEqual((done as StreamDonePayload).source, 'rag_llm');
+});
+
+test('AI Chat Streaming: CRLF-framed events are parsed', async () => {
+  const chunks: string[] = [];
+  let doneCalled = false;
+  await withMockStream(
+    ['event: chunk\r\ndata: {"delta":"A"}\r\n\r\n', 'event: done\r\ndata: {"answer":"A","referenced_books":[],"status":"success"}\r\n\r\n'],
+    () =>
+      streamAiChat('CRLF', {
+        onChunk: (d) => { chunks.push(d); },
+        onDone: () => { doneCalled = true; },
+      })
+  );
+  assert.deepStrictEqual(chunks, ['A']);
+  assert.strictEqual(doneCalled, true);
+});
+
+test('AI Chat Streaming: an in-stream error event is flagged as a server error and reported once', async () => {
+  const infos: (boolean | undefined)[] = [];
+  await withMockStream(
+    ['event: error\ndata: {"error":"An error occurred during AI processing."}\n\n'],
+    () => streamAiChat('Server failure', { onError: (_m, info) => { infos.push(info?.server); } })
+  );
+  assert.deepStrictEqual(infos, [true]);
+});
+
+test('AI Chat Streaming: the previous answer\'s books are sent so a follow-up can refer to them', async () => {
+  let sentBody: Record<string, unknown> | null = null;
+  const originalFetch = global.fetch;
+  global.fetch = (async (_url: unknown, init?: RequestInit) => {
+    sentBody = JSON.parse(String(init?.body));
+    return new Response(createMockStream(['event: done\ndata: {"answer":"ok","referenced_books":[],"status":"success"}\n\n']), {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+  }) as typeof fetch;
+  try {
+    await streamAiChat('Biraz anlatır mısın?', { contextIsbns: ['9780451524935', '', '9780452284234'] });
+    assert.deepStrictEqual(sentBody, { query: 'Biraz anlatır mısın?', context_isbns: ['9780451524935', '9780452284234'] });
+    await streamAiChat('Books like Dune');
+    assert.deepStrictEqual(sentBody, { query: 'Books like Dune' }, 'no context field when there is no previous answer');
+  } finally {
+    global.fetch = originalFetch;
+  }
+});

@@ -35,10 +35,18 @@ export async function POST(req: NextRequest) {
     // Never expose LIBRIS_API_KEY to the client browser.
     const headers = await ApiService.getHeaders();
 
+    // Books of the previous answer, so the backend can answer "tell me more about it". The backend
+    // validates them again; here they are only bounded to short strings.
+    const contextIsbns = Array.isArray(body.context_isbns)
+      ? body.context_isbns
+          .filter((v: unknown): v is string => typeof v === 'string' && v.length <= 20)
+          .slice(0, 5)
+      : [];
+
     const backendRes = await fetch(`${BACKEND_URL}/api/ai/chat/stream`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, context_isbns: contextIsbns }),
       cache: 'no-store',
       signal: req.signal,
     });
