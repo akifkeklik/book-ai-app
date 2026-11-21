@@ -200,3 +200,65 @@ def test_ai_chat_stream_user_session_isolation(client):
             assert res_b.status_code == 200
 
     assert captured_user_ids == [None, user_a_id, user_b_id]
+
+
+def test_ai_chat_stream_done_event_reports_answer_source(client):
+    """The done event says how the answer was produced, so the UI never labels a catalog
+    fallback as a Gemini answer."""
+    import json as _json
+
+    mock_rag_response = {
+        "answer": "Catalog fallback answer.",
+        "referenced_books": [],
+        "status": "llm_fallback",
+        "action": None,
+        "metrics": {"source": "rag_llm", "retrieval_mode": "lexical_fallback"},
+    }
+    with patch("backend.routes.routes._process_rag_query_uc.execute", return_value=mock_rag_response):
+        content = client.post("/api/ai/chat/stream", json={"query": "anything"}).get_data(as_text=True)
+
+    done_block = next(b for b in content.split("\n\n") if b.startswith("event: done"))
+    done = _json.loads(done_block.split("data: ", 1)[1])
+    assert done["status"] == "llm_fallback"
+    assert done["source"] == "rag_llm"
+    assert done["retrieval_mode"] == "lexical_fallback"
+
+
+def test_ai_chat_stream_done_event_tolerates_missing_metrics(client):
+    import json as _json
+
+    with patch(
+        "backend.routes.routes._process_rag_query_uc.execute",
+        return_value={"answer": "ok", "referenced_books": [], "status": "success", "action": None},
+    ):
+        content = client.post("/api/ai/chat/stream", json={"query": "anything"}).get_data(as_text=True)
+    done_block = next(b for b in content.split("\n\n") if b.startswith("event: done"))
+    done = _json.loads(done_block.split("data: ", 1)[1])
+    assert done["source"] is None and done["answer"] == "ok"
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "Plain answer with a few words in it.",
+        "Double  spaces,   triple spaces and a trailing space ",
+        "Line one\nLine two\n\n- bullet **bold** `code`\n1. item",
+        " leading space and unicode: Suç ve Ceza, Gurur ve Önyargı ✨",
+        "",
+    ],
+)
+def test_ai_chat_stream_chunks_reconstruct_the_final_answer_exactly(client, answer):
+    """What the UI shows while streaming (the concatenated chunks) must equal the final answer
+    in the done event, byte for byte, so the streamed text never differs from the stored one."""
+    import json as _json
+
+    payload = {"answer": answer, "referenced_books": [], "status": "success", "action": None,
+               "metrics": {"source": "rag_llm"}}
+    with patch("backend.routes.routes._process_rag_query_uc.execute", return_value=payload):
+        content = client.post("/api/ai/chat/stream", json={"query": "q"}).get_data(as_text=True)
+
+    events = [b for b in content.split("\n\n") if b.strip()]
+    chunks = [_json.loads(b.split("data: ", 1)[1])["delta"] for b in events if b.startswith("event: chunk")]
+    done = _json.loads(next(b for b in events if b.startswith("event: done")).split("data: ", 1)[1])
+    assert "".join(chunks) == done["answer"] == answer
+    assert done["source"] == "rag_llm"

@@ -98,6 +98,28 @@ def test_action_intent_palette_lavender(client, auth_headers):
     assert data["action"]["payload"]["palette"] == "lavender"
 
 
+@pytest.mark.parametrize(
+    "query, palette",
+    [
+        ("Switch the theme to Rose Quartz", "rose_quartz"),
+        ("Temayı Nane Esintisi yap", "mint_breeze"),
+        ("Set the palette to Lavender Dream", "lavender_dream"),
+        ("Farbe Salbeigarten", "sage_garden"),
+        ("Use the Arctic Sky theme", "arctic_sky"),
+        ("Temayı Kiraz Kırmızısı yap", "cherry_red"),
+        ("Switch the theme to Honey Gold", "honey_gold"),
+        ("Temayı çivit yap", "indigo_dusk"),
+        ("Use the graphite theme", "graphite_slate"),
+    ],
+)
+def test_action_intent_palette_new_themes(client, auth_headers, query, palette):
+    """The ten current themes are recognised by name; legacy names keep their legacy ids."""
+    resp = client.post("/api/ai/chat", headers=auth_headers, data=json.dumps({"query": query}))
+    data = resp.get_json()
+    assert data["status"] == "action_executed"
+    assert data["action"] == {"type": "SET_PALETTE", "payload": {"palette": palette}}
+
+
 def test_action_intent_language_turkish(client, auth_headers):
     resp = client.post(
         "/api/ai/chat",
@@ -271,3 +293,40 @@ def test_llm_provider_unavailable_deterministic_fallback(client, auth_headers, m
     assert len(data.get("referenced_books", [])) > 0
     assert any("1984" in b.get("title", "") for b in data["referenced_books"])
 
+
+
+@pytest.mark.parametrize("query, expected, foreign", [
+    ("Temayı Lavanta Rüyası yap", "Lavanta Rüyası", "Lavender Dream"),
+    ("Switch the theme to Rose Quartz", "Rose Quartz", "Gül Kuvarsı"),
+    # A legacy name is confirmed as the theme the user will actually see after migration.
+    ("Vurgu rengini kehribar yap", "Bal Altını", "Amber"),
+])
+def test_palette_confirmation_names_the_theme_in_the_query_language_only(client, auth_headers, query, expected, foreign):
+    data = client.post("/api/ai/chat", headers=auth_headers, data=json.dumps({"query": query})).get_json()
+    assert expected in data["answer"]
+    assert foreign not in data["answer"] and "(" not in data["answer"]
+
+
+def test_backend_theme_names_and_migrations_match_the_web_app():
+    """The assistant's theme names and legacy map must not drift from web/src/lib (the UI's source of truth)."""
+    import os
+    import re as _re
+
+    from backend.application.use_cases import ai_rag
+
+    web = os.path.join(os.path.dirname(__file__), "..", "..", "web", "src", "lib")
+    themes_ts = open(os.path.join(web, "themes.ts"), encoding="utf-8").read()
+    ids = _re.findall(r"^  '([a-z_]+)',$", themes_ts.split("export const THEME_IDS")[1].split("] as const")[0], _re.M)
+    assert ids and set(ids) == set(ai_rag._PALETTE_NAMES)
+    legacy_block = themes_ts.split("export const LEGACY_THEME_MAP")[1].split("};")[0]
+    legacy = dict(_re.findall(r"^  (\w+): '(\w+)',$", legacy_block, _re.M))
+    assert legacy == ai_rag._LEGACY_PALETTE_TARGET
+
+    i18n = open(os.path.join(web, "i18n.ts"), encoding="utf-8").read()
+    for lang in ("en", "tr", "de"):
+        # Each dictionary starts at "  <lang>: {" on its own line; read up to the next one.
+        section = _re.split(rf"^  {lang}: \{{$", i18n, flags=_re.M)[1]
+        for theme_id in ids:
+            m = _re.search(rf"palette_{theme_id}: ['\"](.+?)['\"],", section)
+            assert m, (lang, theme_id)
+            assert ai_rag._PALETTE_NAMES[theme_id][lang] == m.group(1), (lang, theme_id)

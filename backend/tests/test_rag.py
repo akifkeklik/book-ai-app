@@ -354,3 +354,21 @@ def test_popular_book_ranking_discounts_low_vote_rating_outliers():
 
     assert ranked.iloc[0]["title"] == "Well-rated popular book"
     assert "_popularity_score" not in ranked.columns
+
+
+@pytest.mark.unit
+def test_unseeded_semantic_query_ranks_without_mmr_but_seeded_keeps_it():
+    """Regression: MMR diversity put "All Creatures Great and Small" (cosine 0.62) into the top 5
+    of "George Orwell's books". Pure semantic queries must rank by relevance; seeded queries keep MMR."""
+    use_case = ProcessRagQueryUseCase(
+        embedding_port=MagicMock(), book_data_port=MagicMock(), interaction_repo=None,
+        recommender=MagicMock(), enrichment_service=None, llm_port=MagicMock(),
+    )
+    use_case._recommender.recommend.return_value = []
+    use_case._book_data_port.match_query_embeddings.return_value = {"9780000000001": 0.7}
+
+    use_case._semantic_retrieval([0.1], top_k=5)
+    assert use_case._recommender.recommend.call_args.kwargs["use_diversity"] is False
+
+    use_case._semantic_retrieval([0.1], top_k=5, seed_ids=["9780000000002"])
+    assert use_case._recommender.recommend.call_args.kwargs["use_diversity"] is True

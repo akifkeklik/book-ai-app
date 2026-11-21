@@ -6,6 +6,7 @@ The BookService is instantiated once at module import time (singleton pattern).
 import inspect
 import json
 import logging
+import re
 from functools import wraps
 
 from flask import Blueprint, Response, g, jsonify, request
@@ -927,6 +928,29 @@ def add_catalog_book():
     return jsonify(payload), 201 if created else 200
 
 
+def _context_isbns(data: dict) -> list:
+    """ISBNs of the books in the previous answer, sent by the chat client so a follow-up question
+    ("tell me more about it") can be answered about them. Untrusted input: anything that is not a
+    valid ISBN is dropped, and at most five are kept. Missing or malformed means "no context"."""
+    from backend.utils.preprocess import normalize_isbn
+
+    raw = data.get("context_isbns")
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for item in raw[:20]:
+        isbn = normalize_isbn(item) if isinstance(item, (str, int)) and not isinstance(item, bool) else None
+        if isbn and re.fullmatch(r"\d{13}|\d{9}[\dX]", isbn) and isbn not in out:
+            out.append(isbn)
+    return out[:5]
+
+
+def _context_kwargs(data: dict) -> dict:
+    """`context_isbns` only when the client sent some, so callers without context keep the original call."""
+    isbns = _context_isbns(data)
+    return {"context_isbns": isbns} if isbns else {}
+
+
 @discovery_bp.route("/ai/chat", methods=["POST"])
 @optional_auth
 @rate_limit_ai
@@ -958,7 +982,7 @@ def ai_chat():
 
     user_id = getattr(g, "user_id", None)  # Optional if auth is not strictly enforced here
     try:
-        result = _process_rag_query_uc.execute(query, user_id=user_id)
+        result = _process_rag_query_uc.execute(query, user_id=user_id, **_context_kwargs(data))
         # result contains: answer, referenced_books, status
         return jsonify(result), 200
     except Exception as exc:
@@ -999,10 +1023,11 @@ def ai_chat_stream():
         )
 
     user_id = getattr(g, "user_id", None)
+    context_kwargs = _context_kwargs(data)
 
     def generate_events():
         try:
-            result = _process_rag_query_uc.execute(query, user_id=user_id)
+            result = _process_rag_query_uc.execute(query, user_id=user_id, **context_kwargs)
             referenced_books = result.get("referenced_books", [])
             full_answer = result.get("answer", "")
             action = result.get("action")
@@ -1022,7 +1047,19 @@ def ai_chat_stream():
                     yield f"event: chunk\ndata: {json.dumps({'delta': chunk}, ensure_ascii=False)}\n\n"
 
             # 3. Done event
-            yield f"event: done\ndata: {json.dumps({'answer': full_answer, 'referenced_books': referenced_books, 'status': status, 'action': action}, ensure_ascii=False)}\n\n"
+            # source / retrieval_mode tell the UI how the answer was produced (Gemini RAG,
+            # deterministic catalog lookup, or a fallback), so it never claims an LLM answer
+            # that did not happen. Additive fields; existing clients ignore them.
+            metrics = result.get("metrics") or {}
+            done_payload = {
+                "answer": full_answer,
+                "referenced_books": referenced_books,
+                "status": status,
+                "action": action,
+                "source": metrics.get("source"),
+                "retrieval_mode": metrics.get("retrieval_mode"),
+            }
+            yield f"event: done\ndata: {json.dumps(done_payload, ensure_ascii=False)}\n\n"
         except Exception:
             yield f"event: error\ndata: {json.dumps({'error': 'An error occurred during AI processing.'})}\n\n"
 

@@ -535,11 +535,14 @@ class BookRecommender:
 
         # Process semantic scores if provided
         semantic_vec = np.zeros(len(self.df))
+        # Catalog rows that received a vector score (any edition); used only to label results.
+        semantic_indices: set = set()
         if semantic_scores:
             for isbn, score in semantic_scores.items():
                 indices = self.engine.find_all_indices(isbn, validate=False)
                 for idx in indices:
                     semantic_vec[idx] = score
+                    semantic_indices.add(idx)
 
         # Compute Profile Affinity Bonuses
         affinity_scores = np.zeros(len(self.df))
@@ -676,6 +679,7 @@ class BookRecommender:
                     preferred_genres=preferred_genres,
                     preferred_authors=preferred_authors,
                     seed_sources=seed_sources,
+                    semantic_indices=semantic_indices,
                 )
             )
 
@@ -765,17 +769,29 @@ class BookRecommender:
         preferred_genres: Optional[List[str]] = None,
         preferred_authors: Optional[List[str]] = None,
         seed_sources: Optional[Dict[str, str]] = None,
+        semantic_indices: Optional[set] = None,
     ) -> Dict[str, str]:
-        """Generate an explainability payload and natural reasoning for a recommendation."""
+        """
+        Generate an explainability payload and natural reasoning for a recommendation.
+
+        `semantic_indices` holds the catalog rows that received a vector score in this request
+        (recommend() passes it). A book is called a semantic match only if its row is in it, so a
+        book that ranked on popularity alone is never described as matching the search.
+        """
         rec_idx = self.engine.find_index(recommended_book["isbn13"], validate=False)
         if rec_idx is None:
             return {}
 
-        isbn = recommended_book.get("isbn13", "")
-        has_semantic_match = semantic_scores and isbn in semantic_scores
+        if semantic_indices is not None:
+            has_semantic_match = rec_idx in semantic_indices
+        else:
+            isbn = normalize_isbn(recommended_book.get("isbn13", ""))
+            has_semantic_match = bool(semantic_scores) and isbn in {normalize_isbn(k) for k in semantic_scores}
 
-        rec_cats = set(re.split(r"\s*[,|]\s*", str(recommended_book.get("categories", "")).lower()))
-        cat_list = [c for c in rec_cats if c]
+        # Catalog order, not set order, so the explanation text is the same on every run.
+        cat_list = list(dict.fromkeys(
+            c for c in re.split(r"\s*[,|]\s*", str(recommended_book.get("categories", "")).lower()) if c
+        ))
 
         if not seed_indices:
             # Check profile matches first
@@ -801,16 +817,29 @@ class BookRecommender:
                             "confidence": "medium",
                             "is_cold_start": False,
                         }
-            # Pure semantic search case
-            if cat_list:
-                explanation = f"Bu kitap, aramanızla anlamsal olarak eşleşti ve {cat_list[0]} kategorisinde yer alıyor."
+            # No seeds: the book either received a vector score (a semantic match), or it ranked
+            # on the profile / popularity terms. Only the first is described as matching the search.
+            # confidence / is_cold_start keep their previous values: they describe the user's
+            # evidence (none without seeds), not the match.
+            if has_semantic_match:
+                if cat_list:
+                    explanation = f"Bu kitap, aramanız için anlamsal arama sonuçlarında yer aldı ve {cat_list[0]} kategorisinde."
+                else:
+                    explanation = "Bu kitap, aramanız için anlamsal arama sonuçlarında yer aldı."
+                # A vector score only means the book is among the nearest neighbours (the RPC threshold is
+                # 0.0), so the label says "found by semantic search", never "matches".
+                reason, explanation_type = "Found by semantic search", "semantic_match"
+            elif preferred_genres or preferred_authors:
+                explanation = "Bu kitap, belirttiğiniz okuma tercihleri doğrultusunda seçildi."
+                reason, explanation_type = "Curated based on your taste profile", "category_affinity"
             else:
-                explanation = "Bu kitap, arama niyetinizle en yüksek anlamsal benzerliğe sahip olduğu için önerildi."
+                explanation = "Bu kitap, Libris genelindeki popüler ve yüksek puanlı eserler arasından seçildi."
+                reason, explanation_type = "Popular with Libris readers", "trending_catalog"
             return {
                 "explanation": explanation,
                 "explanation_source_book": "",
-                "recommendation_reason": "Trending on Libris right now",
-                "explanation_type": "trending_catalog",
+                "recommendation_reason": reason,
+                "explanation_type": explanation_type,
                 "confidence": "cold_start",
                 "is_cold_start": True,
             }
@@ -871,7 +900,9 @@ class BookRecommender:
         most_similar_seed_idx = seed_indices[np.argmax(sim_scores)]
         source_book = self.df.iloc[most_similar_seed_idx]
         source_cats = set(re.split(r"\s*[,|]\s*", str(source_book.get("categories", "")).lower()))
-        common_genres = rec_cats.intersection(source_cats)
+        # In the recommended book's catalog order: a set intersection made the named genre depend
+        # on PYTHONHASHSEED, so the same request could explain itself differently per process.
+        common_genres = [c for c in cat_list if c in source_cats]
 
         # Determine source interaction type for personalized attribution
         src_clean_isbn = str(source_book.get("isbn13", "")).strip().replace("-", "").lower()
@@ -942,9 +973,9 @@ class BookRecommender:
             if has_semantic_match:
                 # Acknowledge both user preference and semantic query
                 if common_genres:
-                    explanation = f"Aramanızla eşleşmesinin yanı sıra, {verb_tr} '{source_book['title']}' kitabıyla ortak ({list(common_genres)[0]}) türünde olduğu için önerildi."
+                    explanation = f"Anlamsal arama sonuçlarında yer aldı; ayrıca {verb_tr} '{source_book['title']}' kitabıyla ortak ({common_genres[0]}) türünde olduğu için önerildi."
                 else:
-                    explanation = f"Aramanızla güçlü bir eşleşme sağladı ve okuma geçmişinizdeki '{source_book['title']}' kitabına benzer bir atmosfere sahip."
+                    explanation = f"Anlamsal arama sonuçlarında yer aldı ve okuma geçmişinizdeki '{source_book['title']}' kitabına benzer bir atmosfere sahip."
             else:
                 # Standard personalized recommendation
                 if common_genres:
