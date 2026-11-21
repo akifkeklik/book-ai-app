@@ -45,6 +45,9 @@ export default defineConfig({
         SUPABASE_DB_URL: '',
         DATABASE_URL: '',
         LLM_API_KEY: '',
+        // The root .env also carries GEMINI_API_KEY (Config falls back to it); without blanking
+        // it the "hermetic" backend called the real Gemini API.
+        GEMINI_API_KEY: '',
       },
     },
     {

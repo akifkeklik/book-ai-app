@@ -153,6 +153,14 @@ jobs:
           ruff check backend/
         continue-on-error: false
 
+      # Offline RAG contracts: source accuracy, out-of-context ISBN rejection, abstention and
+      # degraded-mode labelling. LLM, embeddings and vector store are mocked; no secrets needed.
+      # Runs first so a grounding regression is reported under its own name. The full suite
+      # below runs these files again (a few seconds).
+      - name: RAG Grounding & Degraded-Mode Regression
+        run: |
+          PYTHONPATH=. python -m pytest backend/tests/test_rag*.py -v --tb=short
+
       - name: Execute Fast Pytest Suite
         run: |
           PYTHONPATH=. python -m pytest backend/tests/ -v --tb=short
