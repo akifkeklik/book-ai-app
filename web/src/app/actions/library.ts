@@ -14,6 +14,15 @@ function safeRevalidatePath(path: string) {
   }
 }
 
+/**
+ * Database errors carry table, column and constraint names. Log them on the server and hand the
+ * client only a stable description of what failed.
+ */
+function dbFailure(context: string, err: { message?: string } | null | undefined): string {
+  console.error(`[library] ${context}:`, err?.message ?? err);
+  return context;
+}
+
 function isLegacyTableMock(client: unknown): boolean {
   return (
     !!client &&
@@ -90,7 +99,7 @@ export async function getLibraryBooks(): Promise<{
       return {
         success: false,
         items: [],
-        error: interactionsError.message || 'Failed to fetch library interactions',
+        error: dbFailure('Failed to fetch library interactions', interactionsError),
       };
     }
 
@@ -223,7 +232,7 @@ export async function getLibraryBooks(): Promise<{
     }
 
     // Sort by addedAt descending
-    libraryItems.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+    libraryItems.sort((a, b) => (Date.parse(b.addedAt) || 0) - (Date.parse(a.addedAt) || 0));
 
     return {
       success: true,
@@ -288,7 +297,7 @@ export async function removeLibraryItem(bookId: string): Promise<{
       .eq('book_id', bookId);
 
     if (deleteInteractionError) {
-      return { success: false, error: deleteInteractionError.message };
+      return { success: false, error: dbFailure('Failed to remove library item', deleteInteractionError) };
     }
 
     // 2. Also delete from mobile favorites table
@@ -310,7 +319,7 @@ export async function removeLibraryItem(bookId: string): Promise<{
       }
       return {
         success: false,
-        error: `Failed to remove from favorites table: ${deleteFavError.message}`,
+        error: dbFailure('Failed to remove from favorites table', deleteFavError),
       };
     }
 
@@ -385,7 +394,7 @@ export async function removeFavoriteItem(bookId: string): Promise<{
       .eq('book_id', bookId);
 
     if (deleteFavError) {
-      return { success: false, error: deleteFavError.message };
+      return { success: false, error: dbFailure('Failed to remove favorite', deleteFavError) };
     }
 
     // 2. In user_interactions, ONLY delete if it is a pure favorite ('favorite').
@@ -412,7 +421,7 @@ export async function removeFavoriteItem(bookId: string): Promise<{
         }
         return {
           success: false,
-          error: `Failed to remove favorite interaction: ${deleteInteractionError.message}`,
+          error: dbFailure('Failed to remove favorite interaction', deleteInteractionError),
         };
       }
     }
@@ -494,7 +503,7 @@ export async function addFavoriteItem(bookId: string): Promise<{
     );
 
     if (favUpsertError) {
-      return { success: false, error: favUpsertError.message };
+      return { success: false, error: dbFailure('Failed to add favorite', favUpsertError) };
     }
 
     // 4. In user_interactions, ONLY insert 'favorite' if NO prior interaction exists.
@@ -518,7 +527,7 @@ export async function addFavoriteItem(bookId: string): Promise<{
 
         return {
           success: false,
-          error: `Failed to record favorite interaction: ${interactionError.message}`,
+          error: dbFailure('Failed to record favorite interaction', interactionError),
         };
       }
     }
@@ -599,7 +608,7 @@ export async function updateLibraryItemStatus(
     );
 
     if (upsertError) {
-      return { success: false, error: upsertError.message };
+      return { success: false, error: dbFailure('Failed to update item status', upsertError) };
     }
 
     // 2. Synchronize favorites table for cross-platform consistency
@@ -643,7 +652,7 @@ export async function updateLibraryItemStatus(
         }
         return {
           success: false,
-          error: `Failed to synchronize favorites: ${favUpsertError.message}`,
+          error: dbFailure('Failed to synchronize favorites', favUpsertError),
         };
       }
     }
@@ -720,7 +729,7 @@ export async function getBookInteraction(bookId: string): Promise<{
         interaction: null,
         isFavorite: false,
         isAuthenticated: true,
-        error: interactionError.message,
+        error: dbFailure('Failed to retrieve book interaction', interactionError),
       };
     }
 

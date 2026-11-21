@@ -166,17 +166,17 @@ export function BookCard({ book, userInteraction, isFavorite }: BookCardProps) {
               gap: '4px',
               marginTop: '6px',
               padding: '3px 8px',
-              background: 'rgba(139, 92, 246, 0.1)',
+              background: 'color-mix(in srgb, var(--accent) 10%, transparent)',
               borderRadius: '6px',
-              border: '1px solid rgba(139, 92, 246, 0.2)',
+              border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
             }}
             title={localizedReason}
           >
-            <Sparkles size={11} color="var(--accent)" style={{ flexShrink: 0 }} />
+            <Sparkles size={11} color="var(--accent-ink)" style={{ flexShrink: 0 }} />
             <p
               style={{
                 fontSize: '0.75rem',
-                color: 'var(--accent)',
+                color: 'var(--accent-ink)',
                 fontStyle: 'italic',
                 fontWeight: 500,
                 overflow: 'hidden',

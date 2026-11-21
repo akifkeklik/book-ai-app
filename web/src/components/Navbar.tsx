@@ -4,13 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { usePreferences } from './PreferencesProvider';
-import { BookOpen, LogOut, Compass, Sparkles, Bookmark, Settings, Globe, Search, Brain } from 'lucide-react';
+import { BookOpen, LogOut, Compass, Sparkles, Bookmark, Settings, Globe, Search, Brain, Sun, Moon } from 'lucide-react';
 import { LANGUAGES } from '@/lib/preferences';
 
 export function Navbar() {
   const pathname = usePathname();
   const { user, loading, signOut } = useAuth();
-  const { preferences, setLanguage, t } = usePreferences();
+  const { preferences, setLanguage, setThemeMode, t } = usePreferences();
 
   const isActive = (route: string) => {
     if (route === '/') return pathname === '/';
@@ -18,6 +18,12 @@ export function Navbar() {
   };
 
   const nextLanguage = LANGUAGES[(LANGUAGES.indexOf(preferences.language) + 1) % LANGUAGES.length];
+
+  // Reads the applied theme from the DOM so "system" resolves to what the user actually sees.
+  const toggleThemeMode = () => {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    setThemeMode(isDark ? 'light' : 'dark');
+  };
 
   const handleOpenSpotlight = () => {
     if (typeof window !== 'undefined') {
@@ -57,7 +63,7 @@ export function Navbar() {
                 fontSize: '0.65rem',
                 padding: '1px 5px',
                 borderRadius: '4px',
-                background: 'rgba(255, 255, 255, 0.08)',
+                background: 'var(--tint-3)',
                 border: '1px solid var(--card-border)',
                 fontFamily: 'var(--font-mono)',
               }}
@@ -89,6 +95,24 @@ export function Navbar() {
               <span className="nav-link-text">{t('nav_profile_settings')}</span>
             </Link>
           </div>
+
+          {/* Quick light/dark toggle. Icon and label follow html[data-theme] via CSS, so the
+              server and client markup always match. */}
+          <button
+            type="button"
+            onClick={toggleThemeMode}
+            id="nav-theme-toggle"
+            className="btn btn-outline nav-icon-btn theme-toggle"
+          >
+            <span className="theme-toggle-to-light">
+              <Sun size={15} color="var(--primary)" aria-hidden="true" />
+              <span className="sr-only">{t('theme_switch_light')}</span>
+            </span>
+            <span className="theme-toggle-to-dark">
+              <Moon size={15} color="var(--primary)" aria-hidden="true" />
+              <span className="sr-only">{t('theme_switch_dark')}</span>
+            </span>
+          </button>
 
           {/* Quick Language Toggle */}
           <button

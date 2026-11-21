@@ -58,7 +58,7 @@ export function CatalogBookList({
           setCurrentPage(nextPage);
           setStatusMessage(t('catalog_loaded_more_sr', { added: newBooks.length, shown: books.length + newBooks.length, total: totalBooks }));
         } else {
-          setError(res.error || 'Failed to load more books. Please try again.');
+          setError(t('catalog_more_error'));
         }
       } catch {
         setError(t('catalog_more_error'));
@@ -165,7 +165,7 @@ export function CatalogBookList({
               fontSize: '0.95rem',
               padding: '0.5rem 1rem',
               borderRadius: '9999px',
-              background: 'rgba(255, 255, 255, 0.04)',
+              background: 'var(--tint-2)',
             }}
           >
             <Check size={16} color="var(--primary)" />

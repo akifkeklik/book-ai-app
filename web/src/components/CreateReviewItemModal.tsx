@@ -57,7 +57,7 @@ export function CreateReviewItemModal({
         onCreated(res.item);
         onClose();
       } else {
-        setError(res.error || 'Failed to create question.');
+        setError(t('review_item_create_error'));
       }
     } catch {
       setError(t('unexpected_error'));

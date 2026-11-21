@@ -57,7 +57,7 @@ export default function FavoritesPage() {
       if (res.success) {
         setItems(res.items);
       } else {
-        setError(res.error || 'Failed to load library items');
+        setError(t('library_load_error'));
       }
     } catch {
       setError(t('library_load_error'));
@@ -77,7 +77,7 @@ export default function FavoritesPage() {
             if (res.success) {
               setItems(res.items);
             } else {
-              setError(res.error || 'Failed to load library items');
+              setError(t('library_load_error'));
             }
             setLoading(false);
           }
@@ -133,7 +133,7 @@ export default function FavoritesPage() {
           return (b.book.averageRating || 0) - (a.book.averageRating || 0);
         }
         // Default: recent (addedAt desc)
-        return new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime();
+        return (Date.parse(b.addedAt) || 0) - (Date.parse(a.addedAt) || 0);
       });
   }, [items, activeTab, searchQuery, sortBy]);
 
@@ -149,7 +149,7 @@ export default function FavoritesPage() {
         const res = await removeLibraryItem(bookId);
         if (!res.success) {
           setItems(previousItems); // Rollback
-          setError(res.error || 'Failed to remove item');
+          setError(t('library_remove_error'));
         }
       } catch {
         setItems(previousItems); // Rollback
@@ -174,7 +174,7 @@ export default function FavoritesPage() {
         const res = await updateLibraryItemStatus(bookId, newStatus);
         if (!res.success) {
           setItems(previousItems); // Rollback
-          setError(res.error || 'Failed to update book status');
+          setError(t('library_status_error'));
         }
       } catch {
         setItems(previousItems); // Rollback
@@ -198,7 +198,7 @@ export default function FavoritesPage() {
               width: '64px',
               height: '64px',
               borderRadius: '50%',
-              background: 'rgba(59, 130, 246, 0.15)',
+              background: 'color-mix(in srgb, var(--primary) 15%, transparent)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -363,7 +363,7 @@ export default function FavoritesPage() {
             className={`library-tab-btn ${activeTab === 'notes' ? 'active' : ''}`}
             id="tab-notes"
           >
-            <PenTool size={16} color="var(--accent, #a78bfa)" />
+            <PenTool size={16} color="var(--accent, var(--accent))" />
             <span>{t('tab_notes')}</span>
             <span style={{ fontSize: '0.75rem', opacity: 0.75 }}>({notes.length})</span>
           </button>
@@ -444,9 +444,9 @@ export default function FavoritesPage() {
                     borderRadius: '9999px',
                     fontSize: '0.825rem',
                     cursor: 'pointer',
-                    background: isSel ? 'var(--primary)' : 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid ' + (isSel ? 'var(--primary)' : 'rgba(255, 255, 255, 0.1)'),
-                    color: isSel ? '#fff' : 'var(--muted)',
+                    background: isSel ? 'var(--primary)' : 'var(--tint-2)',
+                    border: '1px solid ' + (isSel ? 'var(--primary)' : 'var(--tint-4)'),
+                    color: isSel ? 'var(--on-primary)' : 'var(--muted)',
                     fontWeight: isSel ? 600 : 400,
                   }}
                 >
@@ -500,12 +500,12 @@ export default function FavoritesPage() {
                     ? '#fbbf24'
                     : n.noteType === 'question'
                     ? '#34d399'
-                    : 'var(--accent, #a78bfa)';
+                    : 'var(--accent, var(--accent))';
                   const badgeBg = n.noteType === 'key_takeaway'
                     ? 'rgba(245, 158, 11, 0.15)'
                     : n.noteType === 'question'
                     ? 'rgba(16, 185, 129, 0.15)'
-                    : 'rgba(139, 92, 246, 0.15)';
+                    : 'color-mix(in srgb, var(--accent) 15%, transparent)';
 
                   return (
                     <article
@@ -577,9 +577,9 @@ export default function FavoritesPage() {
                               width: '100%',
                               padding: '0.6rem',
                               borderRadius: '8px',
-                              background: 'rgba(0,0,0,0.3)',
-                              color: '#fff',
-                              border: '1px solid rgba(255,255,255,0.15)',
+                              background: 'var(--surface-subtle)',
+                              color: 'var(--text-primary)',
+                              border: '1px solid var(--tint-4)',
                               outline: 'none',
                               fontSize: '0.9rem',
                             }}
@@ -589,7 +589,7 @@ export default function FavoritesPage() {
                               type="button"
                               onClick={() => setEditingNoteId(null)}
                               className="btn"
-                              style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.08)' }}
+                              style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem', background: 'var(--tint-3)' }}
                             >
                               {t('cancel')}
                             </button>
@@ -610,7 +610,7 @@ export default function FavoritesPage() {
                           </div>
                         </div>
                       ) : (
-                        <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: 1.6, color: 'rgba(255,255,255,0.88)', whiteSpace: 'pre-wrap' }}>
+                        <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: 1.6, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>
                           {n.content}
                         </p>
                       )}
@@ -635,7 +635,7 @@ export default function FavoritesPage() {
               width: '56px',
               height: '56px',
               borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.05)',
+              background: 'var(--tint-2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -666,7 +666,7 @@ export default function FavoritesPage() {
               <span>{t('explore_catalog_cta')}</span>
             </Link>
             <Link href="/ai-discovery" className="btn btn-outline">
-              <Sparkles size={16} color="var(--accent)" />
+              <Sparkles size={16} color="var(--accent-ink)" />
               <span>{t('ai_discovery_cta')}</span>
             </Link>
           </div>

@@ -150,13 +150,14 @@ export function SpotlightSearch() {
             setResults(data.books || []);
             setSelectedIndex(0);
           } else {
-            setError(data.error || 'Failed to search catalog');
+            setError(t('search_error'));
           }
           setLoading(false);
         }
       } catch (err: unknown) {
         if (controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : 'Failed to search catalog');
+        console.warn('[search]', err);
+        setError(t('search_error'));
         setLoading(false);
       }
     }, 220);
@@ -165,7 +166,7 @@ export function SpotlightSearch() {
       clearTimeout(debounceTimer);
       controller.abort();
     };
-  }, [query]);
+  }, [query, t]);
 
   // Navigate to book
   const handleSelectBook = (book: Book) => {
@@ -297,7 +298,7 @@ export function SpotlightSearch() {
             onClick={closeSpotlight}
             aria-label={t('spot_close')}
             style={{
-              background: 'rgba(255, 255, 255, 0.08)',
+              background: 'var(--tint-3)',
               border: '1px solid var(--card-border)',
               borderRadius: '6px',
               color: 'var(--text-muted)',
@@ -393,7 +394,7 @@ export function SpotlightSearch() {
                   padding: '0.65rem 0.85rem',
                   borderRadius: '10px',
                   cursor: 'pointer',
-                  background: isSelected ? 'var(--card-hover, rgba(255, 255, 255, 0.08))' : 'transparent',
+                  background: isSelected ? 'var(--card-hover, var(--tint-3))' : 'transparent',
                   border: isSelected ? '1px solid var(--border)' : '1px solid transparent',
                   transition: 'background 0.15s ease',
                 }}

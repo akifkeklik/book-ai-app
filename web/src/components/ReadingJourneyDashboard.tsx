@@ -133,8 +133,8 @@ export function ReadingJourneyDashboard({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ffffff',
-              boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)',
+              color: 'var(--on-primary)',
+              boxShadow: '0 4px 12px color-mix(in srgb, var(--primary) 25%, transparent)',
             }}
           >
             <Trophy size={22} />
@@ -150,7 +150,7 @@ export function ReadingJourneyDashboard({
                   fontWeight: 600,
                   padding: '2px 8px',
                   borderRadius: '9999px',
-                  background: 'rgba(99, 102, 241, 0.12)',
+                  background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
                   color: 'var(--primary)',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -318,7 +318,7 @@ export function ReadingJourneyDashboard({
           <div className="saas-metric-footer">
             <span className="saas-pulse-dot amber" />
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}>
-              {readingBooks.length > 0 ? (readingBooks[0].book?.title || 'Active read') : 'Shelf ready for next read'}
+              {readingBooks.length > 0 ? (readingBooks[0].book?.title || t('journey_active_read')) : t('journey_shelf_ready')}
             </span>
           </div>
         </div>
@@ -327,7 +327,7 @@ export function ReadingJourneyDashboard({
         <div className="saas-metric-card">
           <div className="saas-metric-header">
             <span className="saas-metric-label">{t('status_want_to_read')}</span>
-            <div className="saas-metric-icon" style={{ background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.28)' }}>
+            <div className="saas-metric-icon" style={{ background: 'color-mix(in srgb, var(--primary) 12%, transparent)', color: 'var(--primary)', borderColor: 'color-mix(in srgb, var(--primary) 28%, transparent)' }}>
               <Bookmark size={16} />
             </div>
           </div>
@@ -418,7 +418,7 @@ export function ReadingJourneyDashboard({
           style={{
             height: '10px',
             borderRadius: '9999px',
-            background: 'rgba(255, 255, 255, 0.08)',
+            background: 'var(--tint-3)',
             overflow: 'hidden',
             position: 'relative',
           }}
@@ -488,8 +488,8 @@ export function ReadingJourneyDashboard({
                     style={{
                       height: d.height,
                       background: d.active
-                        ? 'linear-gradient(180deg, #38bdf8 0%, #0284c7 100%)'
-                        : 'linear-gradient(180deg, rgba(56, 189, 248, 0.7) 0%, rgba(14, 165, 233, 0.3) 100%)',
+                        ? 'linear-gradient(180deg, var(--primary) 0%, var(--primary-hover) 100%)'
+                        : 'linear-gradient(180deg, color-mix(in srgb, var(--primary) 70%, transparent) 0%, color-mix(in srgb, var(--primary) 30%, transparent) 100%)',
                     }}
                   />
                 </div>
@@ -505,8 +505,8 @@ export function ReadingJourneyDashboard({
         <div
           className="next-book-spotlight"
           style={{
-            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.12) 100%)',
-            border: '1px solid rgba(139, 92, 246, 0.3)',
+            background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, transparent) 0%, color-mix(in srgb, var(--accent) 12%, transparent) 100%)',
+            border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
             borderRadius: '16px',
             padding: '1.25rem',
             marginBottom: '1.75rem',
@@ -554,8 +554,8 @@ export function ReadingJourneyDashboard({
                 gap: '4px',
                 padding: '2px 8px',
                 borderRadius: '6px',
-                background: 'rgba(139, 92, 246, 0.18)',
-                color: 'var(--accent)',
+                background: 'color-mix(in srgb, var(--accent) 18%, transparent)',
+                color: 'var(--accent-ink)',
                 fontSize: '0.72rem',
                 fontWeight: 700,
                 textTransform: 'uppercase',
@@ -584,7 +584,7 @@ export function ReadingJourneyDashboard({
               <p
                 style={{
                   fontSize: '0.78rem',
-                  color: 'var(--accent)',
+                  color: 'var(--accent-ink)',
                   margin: 0,
                   fontStyle: 'italic',
                 }}

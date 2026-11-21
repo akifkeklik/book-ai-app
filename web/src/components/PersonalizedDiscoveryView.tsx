@@ -119,7 +119,7 @@ export function PersonalizedDiscoveryView() {
           setIsColdStart(Boolean(recsRes.isColdStart));
           setEvidenceCoverage(recsRes.evidenceCoverage || null);
         } else {
-          setError(recsRes.error || 'Failed to load recommendations');
+          setError(t('pd_load_error'));
         }
 
         if (libraryRes?.success && Array.isArray(libraryRes.items)) {
@@ -151,7 +151,7 @@ export function PersonalizedDiscoveryView() {
         setLoading(false);
       }
     },
-    [selectedCategory, excludeCompleted]
+    [selectedCategory, excludeCompleted, t]
   );
 
   const isUnauthenticated = !authLoading && !user;
@@ -184,7 +184,7 @@ export function PersonalizedDiscoveryView() {
             setIsColdStart(Boolean(recsRes.isColdStart));
             setEvidenceCoverage(recsRes.evidenceCoverage || null);
           } else {
-            setError(recsRes.error || 'Failed to load recommendations');
+            setError(t('pd_load_error'));
           }
 
           if (libraryRes?.success && Array.isArray(libraryRes.items)) {
@@ -222,7 +222,7 @@ export function PersonalizedDiscoveryView() {
     return () => {
       ignore = true;
     };
-  }, [user, authLoading, selectedCategory, excludeCompleted]);
+  }, [user, authLoading, selectedCategory, excludeCompleted, t]);
 
   // Handle switching category scope (calls backend /api/recommend/personalized?category=...)
   const handleSelectCategory = (category: string) => {
@@ -279,7 +279,7 @@ export function PersonalizedDiscoveryView() {
         setNotice(t('reset_personalization_success'));
         await loadData();
       } else {
-        setError(res.error || t('pd_reset_error'));
+        setError(t('pd_reset_error'));
       }
     } catch {
       setError(t('pd_reset_error'));
@@ -321,7 +321,7 @@ export function PersonalizedDiscoveryView() {
           const restored = [...originalBooks];
           setBooks(restored);
         }
-        setError(res.error || t('dismiss_error'));
+        setError(t('dismiss_error'));
       }
     } catch {
       // Rollback on unexpected failure
@@ -367,7 +367,7 @@ export function PersonalizedDiscoveryView() {
           next.set(bookId, currentEntry);
           return next;
         });
-        setError(res.error || 'Failed to update favorites');
+        setError(t('pd_favorite_error'));
       }
     } catch {
       // Rollback
@@ -448,7 +448,7 @@ export function PersonalizedDiscoveryView() {
           return next;
         });
         setLibraryItems(previousItems);
-        setError(res.error || 'Failed to update reading shelf');
+        setError(t('pd_shelf_error'));
       }
     } catch {
       // Rollback
@@ -490,7 +490,7 @@ export function PersonalizedDiscoveryView() {
               width: '64px',
               height: '64px',
               borderRadius: '50%',
-              background: 'rgba(99, 102, 241, 0.15)',
+              background: 'color-mix(in srgb, var(--primary) 15%, transparent)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -546,9 +546,9 @@ export function PersonalizedDiscoveryView() {
               gap: '0.45rem',
               padding: '0.3rem 0.85rem',
               borderRadius: '9999px',
-              background: 'rgba(139, 92, 246, 0.12)',
-              border: '1px solid rgba(139, 92, 246, 0.28)',
-              color: 'var(--accent)',
+              background: 'color-mix(in srgb, var(--accent) 12%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--accent) 28%, transparent)',
+              color: 'var(--accent-ink)',
               fontSize: '0.8rem',
               fontWeight: 600,
               marginBottom: '0.75rem',
@@ -685,8 +685,8 @@ export function PersonalizedDiscoveryView() {
             padding: '1.25rem 1.5rem',
             borderRadius: '16px',
             marginBottom: '1.5rem',
-            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(59, 130, 246, 0.08))',
-            border: '1px solid rgba(139, 92, 246, 0.25)',
+            background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), color-mix(in srgb, var(--primary) 8%, transparent))',
+            border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -700,11 +700,11 @@ export function PersonalizedDiscoveryView() {
                 width: '40px',
                 height: '40px',
                 borderRadius: '10px',
-                background: 'rgba(139, 92, 246, 0.2)',
+                background: 'color-mix(in srgb, var(--accent) 20%, transparent)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'var(--accent)',
+                color: 'var(--accent-ink)',
                 flexShrink: 0,
               }}
             >
@@ -788,7 +788,7 @@ export function PersonalizedDiscoveryView() {
               width: '56px',
               height: '56px',
               borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.05)',
+              background: 'var(--tint-2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -800,7 +800,7 @@ export function PersonalizedDiscoveryView() {
             ) : activeFilter === 'reading' ? (
               <Bookmark size={28} color="var(--primary)" />
             ) : (
-              <Sparkles size={28} color="var(--accent)" />
+              <Sparkles size={28} color="var(--accent-ink)" />
             )}
           </div>
 

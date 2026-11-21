@@ -195,7 +195,7 @@ export function LearningDashboard({
         <div className="saas-metric-card">
           <div className="saas-metric-header">
             <span className="saas-metric-label">{t('reviews_due')}</span>
-            <div className="saas-metric-icon" style={{ background: 'rgba(192, 132, 252, 0.12)', color: '#c084fc', borderColor: 'rgba(192, 132, 252, 0.28)' }}>
+            <div className="saas-metric-icon" style={{ background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent-ink)', borderColor: 'color-mix(in srgb, var(--accent) 28%, transparent)' }}>
               <RotateCcw className="w-4 h-4" />
             </div>
           </div>
@@ -229,7 +229,7 @@ export function LearningDashboard({
         <div className="saas-metric-card">
           <div className="saas-metric-header">
             <span className="saas-metric-label">{t('retention_rate')}</span>
-            <div className="saas-metric-icon" style={{ background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.28)' }}>
+            <div className="saas-metric-icon" style={{ background: 'color-mix(in srgb, var(--primary) 12%, transparent)', color: 'var(--primary)', borderColor: 'color-mix(in srgb, var(--primary) 28%, transparent)' }}>
               <Brain className="w-4 h-4" />
             </div>
           </div>
@@ -299,7 +299,7 @@ export function LearningDashboard({
             title={t('ld_proficient')}
             style={{
               width: `${Math.max(0, Math.min(30, 100 - (progress?.masteryScore || 15)))}%`,
-              background: 'linear-gradient(90deg, #0284c7, var(--electric-blue))',
+              background: 'linear-gradient(90deg, var(--primary-hover), var(--electric-blue))',
               transition: 'width 0.4s ease',
             }}
           />

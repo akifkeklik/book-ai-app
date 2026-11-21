@@ -52,7 +52,8 @@ function LoginForm() {
       router.push(safeRedirect);
       router.refresh();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to login');
+      console.warn('[login]', err);
+      setError(t('login_error'));
     } finally {
       setLoading(false);
     }

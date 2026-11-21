@@ -298,7 +298,10 @@ test('getBookInteraction: cleanly distinguishes database query error from "no in
     assert.equal(res.success, false);
     assert.equal(res.isAuthenticated, true);
     assert.equal(res.interaction, null);
-    assert.ok(res.error?.includes('relation user_interactions does not exist'));
+    // A query failure is reported as a failure, but the raw database message (which names
+    // tables and columns) stays in the server log instead of reaching the browser.
+    assert.equal(res.error, 'Failed to retrieve book interaction');
+    assert.ok(!res.error?.includes('user_interactions'));
   } finally {
     setTestClient(null);
   }

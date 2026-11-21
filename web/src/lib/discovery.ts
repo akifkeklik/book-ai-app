@@ -9,7 +9,14 @@ export type ClassifiedSource = 'favorites' | 'reading' | 'category' | 'general';
  * Follows exact semantics shared with Libris mobile client and backend ML recommender.
  */
 export function classifyRecommendation(book: Book): ClassifiedSource {
-  const reason = (book.recommendationReason || book.explanation || '').toLowerCase();
+  // Catalog-level labels carry no reading-history attribution, whatever their wording.
+  if (book.explanationType === 'trending_catalog' || book.explanationType === 'semantic_match') {
+    return 'general';
+  }
+  const reason = (book.recommendationReason || book.explanation || '')
+    .toLowerCase()
+    // "Popular with Libris readers" names other readers, not the user's reading.
+    .replace(/\breaders\b/g, '');
 
   if (
     reason.includes('favorite') ||

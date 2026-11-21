@@ -96,7 +96,8 @@ export function AddBookModal({ open, onClose, initialQuery = '' }: AddBookModalP
     const res = await addCatalogBookAction(form);
     setSaving(false);
     if (!res.success || !res.isbn13) {
-      setError(res.error || t('add_book_save_error'));
+      if (res.error) console.warn('[add-book]', res.error);
+      setError(t('add_book_save_error'));
       return;
     }
     onClose();

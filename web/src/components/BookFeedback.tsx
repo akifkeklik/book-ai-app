@@ -8,13 +8,15 @@ import {
   addFavoriteItem,
   removeFavoriteItem,
 } from '@/app/actions/library';
-import { ThumbsUp, ThumbsDown, Heart, Bookmark, Check, AlertCircle, Trash2, BookOpen, CheckCircle2, WifiOff } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Heart, Bookmark, Check, AlertCircle, Trash2, BookOpen, CheckCircle2 } from 'lucide-react';
 import { usePreferences } from '@/components/PreferencesProvider';
+import type { TranslationKey } from '@/lib/i18n';
 
 interface BookFeedbackProps {
   bookId: string;
   initialInteraction?: string | null;
   initialIsFavorite?: boolean;
+  /** Set when the saved status of this book could not be loaded; the detail is logged server-side. */
   interactionError?: string | null;
   isAuthenticated?: boolean;
 }
@@ -27,7 +29,7 @@ export default function BookFeedback({
   isAuthenticated = false,
 }: BookFeedbackProps) {
   const { t } = usePreferences();
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'offline_pending'>(
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>(
     interactionError ? 'error' : 'idle'
   );
 
@@ -41,8 +43,11 @@ export default function BookFeedback({
     initialInteraction === 'favorite' ? null : initialInteraction || null
   );
 
-  const [feedbackSuccessText, setFeedbackSuccessText] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(interactionError || null);
+  // Messages are kept as translation keys so they follow the UI language; server error text
+  // (English, sometimes technical) is never shown to the reader.
+  const [successKey, setSuccessKey] = useState<TranslationKey | null>(null);
+  const [errorKey, setErrorKey] = useState<TranslationKey | null>(interactionError ? 'fb_error_load' : null);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const [isOffline, setIsOffline] = useState<boolean>(
     typeof navigator !== 'undefined' ? !navigator.onLine : false
   );
@@ -67,47 +72,45 @@ export default function BookFeedback({
     }
   }, [bookId, isAuthenticated]);
 
+  const begin = () => {
+    setStatus('loading');
+    setErrorKey(null);
+    setSuccessKey(null);
+    setNeedsSignIn(false);
+  };
+
+  /** Shows a failure. There is no offline queue, so an offline change is rolled back and said so. */
+  const fail = (res: { error?: string } | null, errorKey: TranslationKey, rollback: () => void) => {
+    rollback();
+    setStatus('error');
+    if (res?.error === 'Unauthorized') {
+      setNeedsSignIn(true);
+      setErrorKey('fb_sign_in');
+      return;
+    }
+    const offline = isOffline || (typeof navigator !== 'undefined' && !navigator.onLine);
+    if (res?.error) console.warn('[BookFeedback]', res.error);
+    setErrorKey(offline ? 'fb_offline_not_saved' : res ? errorKey : 'fb_error_network');
+  };
+
   const handleFavoriteToggle = async () => {
     const currentlyFav = isFavorite;
-    const targetAction = currentlyFav ? 'remove' : 'add';
+    const rollback = () => setIsFavorite(currentlyFav);
 
     // Optimistic favorite update - does NOT mutate active reading status or signals!
     setIsFavorite(!currentlyFav);
-    setStatus('loading');
-    setErrorMessage(null);
-    setFeedbackSuccessText(null);
+    begin();
 
     try {
-      const res = currentlyFav
-        ? await removeFavoriteItem(bookId)
-        : await addFavoriteItem(bookId);
-
+      const res = currentlyFav ? await removeFavoriteItem(bookId) : await addFavoriteItem(bookId);
       if (res.success) {
         setStatus('success');
-        setFeedbackSuccessText(
-          currentlyFav ? 'Removed from favorites.' : 'Added to favorites! Recommendations updated.'
-        );
+        setSuccessKey(currentlyFav ? 'fb_fav_removed' : 'fb_fav_added');
       } else {
-        // Rollback on failure
-        setIsFavorite(currentlyFav);
-        setStatus('error');
-        setErrorMessage(
-          res.error === 'Unauthorized'
-            ? 'Please sign in to manage your favorites'
-            : res.error || (targetAction === 'remove' ? 'Failed to remove from favorites' : 'Failed to add to favorites')
-        );
+        fail(res, 'fb_error_favorite', rollback);
       }
     } catch {
-      const offline = isOffline || (typeof navigator !== 'undefined' && !navigator.onLine);
-      if (offline) {
-        setStatus('offline_pending');
-        setFeedbackSuccessText('Saved offline — will sync automatically when back online.');
-      } else {
-        // Rollback on non-offline unexpected error
-        setIsFavorite(currentlyFav);
-        setStatus('error');
-        setErrorMessage('Network connection issue. Please check your connection and try again.');
-      }
+      fail(null, 'fb_error_favorite', rollback);
     }
   };
 
@@ -121,80 +124,48 @@ export default function BookFeedback({
     const isClearing = activeFeedback === interaction;
     const targetInteraction = isClearing ? 'clear' : interaction;
     const previousFeedback = activeFeedback;
+    const rollback = () => setActiveFeedback(previousFeedback);
 
     // Optimistic update for feedback / reading status - does NOT touch isFavorite!
     setActiveFeedback(isClearing ? null : interaction);
-    setStatus('loading');
-    setErrorMessage(null);
-    setFeedbackSuccessText(null);
+    begin();
 
     try {
       const res = await submitFeedbackAction(bookId, targetInteraction);
       if (res.success) {
         setStatus('success');
-        setFeedbackSuccessText(
-          isClearing ? 'Status cleared! Recommendations updated.' : 'Preference saved! Recommendations updated.'
-        );
+        setSuccessKey(isClearing ? 'fb_cleared' : 'fb_saved');
       } else {
-        setActiveFeedback(previousFeedback);
-        setStatus('error');
-        setErrorMessage(
-          res.error === 'Unauthorized'
-            ? 'Please sign in to save feedback'
-            : res.error || (isClearing ? 'Failed to clear status' : 'Failed to save feedback')
-        );
+        fail(res, 'fb_error_save', rollback);
       }
     } catch {
-      const offline = isOffline || (typeof navigator !== 'undefined' && !navigator.onLine);
-      if (offline) {
-        setStatus('offline_pending');
-        setFeedbackSuccessText('Saved offline — will sync automatically when back online.');
-      } else {
-        setActiveFeedback(previousFeedback);
-        setStatus('error');
-        setErrorMessage('Network connection issue. Please check your connection and try again.');
-      }
+      fail(null, 'fb_error_save', rollback);
     }
   };
 
   const handleRemoveFromLibrary = async () => {
     const previousFav = isFavorite;
     const previousFeedback = activeFeedback;
+    const rollback = () => {
+      setIsFavorite(previousFav);
+      setActiveFeedback(previousFeedback);
+    };
 
     // Optimistic removal of all library and feedback associations
     setIsFavorite(false);
     setActiveFeedback(null);
-    setStatus('loading');
-    setErrorMessage(null);
-    setFeedbackSuccessText(null);
+    begin();
 
     try {
       const res = await removeLibraryItem(bookId);
       if (res.success) {
         setStatus('success');
-        setFeedbackSuccessText('Removed completely from your library.');
+        setSuccessKey('fb_removed_library');
       } else {
-        // Rollback both states on failure
-        setIsFavorite(previousFav);
-        setActiveFeedback(previousFeedback);
-        setStatus('error');
-        setErrorMessage(
-          res.error === 'Unauthorized'
-            ? 'Please sign in to manage your library'
-            : res.error || 'Failed to remove from library'
-        );
+        fail(res, 'fb_error_remove', rollback);
       }
     } catch {
-      const offline = isOffline || (typeof navigator !== 'undefined' && !navigator.onLine);
-      if (offline) {
-        setStatus('offline_pending');
-        setFeedbackSuccessText('Removal saved offline — will sync when back online.');
-      } else {
-        setIsFavorite(previousFav);
-        setActiveFeedback(previousFeedback);
-        setStatus('error');
-        setErrorMessage('Network connection issue. Please check your connection and try again.');
-      }
+      fail(null, 'fb_error_remove', rollback);
     }
   };
 
@@ -232,14 +203,14 @@ export default function BookFeedback({
           type="button"
           onClick={handleFavoriteToggle}
           disabled={status === 'loading'}
-          aria-label={isFavorite ? 'Remove from favorites' : 'Favorite book'}
-          title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+          aria-label={isFavorite ? t('fb_fav_remove_label') : t('fb_fav_add_label')}
+          title={isFavorite ? t('fb_fav_remove_label') : t('fb_fav_add_label')}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.4rem',
             padding: '0.55rem 1rem',
-            background: isFavorite ? 'rgba(236, 72, 153, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+            background: isFavorite ? 'rgba(236, 72, 153, 0.25)' : 'var(--tint-2)',
             color: isFavorite ? '#f472b6' : 'var(--foreground)',
             border: isFavorite ? '1px solid #ec4899' : '1px solid var(--card-border)',
             borderRadius: '9999px',
@@ -263,7 +234,7 @@ export default function BookFeedback({
             alignItems: 'center',
             gap: '0.4rem',
             padding: '0.55rem 1rem',
-            background: activeFeedback === 'want_to_read' ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeFeedback === 'want_to_read' ? 'color-mix(in srgb, var(--primary) 25%, transparent)' : 'var(--tint-2)',
             color: activeFeedback === 'want_to_read' ? 'var(--primary)' : 'var(--foreground)',
             border: activeFeedback === 'want_to_read' ? '1px solid var(--primary)' : '1px solid var(--card-border)',
             borderRadius: '9999px',
@@ -287,7 +258,7 @@ export default function BookFeedback({
             alignItems: 'center',
             gap: '0.4rem',
             padding: '0.55rem 1rem',
-            background: activeFeedback === 'reading' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeFeedback === 'reading' ? 'rgba(245, 158, 11, 0.25)' : 'var(--tint-2)',
             color: activeFeedback === 'reading' ? '#fbbf24' : 'var(--foreground)',
             border: activeFeedback === 'reading' ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid var(--card-border)',
             borderRadius: '9999px',
@@ -311,7 +282,7 @@ export default function BookFeedback({
             alignItems: 'center',
             gap: '0.4rem',
             padding: '0.55rem 1rem',
-            background: activeFeedback === 'finished' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeFeedback === 'finished' ? 'rgba(16, 185, 129, 0.25)' : 'var(--tint-2)',
             color: activeFeedback === 'finished' ? 'var(--success)' : 'var(--foreground)',
             border: activeFeedback === 'finished' ? '1px solid var(--success)' : '1px solid var(--card-border)',
             borderRadius: '9999px',
@@ -335,7 +306,7 @@ export default function BookFeedback({
             alignItems: 'center',
             gap: '0.4rem',
             padding: '0.55rem 1rem',
-            background: activeFeedback === 'like' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeFeedback === 'like' ? 'rgba(16, 185, 129, 0.25)' : 'var(--tint-2)',
             color: activeFeedback === 'like' ? 'var(--success)' : 'var(--foreground)',
             border: activeFeedback === 'like' ? '1px solid var(--success)' : '1px solid var(--card-border)',
             borderRadius: '9999px',
@@ -359,7 +330,7 @@ export default function BookFeedback({
             alignItems: 'center',
             gap: '0.4rem',
             padding: '0.55rem 1rem',
-            background: activeFeedback === 'dislike' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeFeedback === 'dislike' ? 'rgba(239, 68, 68, 0.25)' : 'var(--tint-2)',
             color: activeFeedback === 'dislike' ? 'var(--danger)' : 'var(--foreground)',
             border: activeFeedback === 'dislike' ? '1px solid var(--danger)' : '1px solid var(--card-border)',
             borderRadius: '9999px',
@@ -411,23 +382,14 @@ export default function BookFeedback({
         {status === 'success' && (
           <span style={{ color: 'var(--success)', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
             <Check size={14} />{' '}
-            {feedbackSuccessText ||
-              (isFavorite
-                ? 'Added to favorites! Recommendations updated.'
-                : 'Preference saved! Recommendations updated.')}
-          </span>
-        )}
-        {status === 'offline_pending' && (
-          <span style={{ color: '#fbbf24', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-            <WifiOff size={14} />{' '}
-            {feedbackSuccessText || 'Saved offline — will sync automatically when back online.'}
+            {t(successKey ?? 'fb_saved')}
           </span>
         )}
         {status === 'error' && (
           <span style={{ color: 'var(--danger)', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
             <AlertCircle size={14} style={{ flexShrink: 0 }} />
-            <span>{errorMessage || 'Could not save feedback. Please try again.'}</span>
-            {(errorMessage?.toLowerCase().includes('sign in') || errorMessage?.toLowerCase().includes('unauthorized')) && (
+            <span>{t(errorKey ?? 'fb_error_save')}</span>
+            {needsSignIn && (
               <Link
                 href={`/login?redirect=${encodeURIComponent(`/book/${bookId}`)}`}
                 style={{
@@ -437,7 +399,7 @@ export default function BookFeedback({
                   marginLeft: '0.35rem',
                 }}
               >
-                Sign in now &rarr;
+                {t('fb_sign_in_link')} &rarr;
               </Link>
             )}
           </span>

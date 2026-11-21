@@ -37,7 +37,7 @@ export function HomePersonalizationBanner({
           padding: '1.75rem 2rem',
           borderRadius: '16px',
           border: '1px solid var(--card-border)',
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.05) 100%)',
+          background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, transparent) 0%, color-mix(in srgb, var(--accent) 5%, transparent) 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
