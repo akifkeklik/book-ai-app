@@ -21,13 +21,19 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from backend.evaluation.retrieval import Catalog  # noqa: E402
-from backend.infrastructure.ml.recommender import BookRecommender, WEIGHT_POPULARITY  # noqa: E402
-from backend.scripts.run_rag_quality_eval import (  # noqa: E402
-    DATASET, QUERY_VECTORS, SNAPSHOT, grades_for, human_grades, load_judgment_rows, retrieval_metrics)
 from backend.config import Config  # noqa: E402
+from backend.evaluation.retrieval import Catalog  # noqa: E402
+from backend.infrastructure.ml.recommender import WEIGHT_POPULARITY, BookRecommender  # noqa: E402
+from backend.scripts.run_rag_quality_eval import (  # noqa: E402
+    DATASET,
+    QUERY_VECTORS,
+    SNAPSHOT,
+    grades_for,
+    human_grades,
+    load_judgment_rows,
+    retrieval_metrics,
+)
 from backend.utils.preprocess import normalize_isbn  # noqa: E402
-
 
 
 def candidates(vec, isbns, matrix, pool):
